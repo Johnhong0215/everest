@@ -75,11 +75,10 @@ export const eventStatusEnum = pgEnum("event_status", [
 ]);
 
 export const bookingStatusEnum = pgEnum("booking_status", [
-  "pending",
-  "confirmed",
-  "paid",
-  "cancelled",
-  "refunded"
+  "requested",
+  "accepted", 
+  "rejected",
+  "cancelled"
 ]);
 
 export const paymentStatusEnum = pgEnum("payment_status", [
@@ -119,7 +118,7 @@ export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => events.id),
   userId: varchar("user_id").notNull().references(() => users.id),
-  status: bookingStatusEnum("status").default("pending"),
+  status: bookingStatusEnum("status").default("requested"),
   paymentIntentId: varchar("payment_intent_id"),
   amountPaid: decimal("amount_paid", { precision: 8, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),

@@ -398,17 +398,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You already have a booking for this event" });
       }
       
-      // Create booking
+      // Create booking with "requested" status - host needs to accept/reject
       const booking = await storage.createBooking({
         eventId,
         userId,
-        status: "confirmed",
+        status: "requested",
       });
       
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
       res.status(500).json({ message: "Failed to create booking" });
+    }
+  });
+
+  // Update booking status (accept/reject by host)
+  app.put('/api/bookings/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const bookingId = parseInt(req.params.id);
+      const { status } = req.body;
+      
+      // Validate status
+      if (!['accepted', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status. Must be 'accepted' or 'rejected'" });
+      }
+      
+      // Get the booking and verify the user is the host
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (booking.event.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this booking" });
+      }
+      
+      // Update booking status
+      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
+      
+      // If accepted, increment event player count
+      if (status === 'accepted') {
+        await storage.updateEventPlayerCount(booking.eventId, (booking.event.currentPlayers || 1) + 1);
+      }
+      
+      res.json(updatedBooking);
+    } catch (error) {
+      console.error("Error updating booking status:", error);
+      res.status(500).json({ message: "Failed to update booking status" });
+    }
+  });
+
+  // Cancel booking (by participant)
+  app.put('/api/bookings/:id/cancel', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const bookingId = parseInt(req.params.id);
+      
+      // Get the booking and verify the user owns it
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (booking.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to cancel this booking" });
+      }
+      
+      // Only allow cancellation of accepted bookings
+      if (booking.status !== 'accepted') {
+        return res.status(400).json({ message: "Can only cancel accepted bookings" });
+      }
+      
+      // Update booking status to cancelled
+      const updatedBooking = await storage.updateBookingStatus(bookingId, 'cancelled');
+      
+      // Decrement event player count
+      await storage.updateEventPlayerCount(booking.eventId, Math.max(1, (booking.event.currentPlayers || 1) - 1));
+      
+      res.json(updatedBooking);
+    } catch (error) {
+      console.error("Error cancelling booking:", error);
+      res.status(500).json({ message: "Failed to cancel booking" });
     }
   });
 

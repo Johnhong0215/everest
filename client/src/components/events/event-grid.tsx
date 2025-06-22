@@ -167,6 +167,19 @@ export default function EventGrid({
     return distanceA - distanceB;
   });
 
+  // Fetch user bookings to determine status for each event
+  const { data: userBookings = [] } = useQuery({
+    queryKey: ['/api/my-bookings'],
+    enabled: isAuthenticated,
+    retry: false,
+  });
+
+  // Create a map of event ID to booking status for quick lookup
+  const userBookingStatusMap = (userBookings as any[]).reduce((map: Record<number, string>, booking: any) => {
+    map[booking.eventId] = booking.status;
+    return map;
+  }, {});
+
   // Create booking mutation
   const createBookingMutation = useMutation({
     mutationFn: async (eventId: number) => {
@@ -427,6 +440,7 @@ export default function EventGrid({
                     onModify={handleModifyEvent}
                     currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
                     userLocation={userLocation}
+                    userBookingStatus={userBookingStatusMap[event.id] as 'requested' | 'accepted' | 'rejected' | 'cancelled' | null}
                   />
                 ))}
               </div>

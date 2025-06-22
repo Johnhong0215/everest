@@ -15,9 +15,10 @@ interface EventCardProps {
   onModify?: (eventId: number) => void;
   currentUserId?: string;
   userLocation?: { lat: number; lng: number } | null;
+  userBookingStatus?: 'requested' | 'accepted' | 'rejected' | 'cancelled' | null;
 }
 
-export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId, userLocation }: EventCardProps) {
+export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId, userLocation, userBookingStatus }: EventCardProps) {
   const sport = SPORTS.find(s => s.id === event.sport);
   const sportColor = sport?.color || 'sport-badminton';
   
@@ -154,18 +155,54 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
             </>
           ) : (
             <>
-              {isEventFull ? (
-                <Button disabled className="flex-1">
-                  Event Full
-                </Button>
-              ) : (
-                <Button 
-                  onClick={() => onJoin(event.id)}
-                  className="flex-1 bg-everest-blue hover:bg-blue-700"
-                >
-                  Join & Pay
-                </Button>
-              )}
+              {(() => {
+                // Event is full
+                if (isEventFull) {
+                  return (
+                    <Button disabled className="flex-1">
+                      Event Full
+                    </Button>
+                  );
+                }
+                
+                // User has different booking statuses
+                switch (userBookingStatus) {
+                  case 'requested':
+                    return (
+                      <Button disabled className="flex-1 bg-yellow-500">
+                        Request Sent
+                      </Button>
+                    );
+                  case 'accepted':
+                    return (
+                      <Button disabled className="flex-1 bg-green-600">
+                        Accepted
+                      </Button>
+                    );
+                  case 'rejected':
+                    return (
+                      <Button disabled className="flex-1 bg-red-600">
+                        Rejected
+                      </Button>
+                    );
+                  case 'cancelled':
+                    return (
+                      <Button disabled className="flex-1 bg-gray-500">
+                        Cancelled
+                      </Button>
+                    );
+                  default:
+                    // User can join
+                    return (
+                      <Button 
+                        onClick={() => onJoin(event.id)}
+                        className="flex-1 bg-everest-blue hover:bg-blue-700"
+                      >
+                        Join & Pay
+                      </Button>
+                    );
+                }
+              })()}
             </>
           )}
           

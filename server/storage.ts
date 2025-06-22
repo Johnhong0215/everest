@@ -436,7 +436,7 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .leftJoin(events, eq(bookings.eventId, events.id))
       .leftJoin(users, eq(events.hostId, users.id))
-      .where(and(eq(events.hostId, hostId), eq(bookings.status, "pending")))
+      .where(and(eq(events.hostId, hostId), sql`${bookings.status} = 'requested'`))
       .orderBy(desc(bookings.createdAt));
 
     const bookingUsers = await Promise.all(

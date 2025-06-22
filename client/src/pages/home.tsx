@@ -5,7 +5,7 @@ import EventGrid from "@/components/events/event-grid";
 import CreateEventModal from "@/components/events/create-event-modal";
 import MyBookingsModal from "@/components/bookings/my-bookings-modal";
 import ChatModal from "@/components/chat/chat-modal";
-import BookingRequestsModal from "@/components/notifications/booking-requests-modal";
+import BookingRequestsModal from "@/components/bookings/booking-requests-modal";
 
 export default function Home() {
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);

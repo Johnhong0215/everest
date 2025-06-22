@@ -105,7 +105,12 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
   // Cancel booking mutation
   const cancelBookingMutation = useMutation({
     mutationFn: async (bookingId: number) => {
-      return await apiRequest('DELETE', `/api/bookings/${bookingId}`);
+      const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to cancel booking');
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -141,19 +146,18 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
     if (event.status === 'cancelled') return { label: 'Cancelled', variant: 'destructive' as const };
     if (event.status === 'completed') return { label: 'Completed', variant: 'default' as const };
     if (eventDate < now) return { label: 'Past Event', variant: 'secondary' as const };
-    if (event.currentPlayers >= event.maxPlayers) return { label: 'Full', variant: 'default' as const };
+    if ((event.currentPlayers || 1) >= event.maxPlayers) return { label: 'Full', variant: 'default' as const };
     if (event.currentPlayers === 0) return { label: 'Waiting for Players', variant: 'outline' as const };
     return { label: 'Confirmed', variant: 'default' as const };
   };
 
   const getBookingStatus = (booking: BookingWithEventAndUser) => {
     switch (booking.status) {
-      case 'pending': return { label: 'Awaiting Payment', variant: 'outline' as const };
-      case 'confirmed': return { label: 'Confirmed', variant: 'default' as const };
-      case 'paid': return { label: 'Paid', variant: 'default' as const };
-      case 'cancelled': return { label: 'Cancelled', variant: 'destructive' as const };
-      case 'refunded': return { label: 'Refunded', variant: 'secondary' as const };
-      default: return { label: booking.status, variant: 'outline' as const };
+      case 'requested': return { label: 'Request Sent', variant: 'outline' as const };
+      case 'accepted': return { label: 'Accepted', variant: 'default' as const };
+      case 'rejected': return { label: 'Rejected', variant: 'destructive' as const };
+      case 'cancelled': return { label: 'Cancelled', variant: 'secondary' as const };
+      default: return { label: booking.status || 'Unknown', variant: 'outline' as const };
     }
   };
 
@@ -452,7 +456,7 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
                                   <MessageCircle className="w-4 h-4 mr-1" />
                                   Chat
                                 </Button>
-                                {booking.status === 'confirmed' && new Date(booking.event.startTime) > new Date() && (
+                                {booking.status === 'accepted' && new Date(booking.event.startTime) > new Date() && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
