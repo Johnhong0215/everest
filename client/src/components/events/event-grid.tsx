@@ -244,76 +244,86 @@ export default function EventGrid({
         </div>
       )}
 
-      {/* Fixed Header */}
-      <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-30 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="lg:hidden"
-                >
-                  <Filter className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-                <div className="space-y-4">
-                  <div className="border-b pb-4">
-                    <h2 className="text-lg font-semibold">Filter Events</h2>
-                    <p className="text-sm text-gray-600">Find the perfect game for you</p>
+      {/* Completely Fixed Header Region */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        {/* Main Header Row */}
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="lg:hidden"
+                  >
+                    <Filter className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[300px] sm:w-[400px]">
+                  <div className="space-y-4">
+                    <div className="border-b pb-4">
+                      <h2 className="text-lg font-semibold">Filter Events</h2>
+                      <p className="text-sm text-gray-600">Find the perfect game for you</p>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      Mobile filtering coming soon
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Mobile filtering coming soon
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-            <h1 className="text-2xl font-bold text-gray-900">Discover Events</h1>
-          </div>
-          <div className="flex items-center space-x-3">
-            {/* View Toggle */}
-            <div className="bg-gray-100 rounded-lg p-1 flex">
-              <Toggle
-                pressed={viewMode === 'list'}
-                onPressedChange={() => onViewModeChange('list')}
-                size="sm"
-                className="data-[state=on]:bg-white data-[state=on]:shadow-sm"
-              >
-                <List className="w-4 h-4 mr-1" />
-                List
-              </Toggle>
-              <Toggle
-                pressed={viewMode === 'map'}
-                onPressedChange={() => onViewModeChange('map')}
-                size="sm"
-                className="data-[state=on]:bg-white data-[state=on]:shadow-sm"
-              >
-                <Map className="w-4 h-4 mr-1" />
-                Map
-              </Toggle>
+                </SheetContent>
+              </Sheet>
+              <h1 className="text-2xl font-bold text-gray-900">Discover Events</h1>
             </div>
-            <Button 
-              onClick={onCreateEvent}
-              className="bg-everest-blue hover:bg-blue-700"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              <span className="hidden sm:inline">Create Event</span>
-            </Button>
+            <div className="flex items-center space-x-3">
+              {/* View Toggle */}
+              <div className="bg-gray-100 rounded-lg p-1 flex">
+                <Toggle
+                  pressed={viewMode === 'list'}
+                  onPressedChange={() => onViewModeChange('list')}
+                  size="sm"
+                  className="data-[state=on]:bg-white data-[state=on]:shadow-sm"
+                >
+                  <List className="w-4 h-4 mr-1" />
+                  List
+                </Toggle>
+                <Toggle
+                  pressed={viewMode === 'map'}
+                  onPressedChange={() => onViewModeChange('map')}
+                  size="sm"
+                  className="data-[state=on]:bg-white data-[state=on]:shadow-sm"
+                >
+                  <Map className="w-4 h-4 mr-1" />
+                  Map
+                </Toggle>
+              </div>
+              <Button 
+                onClick={onCreateEvent}
+                className="bg-everest-blue hover:bg-blue-700"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                <span className="hidden sm:inline">Create Event</span>
+              </Button>
+            </div>
+          </div>
+          
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="relative mb-4">
+            <Input
+              placeholder="Search events by sport, location, or host..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+            <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+          </form>
+
+          {/* Events Count */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              {isLoading ? 'Loading...' : `${events?.length || 0} events found`}
+            </p>
           </div>
         </div>
-        
-        {/* Search Bar */}
-        <form onSubmit={handleSearch} className="relative">
-          <Input
-            placeholder="Search events by sport, location, or host..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-          <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-        </form>
       </div>
 
       {/* Content */}
