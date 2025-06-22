@@ -87,7 +87,7 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
             <Users className="w-4 h-4" />
             <span>
               {event.currentPlayers || 1} / {event.maxPlayers} players
-              {spotsRemaining > 0 && spotsRemaining <= 2 && (
+              {spotsRemaining > 0 && (
                 <Badge variant="outline" className="ml-2 text-xs">
                   {spotsRemaining} spot{spotsRemaining !== 1 ? 's' : ''} left
                 </Badge>

@@ -174,7 +174,7 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto w-[95vw]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">My Bookings</DialogTitle>
           <DialogDescription>
@@ -250,26 +250,26 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
                     <p className="text-gray-500">You haven't created any events yet.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
+                  <div className="w-full">
+                    <table className="w-full table-fixed">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="w-1/4 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Event
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="w-1/6 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Date/Time
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="w-1/5 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Location
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="w-1/8 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Players
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="w-1/8 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="w-1/6 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -279,42 +279,41 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
                           const status = getEventStatus(event);
                           return (
                             <tr key={event.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-3 py-4 w-1/4">
                                 <div className="flex items-center">
                                   {getSportIcon(event.sport)}
-                                  <div className="ml-3">
-                                    <div className="text-sm font-medium text-gray-900">
+                                  <div className="ml-2 min-w-0">
+                                    <div className="text-sm font-medium text-gray-900 truncate">
                                       {event.title}
                                     </div>
-                                    <div className="text-sm text-gray-500 capitalize">
+                                    <div className="text-xs text-gray-500 capitalize">
                                       {event.sport}
                                     </div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {format(new Date(event.startTime), 'MMM d, yyyy')}<br/>
-                                {format(new Date(event.startTime), 'h:mm a')} - {format(new Date(event.endTime), 'h:mm a')}
+                              <td className="px-3 py-4 w-1/6 text-xs text-gray-900">
+                                {format(new Date(event.startTime), 'MMM d')}<br/>
+                                {format(new Date(event.startTime), 'h:mm a')}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <td className="px-3 py-4 w-1/5 text-xs text-gray-900">
                                 <div className="flex items-center">
-                                  <MapPin className="w-4 h-4 text-gray-400 mr-1" />
-                                  {event.location.substring(0, 30)}
-                                  {event.location.length > 30 && '...'}
+                                  <MapPin className="w-3 h-3 text-gray-400 mr-1 flex-shrink-0" />
+                                  <span className="truncate">{event.location.substring(0, 20)}</span>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <td className="px-3 py-4 w-1/8 text-xs text-gray-900">
                                 <div className="flex items-center">
-                                  <Users className="w-4 h-4 text-gray-400 mr-1" />
-                                  {event.currentPlayers} / {event.maxPlayers}
+                                  <Users className="w-3 h-3 text-gray-400 mr-1" />
+                                  {event.currentPlayers || 1} / {event.maxPlayers}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge variant={status.variant}>
+                              <td className="px-3 py-4 w-1/8">
+                                <Badge variant={status.variant} className="text-xs">
                                   {status.label}
                                 </Badge>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                              <td className="px-3 py-4 w-1/6 text-xs font-medium">
                                 <Button
                                   variant="ghost"
                                   size="sm"
