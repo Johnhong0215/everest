@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { MapPin, Filter } from "lucide-react";
+import LocationSearch from "@/components/ui/location-search";
 import { SPORTS, SKILL_LEVELS } from "@/lib/constants";
 
 interface SidebarProps {
@@ -129,15 +130,11 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
           {/* Location */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Location</h3>
-            <div className="relative">
-              <Input
-                placeholder="Enter location or use current"
-                value={filters.location}
-                onChange={(e) => updateFilters('location', e.target.value)}
-                className="pl-10"
-              />
-              <MapPin className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-            </div>
+            <LocationSearch
+              value={filters.location}
+              onChange={(location) => updateFilters('location', location)}
+              placeholder="Search for location..."
+            />
             <div className="mt-3">
               <Label className="text-sm text-gray-600">
                 Distance: <span className="font-medium">{filters.radius} miles</span>
@@ -156,20 +153,20 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
           {/* Price Range */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">$0</span>
+            <div className="px-1">
               <Slider
                 value={[filters.priceMax]}
                 onValueChange={(value) => updateFilters('priceMax', value[0])}
                 max={100}
                 min={0}
                 step={5}
-                className="flex-1"
+                className="w-full"
               />
-              <span className="text-sm text-gray-600">$100+</span>
-            </div>
-            <div className="text-center mt-1 text-sm text-gray-600">
-              Up to ${filters.priceMax}
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>$0</span>
+                <span className="font-medium">Up to ${filters.priceMax}</span>
+                <span>$100+</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,225 +1,210 @@
-import { useState, useEffect, useRef } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { MapPin, Search, Navigation } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useRef, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { MapPin, Navigation, X } from 'lucide-react';
 
-interface LocationResult {
+interface LocationSearchProps {
+  value: string;
+  onChange: (location: string, coordinates?: { lat: number; lng: number }) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+interface LocationSuggestion {
   display_name: string;
   lat: string;
   lon: string;
   place_id: string;
 }
 
-interface LocationSearchProps {
-  value: string;
-  onChange: (location: string, lat?: string, lng?: string) => void;
-  placeholder?: string;
-  className?: string;
-}
+export default function LocationSearch({ 
+  value, 
+  onChange, 
+  placeholder = "Search location...",
+  className = ""
+}: LocationSearchProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const searchTimeout = useRef<NodeJS.Timeout>();
 
-export default function LocationSearch({ value, onChange, placeholder = "Search for a location...", className }: LocationSearchProps) {
-  const [query, setQuery] = useState(value);
-  const [results, setResults] = useState<LocationResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout>();
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Get user's current location
+  const getCurrentLocation = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserLocation(coords);
+          onChange('Current Location', coords);
+          setIsOpen(false);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      );
+    }
+  };
 
-  useEffect(() => {
-    setQuery(value);
-  }, [value]);
+  // Search for locations using Nominatim API
+  const searchLocations = async (query: string) => {
+    if (!query.trim() || query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
 
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}&countrycodes=us`
+      );
+      const data = await response.json();
+      setSuggestions(data);
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle input change with debounce
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    
+    searchTimeout.current = setTimeout(() => {
+      searchLocations(newValue);
+    }, 300);
+    
+    setIsOpen(true);
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = (suggestion: LocationSuggestion) => {
+    const coordinates = {
+      lat: parseFloat(suggestion.lat),
+      lng: parseFloat(suggestion.lon)
+    };
+    
+    onChange(suggestion.display_name, coordinates);
+    setIsOpen(false);
+    inputRef.current?.blur();
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    onChange('');
+    setSuggestions([]);
+    setIsOpen(false);
+    inputRef.current?.focus();
+  };
+
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowResults(false);
+      if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
-  const searchLocations = async (searchQuery: string) => {
-    if (!searchQuery.trim() || searchQuery.length < 3) {
-      setResults([]);
-      setShowResults(false);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      // Get user's current location for proximity-based search
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=10&addressdetails=1&viewbox=${longitude-0.5},${latitude+0.5},${longitude+0.5},${latitude-0.5}&bounded=1`
-          );
-          const data = await response.json();
-          
-          // Sort results by distance from user location
-          const resultsWithDistance = data.map((result: LocationResult) => ({
-            ...result,
-            distance: calculateDistance(latitude, longitude, parseFloat(result.lat), parseFloat(result.lon))
-          })).sort((a: any, b: any) => a.distance - b.distance);
-          
-          setResults(resultsWithDistance.slice(0, 5));
-          setShowResults(true);
-          setIsSearching(false);
-        },
-        async () => {
-          // Fallback to regular search if geolocation fails
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1`
-          );
-          const data = await response.json();
-          setResults(data);
-          setShowResults(true);
-          setIsSearching(false);
-        }
-      );
-    } catch (error) {
-      console.error('Location search error:', error);
-      setResults([]);
-      setIsSearching(false);
-    }
-  };
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 3959; // Earth's radius in miles
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newQuery = e.target.value;
-    setQuery(newQuery);
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      searchLocations(newQuery);
-    }, 300);
-  };
-
-  const handleLocationSelect = (result: LocationResult) => {
-    setQuery(result.display_name);
-    onChange(result.display_name, result.lat, result.lon);
-    setShowResults(false);
-    setResults([]);
-  };
-
-  const getCurrentLocation = () => {
-    setIsGettingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-          );
-          const data = await response.json();
-          const address = data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-          
-          setQuery(address);
-          onChange(address, latitude.toString(), longitude.toString());
-        } catch (error) {
-          const fallback = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-          setQuery(fallback);
-          onChange(fallback, latitude.toString(), longitude.toString());
-        }
-        
-        setIsGettingLocation(false);
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        setIsGettingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
-      <div className="flex space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            type="text"
-            value={query}
-            onChange={handleInputChange}
-            placeholder={placeholder}
-            className="pl-10"
-            onFocus={() => {
-              if (results.length > 0) {
-                setShowResults(true);
-              }
-            }}
-          />
-          {isSearching && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-everest-blue"></div>
-            </div>
+    <div className={`relative ${className}`}>
+      <div className="relative">
+        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={handleInputChange}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          className="pl-10 pr-20"
+        />
+        <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+          {value && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearSearch}
+              className="h-8 w-8 p-0 hover:bg-gray-100"
+            >
+              <X className="w-4 h-4" />
+            </Button>
           )}
-        </div>
-        
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={getCurrentLocation}
-          disabled={isGettingLocation}
-          className="px-3"
-        >
-          {isGettingLocation ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-everest-blue"></div>
-          ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={getCurrentLocation}
+            className="h-8 w-8 p-0 hover:bg-gray-100"
+            title="Use current location"
+          >
             <Navigation className="w-4 h-4" />
-          )}
-        </Button>
+          </Button>
+        </div>
       </div>
 
-      {showResults && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-          {results.map((result) => (
-            <button
-              key={result.place_id}
-              type="button"
-              className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
-              onClick={() => handleLocationSelect(result)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3 flex-1 min-w-0">
-                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {result.display_name.split(',')[0]}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {result.display_name}
-                    </p>
+      {/* Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {loading && (
+            <div className="px-4 py-3 text-sm text-gray-500">
+              Searching locations...
+            </div>
+          )}
+          
+          {!loading && suggestions.length === 0 && value.length >= 3 && (
+            <div className="px-4 py-3 text-sm text-gray-500">
+              No locations found
+            </div>
+          )}
+          
+          {!loading && suggestions.length > 0 && (
+            <>
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.place_id}
+                  onClick={() => handleSuggestionSelect(suggestion)}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                >
+                  <div className="flex items-start space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {suggestion.display_name.split(',')[0]}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {suggestion.display_name}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                {(result as any).distance && (
-                  <div className="text-xs text-gray-400 ml-2 flex-shrink-0">
-                    {(result as any).distance.toFixed(1)} mi
-                  </div>
-                )}
-              </div>
-            </button>
-          ))}
+                </button>
+              ))}
+            </>
+          )}
+          
+          {!loading && value.length < 3 && (
+            <div className="px-4 py-3 text-sm text-gray-500">
+              Type at least 3 characters to search
+            </div>
+          )}
         </div>
       )}
     </div>

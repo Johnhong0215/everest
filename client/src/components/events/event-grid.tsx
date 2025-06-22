@@ -8,6 +8,7 @@ import { Plus, Search, List, Map, Filter } from "lucide-react";
 import EventCard from "./event-card";
 import MapView from "@/components/map/map-view";
 import Sidebar from "@/components/layout/sidebar";
+import EditEventModal from "./edit-event-modal";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { EventWithHost } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +42,7 @@ export default function EventGrid({
 }: EventGridProps) {
   const [searchQuery, setSearchQuery] = useState(filters.search);
   const [selectedEventForPayment, setSelectedEventForPayment] = useState<number | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventWithHost | null>(null);
 
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
@@ -149,11 +151,10 @@ export default function EventGrid({
   };
 
   const handleModifyEvent = (eventId: number) => {
-    // TODO: Implement event modification modal
-    toast({
-      title: "Coming Soon",
-      description: "Event modification feature will be available soon.",
-    });
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      setEditingEvent(event);
+    }
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -294,14 +295,14 @@ export default function EventGrid({
                   </Button>
                 </div>
               </div>
-            ) : viewMode === 'map' ? (
+            ) : (viewMode as string) === 'map' ? (
               <MapView
                 events={events}
                 onJoin={handleJoinEvent}
                 onOpenChat={onOpenChat}
                 onCancel={handleCancelEvent}
                 onModify={handleModifyEvent}
-                currentUserId={user?.id || ''}
+                currentUserId={user?.id}
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -314,6 +315,7 @@ export default function EventGrid({
                     onCancel={handleCancelEvent}
                     onModify={handleModifyEvent}
                     currentUserId={user?.id}
+                    userLocation={null}
                   />
                 ))}
               </div>
@@ -331,7 +333,12 @@ export default function EventGrid({
         )}
       </div>
 
-
+      {/* Edit Event Modal */}
+      <EditEventModal
+        isOpen={!!editingEvent}
+        onClose={() => setEditingEvent(null)}
+        event={editingEvent}
+      />
     </>
   );
 }

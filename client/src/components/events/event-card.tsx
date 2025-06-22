@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Clock, MapPin, Users, Star } from "lucide-react";
+import { Clock, MapPin, Users, Navigation } from "lucide-react";
 import { EventWithHost } from "@shared/schema";
 import { SPORTS } from "@/lib/constants";
 import { format } from "date-fns";
@@ -14,9 +14,10 @@ interface EventCardProps {
   onCancel?: (eventId: number) => void;
   onModify?: (eventId: number) => void;
   currentUserId?: string;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
-export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId }: EventCardProps) {
+export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId, userLocation }: EventCardProps) {
   const sport = SPORTS.find(s => s.id === event.sport);
   const sportColor = sport?.color || 'sport-badminton';
   
@@ -28,6 +29,23 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
   const isEventFull = currentPlayers >= event.maxPlayers;
   const spotsRemaining = event.maxPlayers - currentPlayers;
   const isHost = currentUserId === event.hostId;
+
+  // Calculate distance if user location is available
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 3959; // Radius of Earth in miles
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const distance = userLocation && event.latitude && event.longitude 
+    ? calculateDistance(userLocation.lat, userLocation.lng, parseFloat(event.latitude), parseFloat(event.longitude))
+    : null;
 
   return (
     <Card className="card-hover bg-white border border-gray-200">
@@ -45,8 +63,10 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
             </span>
           </div>
           <div className="flex items-center space-x-1">
-            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-            <span className="text-sm text-gray-600">4.8</span>
+            <Navigation className="w-4 h-4 text-blue-500" />
+            <span className="text-sm text-gray-600">
+              {distance ? `${distance.toFixed(1)} mi` : 'Distance N/A'}
+            </span>
           </div>
         </div>
 

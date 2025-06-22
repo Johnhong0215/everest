@@ -44,10 +44,10 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
 
-  const handleLocationChange = (location: string, lat?: string, lng?: string) => {
+  const handleLocationChange = (location: string, coordinates?: { lat: number; lng: number }) => {
     form.setValue('location', location);
-    if (lat && lng) {
-      setLocationCoords({ lat, lng });
+    if (coordinates) {
+      setLocationCoords({ lat: coordinates.lat.toString(), lng: coordinates.lng.toString() });
     }
   };
 

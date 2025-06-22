@@ -114,9 +114,10 @@ export default function MapView({ events, onJoin, onOpenChat, onCancel, onModify
       <InteractiveMap
         events={events}
         userLocation={userLocation}
-        onEventClick={(event) => {
+        onEventSelect={(event) => {
           setSelectedEvent(event);
         }}
+        className="h-96"
       />
 
       {/* Nearby Events List */}
@@ -135,6 +136,7 @@ export default function MapView({ events, onJoin, onOpenChat, onCancel, onModify
                   onCancel={onCancel}
                   onModify={onModify}
                   currentUserId={currentUserId}
+                  userLocation={userLocation}
                 />
                 {(event as any).distance !== undefined && (
                   <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-gray-600">

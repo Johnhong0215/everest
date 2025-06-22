@@ -1,167 +1,182 @@
-import { useState, useEffect } from "react";
-import { MapPin, Navigation, Users } from "lucide-react";
-import { EventWithHost } from "@shared/schema";
-import { SPORTS } from "@/lib/constants";
+import React, { useEffect, useRef, useState } from 'react';
+import { EventWithHost } from '@shared/schema';
+import { SPORTS } from '@/lib/constants';
 
-interface InteractiveMapProps {
+interface MapProps {
   events: EventWithHost[];
-  userLocation: { lat: number; lng: number } | null;
-  onEventClick?: (event: EventWithHost) => void;
+  userLocation?: { lat: number; lng: number } | null;
+  onEventSelect?: (event: EventWithHost) => void;
+  className?: string;
 }
 
-export default function InteractiveMap({ events, userLocation, onEventClick }: InteractiveMapProps) {
+interface MapEvent extends EventWithHost {
+  lat: number;
+  lng: number;
+}
 
-  const [selectedEvent, setSelectedEvent] = useState<EventWithHost | null>(null);
+export default function InteractiveMap({ events, userLocation, onEventSelect, className = '' }: MapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [mapEvents, setMapEvents] = useState<MapEvent[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
+  const [zoom, setZoom] = useState(12);
+  const [center, setCenter] = useState({ lat: 40.7128, lng: -74.0060 }); // Default to NYC
 
-  // Filter events that have location data
-  const eventsWithLocation = events.filter(event => event.latitude && event.longitude);
+  useEffect(() => {
+    // Process events with valid coordinates
+    const validEvents = events
+      .filter(event => event.latitude && event.longitude)
+      .map(event => ({
+        ...event,
+        lat: parseFloat(event.latitude!),
+        lng: parseFloat(event.longitude!)
+      }));
+    
+    setMapEvents(validEvents);
 
-  const handleEventClick = (event: EventWithHost) => {
+    // Set center to user location or first event
+    if (userLocation) {
+      setCenter(userLocation);
+    } else if (validEvents.length > 0) {
+      setCenter({ lat: validEvents[0].lat, lng: validEvents[0].lng });
+    }
+  }, [events, userLocation]);
+
+  const handleEventClick = (event: MapEvent) => {
     setSelectedEvent(event);
-    onEventClick?.(event);
+    onEventSelect?.(event);
   };
 
-  const getSportIcon = (sportId: string) => {
-    const sportIcons: Record<string, string> = {
-      'badminton': '🏸',
-      'basketball': '🏀',
-      'soccer': '⚽',
-      'tennis': '🎾',
-      'volleyball': '🏐',
-      'tabletennis': '🏓'
-    };
-    return sportIcons[sportId] || "🏃";
+  const getSportColor = (sport: string) => {
+    const sportConfig = SPORTS.find(s => s.id === sport);
+    return sportConfig?.color || 'blue';
   };
 
-  const formatDateTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    }).format(new Date(date));
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLng = (lng2 - lng1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
-
-  if (!userLocation) {
-    return (
-      <div className="h-96 bg-gray-50 rounded-lg flex items-center justify-center">
-        <div className="text-center">
-          <Navigation className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-600">Getting your location...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate map bounds to include all events and user location
-  const allLatitudes = [userLocation.lat, ...eventsWithLocation.map(e => parseFloat(e.latitude!))];
-  const allLongitudes = [userLocation.lng, ...eventsWithLocation.map(e => parseFloat(e.longitude!))];
-  
-  const minLat = Math.min(...allLatitudes) - 0.01;
-  const maxLat = Math.max(...allLatitudes) + 0.01;
-  const minLng = Math.min(...allLongitudes) - 0.01;
-  const maxLng = Math.max(...allLongitudes) + 0.01;
-
-  const centerLat = (minLat + maxLat) / 2;
-  const centerLng = (minLng + maxLng) / 2;
 
   return (
-    <div className="relative h-96 bg-white rounded-lg border overflow-hidden">
-      {/* Map iframe with markers */}
-      <iframe
-        src={`https://www.openstreetmap.org/export/embed.html?bbox=${minLng},${minLat},${maxLng},${maxLat}&layer=mapnik&marker=${userLocation.lat},${userLocation.lng}`}
-        width="100%"
-        height="100%"
-        frameBorder="0"
-        style={{ border: 0 }}
-        allowFullScreen
-        title="Interactive Event Map"
-      />
+    <div className={`relative w-full h-full bg-gray-100 rounded-lg overflow-hidden ${className}`}>
+      {/* Map Container */}
+      <div ref={mapRef} className="w-full h-full relative">
+        {/* Simple Map Visualization */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-green-100">
+          {/* Grid overlay to simulate map tiles */}
+          <div className="absolute inset-0 opacity-20">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div key={i} className="absolute border-gray-300 border-r border-b w-20 h-20" 
+                   style={{ 
+                     left: `${(i % 10) * 10}%`, 
+                     top: `${Math.floor(i / 10) * 50}%` 
+                   }} />
+            ))}
+          </div>
 
-      {/* Event pins overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        {eventsWithLocation.map((event) => {
-          const lat = parseFloat(event.latitude!);
-          const lng = parseFloat(event.longitude!);
-          
-          // Calculate position relative to map bounds
-          const x = ((lng - minLng) / (maxLng - minLng)) * 100;
-          const y = ((maxLat - lat) / (maxLat - minLat)) * 100;
-          
-          return (
+          {/* User Location Marker */}
+          {userLocation && (
             <div
-              key={event.id}
-              className="absolute pointer-events-auto cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${x}%`, top: `${y}%` }}
-              onClick={() => handleEventClick(event)}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
+              style={{
+                left: '50%',
+                top: '50%'
+              }}
             >
-              <div className="relative group">
-                <div className="w-8 h-8 bg-everest-blue rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm font-bold hover:scale-110 transition-transform">
-                  {getSportIcon(event.sport)}
+              <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg animate-pulse" />
+              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                Your Location
+              </div>
+            </div>
+          )}
+
+          {/* Event Markers */}
+          {mapEvents.map((event, index) => {
+            const distance = userLocation 
+              ? calculateDistance(userLocation.lat, userLocation.lng, event.lat, event.lng)
+              : 0;
+            
+            // Position markers relative to center and distance
+            const offsetX = userLocation ? (event.lng - userLocation.lng) * 1000 : (index % 5) * 100 - 200;
+            const offsetY = userLocation ? (userLocation.lat - event.lat) * 1000 : Math.floor(index / 5) * 100 - 200;
+            
+            return (
+              <div
+                key={event.id}
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer"
+                style={{
+                  left: `calc(50% + ${Math.max(-200, Math.min(200, offsetX))}px)`,
+                  top: `calc(50% + ${Math.max(-200, Math.min(200, offsetY))}px)`
+                }}
+                onClick={() => handleEventClick(event)}
+              >
+                <div className={`w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg hover:scale-110 transition-transform ${
+                  selectedEvent?.id === event.id ? 'ring-2 ring-red-300' : ''
+                }`}>
+                  <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                    {SPORTS.find(s => s.id === event.sport)?.name?.charAt(0) || 'E'}
+                  </div>
                 </div>
                 
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <div className="bg-black text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                    {event.title}
-                    <div className="text-xs opacity-75">
-                      {formatDateTime(event.startTime)}
+                {selectedEvent?.id === event.id && (
+                  <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-48 z-30">
+                    <div className="text-sm font-semibold text-gray-900 mb-1">{event.title}</div>
+                    <div className="text-xs text-gray-600 mb-1">{event.sport}</div>
+                    <div className="text-xs text-gray-500">
+                      {userLocation && `${distance.toFixed(1)} mi away`}
+                    </div>
+                    <div className="text-xs text-blue-600 mt-1">
+                      ${(event as any).price || 0} • {event.maxPlayers - (event.currentPlayers || 0)} spots left
                     </div>
                   </div>
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black"></div>
-                </div>
+                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Map controls */}
-      <div className="absolute top-4 left-4 space-y-2">
-        <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-md">
-          <div className="flex items-center space-x-2 text-sm">
-            <Navigation className="w-4 h-4 text-everest-blue" />
-            <span className="font-medium">Your Location</span>
-          </div>
-          <div className="text-xs text-gray-600 mt-1">
-            {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-          </div>
+            );
+          })}
         </div>
-      </div>
 
-      {/* Events count */}
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-md">
-        <div className="text-center">
-          <div className="text-lg font-bold text-everest-blue">{eventsWithLocation.length}</div>
-          <div className="text-xs text-gray-600">Events</div>
+        {/* Map Controls */}
+        <div className="absolute top-4 right-4 z-20 flex flex-col space-y-2">
+          <button
+            onClick={() => setZoom(Math.min(zoom + 1, 18))}
+            className="w-10 h-10 bg-white border border-gray-300 rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 text-gray-700 font-bold"
+          >
+            +
+          </button>
+          <button
+            onClick={() => setZoom(Math.max(zoom - 1, 8))}
+            className="w-10 h-10 bg-white border border-gray-300 rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 text-gray-700 font-bold"
+          >
+            −
+          </button>
         </div>
-      </div>
 
-      {/* Selected event details */}
-      {selectedEvent && (
-        <div className="absolute bottom-4 left-4 right-4 bg-white rounded-lg shadow-lg p-4 border">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">{selectedEvent.title}</h3>
-              <p className="text-sm text-gray-600">{selectedEvent.location}</p>
-              <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                <div className="flex items-center space-x-1">
-                  <Users className="w-4 h-4" />
-                  <span>{selectedEvent.currentPlayers}/{selectedEvent.maxPlayers}</span>
-                </div>
-                <span>{formatDateTime(selectedEvent.startTime)}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedEvent(null)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
+        {/* Map Legend */}
+        <div className="absolute bottom-4 left-4 bg-white border border-gray-200 rounded-lg p-3 shadow-lg z-20">
+          <div className="text-xs font-semibold text-gray-900 mb-2">Legend</div>
+          <div className="flex items-center space-x-2 mb-1">
+            <div className="w-3 h-3 bg-blue-600 rounded-full" />
+            <span className="text-xs text-gray-600">Your Location</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-red-500 rounded-full" />
+            <span className="text-xs text-gray-600">Sports Events</span>
           </div>
         </div>
-      )}
+
+        {/* Event Count */}
+        <div className="absolute top-4 left-4 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg z-20">
+          <div className="text-sm font-semibold text-gray-900">
+            {mapEvents.length} Event{mapEvents.length !== 1 ? 's' : ''} Found
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
