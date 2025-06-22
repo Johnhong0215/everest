@@ -44,7 +44,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4">
         <div className="flex items-center justify-between h-16 w-full">
           {/* Left: Logo */}
           <div className="flex items-center space-x-3">
@@ -55,7 +55,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
           </div>
 
           {/* Right: Navigation Links + User Avatar */}
-          <div className="flex items-center space-x-6 mr-2">
+          <div className="flex items-center space-x-6">
             {/* Desktop Navigation Links */}
             <div className="hidden md:flex items-center space-x-6">
               <button 
@@ -126,7 +126,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center ml-auto mr-2">
+          <div className="md:hidden flex items-center ml-auto">
             <Button
               variant="ghost"
               size="sm"
