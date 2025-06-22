@@ -29,6 +29,20 @@ interface SidebarProps {
 
 export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasPendingChanges, className }: SidebarProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  
+  // Local state for filters that need Apply button
+  const [localLocation, setLocalLocation] = useState(filters.location);
+  const [localRadius, setLocalRadius] = useState(filters.radius);
+  const [localPriceMax, setLocalPriceMax] = useState(filters.priceMax);
+  const [localSearch, setLocalSearch] = useState(filters.search);
+
+  // Sync local state with filters when they change externally
+  useEffect(() => {
+    setLocalLocation(filters.location);
+    setLocalRadius(filters.radius);
+    setLocalPriceMax(filters.priceMax);
+    setLocalSearch(filters.search);
+  }, [filters.location, filters.radius, filters.priceMax, filters.search]);
 
   // Get user location for proximity-based search
   useEffect(() => {
@@ -48,15 +62,29 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
     }
   }, []);
 
-  const updateFilters = useCallback((key: string, value: any) => {
-    onFiltersChange({ ...filters, [key]: value });
+  // Update filters for immediate application (sports, date, skill level)
+  const updateImmediateFilters = useCallback((key: string, value: any) => {
+    const newFilters = { ...filters, [key]: value };
+    onFiltersChange(newFilters);
   }, [filters, onFiltersChange]);
+
+  // Update local state and trigger parent update for pending filters
+  const updatePendingFilters = useCallback(() => {
+    const newFilters = {
+      ...filters,
+      location: localLocation,
+      radius: localRadius,
+      priceMax: localPriceMax,
+      search: localSearch,
+    };
+    onFiltersChange(newFilters);
+  }, [filters, localLocation, localRadius, localPriceMax, localSearch, onFiltersChange]);
 
   const toggleSport = (sportId: string) => {
     const newSports = filters.sports.includes(sportId)
       ? filters.sports.filter(s => s !== sportId)
       : [...filters.sports, sportId];
-    updateFilters('sports', newSports);
+    updateImmediateFilters('sports', newSports);
   };
 
   const FilterContent = () => (
@@ -98,7 +126,7 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
             <Input
               type="date"
               value={filters.date}
-              onChange={(e) => updateFilters('date', e.target.value)}
+              onChange={(e) => updateImmediateFilters('date', e.target.value)}
               className="w-full mb-2"
             />
             <div className="grid grid-cols-2 gap-2">
@@ -130,7 +158,7 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
             <h3 className="text-sm font-medium text-gray-700 mb-3">Skill Level</h3>
             <RadioGroup
               value={filters.skillLevel}
-              onValueChange={(value) => updateFilters('skillLevel', value)}
+              onValueChange={(value) => updateImmediateFilters('skillLevel', value)}
             >
               {SKILL_LEVELS.map((level) => (
                 <div key={level.value} className="flex items-center space-x-2">
@@ -150,20 +178,19 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
           {/* Location */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Location</h3>
-            <Input
-              type="text"
-              value={filters.location}
-              onChange={(e) => updateFilters('location', e.target.value)}
-              placeholder="Enter location..."
-              className="w-full"
+            <LocationSearch
+              value={localLocation}
+              onChange={setLocalLocation}
+              placeholder="Search for location..."
+              userLocation={userLocation}
             />
             <div className="mt-3">
               <Label className="text-sm text-gray-600">
-                Distance: <span className="font-medium">{filters.radius} miles</span>
+                Distance: <span className="font-medium">{localRadius} miles</span>
               </Label>
               <Slider
-                value={[filters.radius]}
-                onValueChange={(value) => updateFilters('radius', value[0])}
+                value={[localRadius]}
+                onValueChange={(value) => setLocalRadius(value[0])}
                 max={25}
                 min={1}
                 step={1}
@@ -177,8 +204,8 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
             <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
             <div className="px-1">
               <Slider
-                value={[filters.priceMax]}
-                onValueChange={(value) => updateFilters('priceMax', value[0])}
+                value={[localPriceMax]}
+                onValueChange={(value) => setLocalPriceMax(value[0])}
                 max={100}
                 min={0}
                 step={5}
@@ -186,7 +213,7 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>$0</span>
-                <span className="font-medium">Up to ${filters.priceMax}</span>
+                <span className="font-medium">Up to ${localPriceMax}</span>
                 <span>$100+</span>
               </div>
             </div>
@@ -196,7 +223,10 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
           {hasPendingChanges && (
             <div className="mb-6 pt-4 border-t border-gray-200">
               <Button 
-                onClick={onApplyFilters}
+                onClick={() => {
+                  updatePendingFilters();
+                  onApplyFilters();
+                }}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Apply Filters

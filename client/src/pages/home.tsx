@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Navigation from "@/components/layout/navigation";
 import Sidebar from "@/components/layout/sidebar";
 import EventGrid from "@/components/events/event-grid";
@@ -57,12 +57,12 @@ export default function Home() {
   }, [uiFilters]);
 
   // Check if there are pending filter changes
-  const hasPendingChanges = (
+  const hasPendingChanges = useMemo(() => (
     uiFilters.location !== appliedFilters.location ||
     uiFilters.radius !== appliedFilters.radius ||
     uiFilters.priceMax !== appliedFilters.priceMax ||
     uiFilters.search !== appliedFilters.search
-  );
+  ), [uiFilters, appliedFilters]);
 
   return (
     <div className="min-h-screen bg-gray-50">
