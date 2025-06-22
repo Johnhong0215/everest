@@ -43,6 +43,36 @@ export default function EventGrid({
 
   const { data: events = [], isLoading, error } = useQuery<EventWithHost[]>({
     queryKey: ['/api/events', filters],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filters.sports.length > 0) {
+        params.append('sports', filters.sports.join(','));
+      }
+      if (filters.date) {
+        params.append('date', filters.date);
+      }
+      if (filters.skillLevel) {
+        params.append('skillLevel', filters.skillLevel);
+      }
+      if (filters.location) {
+        params.append('location', filters.location);
+      }
+      if (filters.radius) {
+        params.append('radius', filters.radius.toString());
+      }
+      if (filters.priceMax) {
+        params.append('priceMax', filters.priceMax.toString());
+      }
+      if (filters.search) {
+        params.append('search', filters.search);
+      }
+      
+      const url = `/api/events${params.toString() ? `?${params.toString()}` : ''}`;
+      return fetch(url).then(res => {
+        if (!res.ok) throw new Error('Failed to fetch events');
+        return res.json();
+      });
+    },
     staleTime: 30000, // 30 seconds
   });
 
@@ -123,7 +153,11 @@ export default function EventGrid({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Update search filter
+    const formData = new FormData(e.target as HTMLFormElement);
+    const searchTerm = formData.get('search') as string;
+    // Update filters through parent component
+    const newFilters = { ...filters, search: searchTerm };
+    // This would need to be passed down from parent component
   };
 
   if (error) {
@@ -237,6 +271,23 @@ export default function EventGrid({
                     <Plus className="w-4 h-4 mr-2" />
                     Create Event
                   </Button>
+                </div>
+              </div>
+            ) : viewMode === 'map' ? (
+              <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
+                <div className="text-center">
+                  <Map className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Interactive Map View</h3>
+                  <p className="text-gray-500 mb-4">
+                    Events will be displayed on an interactive map showing their actual locations.
+                  </p>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    {events.filter(e => e.latitude && e.longitude).length > 0 ? (
+                      <p>{events.filter(e => e.latitude && e.longitude).length} events with location data</p>
+                    ) : (
+                      <p>No events with location coordinates found</p>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (

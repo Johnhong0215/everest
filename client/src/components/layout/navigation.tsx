@@ -45,7 +45,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-everest-blue rounded-lg flex items-center justify-center">
@@ -55,7 +55,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
           </div>
 
           {/* Desktop Navigation */}
-          <div className="flex items-center space-x-8 ml-auto">
+          <div className="hidden md:flex items-center space-x-8">
             <button 
               onClick={onOpenBookings}
               className="text-gray-600 hover:text-gray-900 font-medium"
@@ -122,69 +122,105 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
                     {(user as any)?.email}
                   </p>
                 </div>
-                <DropdownMenuItem onClick={onOpenBookings}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  <span>My Bookings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onOpenChat}>
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  <span>Messages</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden flex items-center space-x-2">
             <Button 
-              variant="ghost" 
+              onClick={onCreateEvent}
               size="sm"
-              className="md:hidden"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="bg-everest-blue hover:bg-blue-700"
             >
-              <Menu className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2"
+            >
+              <Menu className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-2 border-t border-gray-200">
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start"
-              onClick={() => {
-                onOpenBookings();
-                setIsMobileMenuOpen(false);
-              }}
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              My Bookings
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start"
-              onClick={() => {
-                onOpenChat();
-                setIsMobileMenuOpen(false);
-              }}
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Chat
-              {unreadCount > 0 && (
-                <Badge variant="destructive" className="ml-auto">{unreadCount}</Badge>
-              )}
-            </Button>
-            <Button 
-              onClick={() => {
-                onCreateEvent();
-                setIsMobileMenuOpen(false);
-              }}
-              className="w-full bg-everest-blue hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
-            </Button>
+          <div className="md:hidden border-t border-gray-200 pb-3 pt-4">
+            <div className="space-y-3">
+              <button 
+                onClick={() => {
+                  onOpenBookings();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 font-medium"
+              >
+                My Bookings
+              </button>
+              <button 
+                onClick={() => {
+                  onOpenChat();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 font-medium"
+              >
+                <div className="flex items-center space-x-2">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat</span>
+                  {unreadCount > 0 && (
+                    <Badge variant="destructive" className="ml-2 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </div>
+              </button>
+              <button 
+                onClick={() => {
+                  onOpenRequests();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 font-medium"
+              >
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4" />
+                  <span>Requests</span>
+                  {pendingRequestsCount > 0 && (
+                    <Badge variant="destructive" className="ml-2 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                      {pendingRequestsCount}
+                    </Badge>
+                  )}
+                </div>
+              </button>
+              <div className="border-t border-gray-200 pt-3">
+                <div className="flex items-center px-3 py-2">
+                  <Avatar className="h-8 w-8 mr-3">
+                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
+                    <AvatarFallback>
+                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
+                      {(user as any)?.firstName && (user as any)?.lastName 
+                        ? `${(user as any).firstName} ${(user as any).lastName}`
+                        : (user as any)?.email?.split('@')[0]
+                      }
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 font-medium"
+                >
+                  Log out
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

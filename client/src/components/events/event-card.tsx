@@ -66,12 +66,22 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Users className="w-4 h-4" />
             <span>
-              {event.currentPlayers} / {event.maxPlayers} players
+              {event.currentPlayers || 1} / {event.maxPlayers} players
               {spotsRemaining > 0 && spotsRemaining <= 2 && (
                 <Badge variant="outline" className="ml-2 text-xs">
                   {spotsRemaining} spot{spotsRemaining !== 1 ? 's' : ''} left
                 </Badge>
               )}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="w-4 h-4 flex items-center justify-center">
+              {event.genderMix === 'mens' ? '♂' : event.genderMix === 'womens' ? '♀' : '⚥'}
+            </div>
+            <span className="capitalize">
+              {event.genderMix === 'mens' ? 'Men only' : 
+               event.genderMix === 'womens' ? 'Women only' : 
+               'Mixed gender'}
             </span>
           </div>
         </div>

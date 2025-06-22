@@ -105,7 +105,7 @@ export const events = pgTable("events", {
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   maxPlayers: integer("max_players").notNull(),
-  currentPlayers: integer("current_players").default(0),
+  currentPlayers: integer("current_players").default(1),
   pricePerPerson: decimal("price_per_person", { precision: 8, scale: 2 }).notNull(),
   sportConfig: jsonb("sport_config").notNull(), // Sport-specific configuration
   status: eventStatusEnum("status").default("published"),

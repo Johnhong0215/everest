@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { MapPin, Filter } from "lucide-react";
 import { SPORTS, SKILL_LEVELS } from "@/lib/constants";
 
 interface SidebarProps {
@@ -18,9 +21,12 @@ interface SidebarProps {
     search: string;
   };
   onFiltersChange: (filters: any) => void;
+  className?: string;
 }
 
-export default function Sidebar({ filters, onFiltersChange }: SidebarProps) {
+export default function Sidebar({ filters, onFiltersChange, className }: SidebarProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   const updateFilters = (key: string, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
   };
@@ -32,9 +38,8 @@ export default function Sidebar({ filters, onFiltersChange }: SidebarProps) {
     updateFilters('sports', newSports);
   };
 
-  return (
-    <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block sidebar-transition">
-      <div className="p-6">
+  const FilterContent = () => (
+    <div className="p-6 space-y-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Find Your Game</h2>
           
@@ -168,7 +173,33 @@ export default function Sidebar({ filters, onFiltersChange }: SidebarProps) {
             </div>
           </div>
         </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block">
+        <FilterContent />
+      </aside>
+
+      {/* Mobile Filter Button */}
+      <div className="lg:hidden fixed bottom-4 right-4 z-50">
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <SheetTrigger asChild>
+            <Button size="lg" className="bg-everest-blue hover:bg-blue-700 rounded-full shadow-lg">
+              <Filter className="w-5 h-5 mr-2" />
+              Filters
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-80">
+            <SheetHeader>
+              <SheetTitle>Find Your Game</SheetTitle>
+            </SheetHeader>
+            <FilterContent />
+          </SheetContent>
+        </Sheet>
       </div>
-    </aside>
+    </>
   );
 }

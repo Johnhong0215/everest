@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -38,9 +38,28 @@ type CreateEventFormData = z.infer<typeof createEventFormSchema>;
 
 export default function CreateEventModal({ isOpen, onClose }: CreateEventModalProps) {
   const [selectedSport, setSelectedSport] = useState<string>('badminton');
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
+
+  // Get user's current location on modal open
+  useEffect(() => {
+    if (isOpen && !userLocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Geolocation error:', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }, [isOpen, userLocation]);
 
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventFormSchema),
@@ -112,6 +131,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sportConfig: data.sportConfig || {},
       currentPlayers: 1, // Host counts as first player
       description: '', // No description field
+      latitude: userLocation?.lat?.toString() || null,
+      longitude: userLocation?.lng?.toString() || null,
     };
     
     console.log('Sending to API:', eventData);
@@ -275,7 +296,14 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 <FormItem>
                   <FormLabel>Location</FormLabel>
                   <FormControl>
-                    <Input placeholder="Venue name and address" {...field} />
+                    <div className="relative">
+                      <Input placeholder="Venue name and address" {...field} />
+                      {userLocation && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          📍 Current location detected for map display
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
