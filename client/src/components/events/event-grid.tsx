@@ -184,8 +184,8 @@ export default function EventGrid({
   const createBookingMutation = useMutation({
     mutationFn: async (eventId: number) => {
       const response = await apiRequest('POST', '/api/bookings', {
-        eventId,
-        status: 'pending'
+        eventId
+        // Status will be set to 'requested' automatically by the server
       });
       return response.json();
     },

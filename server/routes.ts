@@ -210,6 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId,
+        status: "requested", // Always set status to requested for new bookings
       });
 
       // Check if event has space
