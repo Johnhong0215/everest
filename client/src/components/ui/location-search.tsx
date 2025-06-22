@@ -82,11 +82,16 @@ export default function LocationSearch({
       clearTimeout(searchTimeout.current);
     }
     
-    searchTimeout.current = setTimeout(() => {
-      searchLocations(newValue);
-    }, 300);
-    
-    setIsOpen(true);
+    // Only search and show dropdown if value has meaningful length
+    if (newValue.length >= 3) {
+      searchTimeout.current = setTimeout(() => {
+        searchLocations(newValue);
+        setIsOpen(true);
+      }, 500); // Increased delay to 500ms for better UX
+    } else {
+      setSuggestions([]);
+      setIsOpen(false);
+    }
   };
 
   // Handle suggestion selection

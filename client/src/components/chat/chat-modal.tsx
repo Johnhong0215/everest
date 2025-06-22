@@ -37,7 +37,14 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isConnected, sendMessage, messages: socketMessages } = useSocket();
+  
+  // Safely handle socket connection with fallback
+  const socketHook = useSocket();
+  const { isConnected, sendMessage, messages: socketMessages } = socketHook || { 
+    isConnected: false, 
+    sendMessage: () => {}, 
+    messages: [] 
+  };
   const queryClient = useQueryClient();
 
   // Redirect to login if not authenticated

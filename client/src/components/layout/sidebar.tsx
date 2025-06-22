@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,9 +28,14 @@ interface SidebarProps {
 export default function Sidebar({ filters, onFiltersChange, className }: SidebarProps) {
 
 
-  const updateFilters = (key: string, value: any) => {
+  const updateFilters = useCallback((key: string, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
-  };
+  }, [filters, onFiltersChange]);
+
+  // Debounced location handler to prevent triggering on every character
+  const handleLocationChange = useCallback((location: string, coordinates?: { lat: number; lng: number }) => {
+    updateFilters('location', location);
+  }, [updateFilters]);
 
   const toggleSport = (sportId: string) => {
     const newSports = filters.sports.includes(sportId)

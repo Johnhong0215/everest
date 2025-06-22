@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, List, Map, Filter } from "lucide-react";
+import { Plus, Search, List, Map, Filter, Navigation, AlertCircle } from "lucide-react";
 import EventCard from "./event-card";
 import MapView from "@/components/map/map-view";
 import Sidebar from "@/components/layout/sidebar";
@@ -43,10 +43,51 @@ export default function EventGrid({
   const [searchQuery, setSearchQuery] = useState(filters.search);
   const [selectedEventForPayment, setSelectedEventForPayment] = useState<number | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventWithHost | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
 
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+
+  // Get user location on component mount
+  useEffect(() => {
+    if ('geolocation' in navigator && locationPermission === 'prompt') {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setLocationPermission('granted');
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          setLocationPermission('denied');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      );
+    }
+  }, [locationPermission]);
+
+  const requestLocation = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setLocationPermission('granted');
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          setLocationPermission('denied');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      );
+    }
+  };
 
   const { data: events = [], isLoading, error } = useQuery<EventWithHost[]>({
     queryKey: ['/api/events', filters],
@@ -179,6 +220,30 @@ export default function EventGrid({
 
   return (
     <>
+      {/* Location Permission Banner */}
+      {locationPermission === 'denied' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mx-4 mt-4">
+          <div className="flex items-center space-x-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-amber-800">Enable Location for Distance Calculations</h3>
+              <p className="text-sm text-amber-700 mt-1">
+                Allow location access to see accurate distances to events instead of "Distance N/A"
+              </p>
+            </div>
+            <Button
+              onClick={requestLocation}
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0"
+            >
+              <Navigation className="w-4 h-4 mr-2" />
+              Enable Location
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center justify-between mb-4">
@@ -302,7 +367,7 @@ export default function EventGrid({
                 onOpenChat={onOpenChat}
                 onCancel={handleCancelEvent}
                 onModify={handleModifyEvent}
-                currentUserId={user?.id}
+                currentUserId={user?.id || ''}
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -314,8 +379,8 @@ export default function EventGrid({
                     onOpenChat={onOpenChat}
                     onCancel={handleCancelEvent}
                     onModify={handleModifyEvent}
-                    currentUserId={user?.id}
-                    userLocation={null}
+                    currentUserId={user?.id || ''}
+                    userLocation={userLocation}
                   />
                 ))}
               </div>
