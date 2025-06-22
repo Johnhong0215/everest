@@ -23,14 +23,14 @@ interface CreateEventModalProps {
 
 const createEventFormSchema = insertEventSchema.omit({
   hostId: true, // We'll add this in the submit handler
+  description: true, // Remove description requirement
 }).extend({
   sportConfig: z.record(z.string(), z.any()),
-  startTime: z.coerce.date(),
-  endTime: z.coerce.date(),
+  startTime: z.string(),
+  endTime: z.string(),
   maxPlayers: z.coerce.number().min(2).max(22),
   pricePerPerson: z.string().min(1),
   title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
   location: z.string().min(1, "Location is required"),
 });
 
@@ -46,12 +46,11 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     resolver: zodResolver(createEventFormSchema),
     defaultValues: {
       title: '',
-      description: '',
       sport: 'badminton',
       skillLevel: 'intermediate',
       genderMix: 'mixed',
-      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
-      endTime: new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // Tomorrow + 2 hours
+      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      endTime: new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString().slice(0, 16),
       location: '',
       maxPlayers: 4,
       pricePerPerson: '12.00',
@@ -61,7 +60,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   });
 
   const createEventMutation = useMutation({
-    mutationFn: async (data: CreateEventFormData) => {
+    mutationFn: async (data: any) => {
       console.log('Sending data to API:', data);
       const response = await apiRequest('POST', '/api/events', data);
       return response.json();
@@ -113,10 +112,11 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       endTime: new Date(data.endTime),
       sportConfig: data.sportConfig || {},
       currentPlayers: 0, // Initialize to 0
+      description: data.notes || '', // Use notes as description for API
     };
     
     console.log('Sending to API:', eventData);
-    createEventMutation.mutate(eventData);
+    createEventMutation.mutate(eventData as any);
   };
 
   const handleSportSelect = (sportId: string) => {
@@ -190,24 +190,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
               )}
             />
 
-            {/* Event Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe the event, skill level, what to bring..."
-                      rows={3}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
 
             {/* Sport-Specific Configuration */}
             {selectedSport && sportConfig && (
@@ -255,12 +238,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <FormControl>
                       <Input
                         type="datetime-local"
-                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            field.onChange(e.target.value);
-                          }
-                        }}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -276,12 +255,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <FormControl>
                       <Input
                         type="datetime-local"
-                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            field.onChange(e.target.value);
-                          }
-                        }}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value)}
                       />
                     </FormControl>
                     <FormMessage />
