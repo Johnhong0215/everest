@@ -6,6 +6,9 @@ import { Toggle } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, List, Map, Filter } from "lucide-react";
 import EventCard from "./event-card";
+import MapView from "@/components/map/map-view";
+import Sidebar from "@/components/layout/sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { EventWithHost } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,6 +28,7 @@ interface EventGridProps {
   onViewModeChange: (mode: 'list' | 'map') => void;
   onCreateEvent: () => void;
   onOpenChat: (eventId: number) => void;
+  onFiltersChange: (filters: any) => void;
 }
 
 export default function EventGrid({ 
@@ -32,11 +36,12 @@ export default function EventGrid({
   viewMode, 
   onViewModeChange, 
   onCreateEvent, 
-  onOpenChat 
+  onOpenChat,
+  onFiltersChange
 }: EventGridProps) {
   const [searchQuery, setSearchQuery] = useState(filters.search);
   const [selectedEventForPayment, setSelectedEventForPayment] = useState<number | null>(null);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -177,14 +182,24 @@ export default function EventGrid({
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden"
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-            >
-              <Filter className="w-5 h-5" />
-            </Button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="lg:hidden"
+                >
+                  <Filter className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[400px]">
+                <Sidebar 
+                  filters={filters}
+                  onFiltersChange={onFiltersChange}
+                  className="p-0"
+                />
+              </SheetContent>
+            </Sheet>
             <h1 className="text-2xl font-bold text-gray-900">Discover Events</h1>
           </div>
           <div className="flex items-center space-x-3">
@@ -274,22 +289,14 @@ export default function EventGrid({
                 </div>
               </div>
             ) : viewMode === 'map' ? (
-              <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <Map className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Interactive Map View</h3>
-                  <p className="text-gray-500 mb-4">
-                    Events will be displayed on an interactive map showing their actual locations.
-                  </p>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    {events.filter(e => e.latitude && e.longitude).length > 0 ? (
-                      <p>{events.filter(e => e.latitude && e.longitude).length} events with location data</p>
-                    ) : (
-                      <p>No events with location coordinates found</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <MapView
+                events={events}
+                onJoin={handleJoinEvent}
+                onOpenChat={onOpenChat}
+                onCancel={handleCancelEvent}
+                onModify={handleModifyEvent}
+                currentUserId={user?.id || ''}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {events.map((event) => (
@@ -300,7 +307,7 @@ export default function EventGrid({
                     onOpenChat={onOpenChat}
                     onCancel={handleCancelEvent}
                     onModify={handleModifyEvent}
-                    currentUserId={user ? (user as any).id : undefined}
+                    currentUserId={user?.id}
                   />
                 ))}
               </div>

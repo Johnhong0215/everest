@@ -90,13 +90,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
                 )}
               </div>
             </button>
-            <Button 
-              onClick={onCreateEvent}
-              className="bg-everest-blue hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
-            </Button>
+
 
             {/* User Menu */}
             <DropdownMenu>

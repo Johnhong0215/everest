@@ -45,6 +45,7 @@ export default function Home() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onCreateEvent={() => setIsCreateEventOpen(true)}
+            onFiltersChange={setFilters}
             onOpenChat={(eventId) => {
               setActiveEventId(eventId);
               setIsChatOpen(true);
