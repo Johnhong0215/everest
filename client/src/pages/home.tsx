@@ -34,10 +34,12 @@ export default function Home() {
       />
       
       <div className="flex">
-        <Sidebar 
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block">
+          <Sidebar 
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
+        </aside>
         
         <main className="flex-1 lg:pl-0">
           <EventGrid 

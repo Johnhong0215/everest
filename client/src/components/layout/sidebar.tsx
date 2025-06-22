@@ -25,7 +25,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ filters, onFiltersChange, className }: SidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
+
 
   const updateFilters = (key: string, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
@@ -177,13 +177,8 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
   );
 
   return (
-    <>
-      {/* Desktop Sidebar */}
-      <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block">
-        <FilterContent />
-      </aside>
-
-
-    </>
+    <div className={className}>
+      <FilterContent />
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, AlertCircle } from "lucide-react";
 import { EventWithHost } from "@shared/schema";
 import EventCard from "@/components/events/event-card";
+import InteractiveMap from "@/components/ui/interactive-map";
 
 interface MapViewProps {
   events: EventWithHost[];
@@ -109,37 +110,14 @@ export default function MapView({ events, onJoin, onOpenChat, onCancel, onModify
 
   return (
     <div className="space-y-6">
-      {/* Interactive Map */}
-      <div className="relative h-96 bg-white rounded-lg border overflow-hidden">
-        <iframe
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${userLocation.lng - 0.1},${userLocation.lat - 0.1},${userLocation.lng + 0.1},${userLocation.lat + 0.1}&layer=mapnik&marker=${userLocation.lat},${userLocation.lng}`}
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          style={{ border: 0 }}
-          allowFullScreen
-          title="Interactive Map"
-        />
-        
-        {/* Map Controls Overlay */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-md">
-          <div className="flex items-center space-x-2 text-sm">
-            <MapPin className="w-4 h-4 text-everest-blue" />
-            <span className="font-medium">Your Location</span>
-          </div>
-          <p className="text-xs text-gray-600 mt-1">
-            {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-          </p>
-        </div>
-
-        {/* Events Count Overlay */}
-        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-md">
-          <div className="text-center">
-            <div className="text-lg font-bold text-everest-blue">{eventsWithLocation.length}</div>
-            <div className="text-xs text-gray-600">Events Found</div>
-          </div>
-        </div>
-      </div>
+      {/* Interactive Map with Event Pins */}
+      <InteractiveMap
+        events={events}
+        userLocation={userLocation}
+        onEventClick={(event) => {
+          setSelectedEvent(event);
+        }}
+      />
 
       {/* Nearby Events List */}
       {eventsWithDistance.length > 0 && (
