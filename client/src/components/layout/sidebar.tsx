@@ -140,7 +140,7 @@ export default function Sidebar({
               <SelectValue placeholder="Any skill level" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Any skill level</SelectItem>
+              <SelectItem value="any">Any skill level</SelectItem>
               {SKILL_LEVELS.map((level) => (
                 <SelectItem key={level.value} value={level.value}>
                   {level.label}
