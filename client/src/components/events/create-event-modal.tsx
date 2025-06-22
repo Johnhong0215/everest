@@ -21,12 +21,17 @@ interface CreateEventModalProps {
   onClose: () => void;
 }
 
-const createEventFormSchema = insertEventSchema.extend({
+const createEventFormSchema = insertEventSchema.omit({
+  hostId: true, // We'll add this in the submit handler
+}).extend({
   sportConfig: z.record(z.string(), z.any()),
   startTime: z.coerce.date(),
   endTime: z.coerce.date(),
   maxPlayers: z.coerce.number().min(2).max(22),
   pricePerPerson: z.string().min(1),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  location: z.string().min(1, "Location is required"),
 });
 
 type CreateEventFormData = z.infer<typeof createEventFormSchema>;
@@ -88,9 +93,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const sportConfig = selectedSport ? SPORT_CONFIGS[selectedSport as keyof typeof SPORT_CONFIGS] : null;
 
   const onSubmit = (data: CreateEventFormData) => {
-    console.log('Form data:', data);
-    console.log('Form errors:', form.formState.errors);
-    console.log('Form is valid:', form.formState.isValid);
+    console.log('Form data submitted:', data);
     
     if (!isAuthenticated || !user || typeof user !== 'object' || !('id' in user)) {
       toast({
@@ -109,9 +112,10 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       startTime: new Date(data.startTime),
       endTime: new Date(data.endTime),
       sportConfig: data.sportConfig || {},
+      currentPlayers: 0, // Initialize to 0
     };
     
-    console.log('Processed event data:', eventData);
+    console.log('Sending to API:', eventData);
     createEventMutation.mutate(eventData);
   };
 
@@ -131,15 +135,14 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
         <Form {...form}>
           <form 
-            onSubmit={(e) => {
-              console.log('Form submit event triggered');
-              console.log('Form isValid:', form.formState.isValid);
-              console.log('Form errors:', form.formState.errors);
-              console.log('Form values:', form.getValues());
-              form.handleSubmit(onSubmit, (errors) => {
-                console.log('Form validation failed:', errors);
-              })(e);
-            }} 
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              console.log('Form validation failed:', errors);
+              toast({
+                title: "Form Error",
+                description: "Please fill in all required fields",
+                variant: "destructive",
+              });
+            })} 
             className="space-y-6"
           >
             {/* Sport Selection */}
