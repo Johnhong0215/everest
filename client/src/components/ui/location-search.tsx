@@ -114,7 +114,10 @@ export default function LocationSearch({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     
-    // Call the input change handler if provided (for debounced filtering)
+    // Always update parent immediately for UI responsiveness
+    onChange(newValue);
+    
+    // Call the separate input change handler if provided (for additional logic)
     if (onInputChange) {
       onInputChange(newValue);
     }

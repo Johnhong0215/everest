@@ -150,11 +150,12 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
           {/* Location */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Location</h3>
-            <LocationSearch
+            <Input
+              type="text"
               value={filters.location}
-              onChange={(location) => updateFilters('location', location)}
-              placeholder="Search for location..."
-              userLocation={userLocation}
+              onChange={(e) => updateFilters('location', e.target.value)}
+              placeholder="Enter location..."
+              className="w-full"
             />
             <div className="mt-3">
               <Label className="text-sm text-gray-600">
@@ -196,10 +197,13 @@ export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasP
             <div className="mb-6 pt-4 border-t border-gray-200">
               <Button 
                 onClick={onApplyFilters}
-                className="w-full bg-everest-blue hover:bg-everest-blue/90 text-white"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Apply Filters
               </Button>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Changes will be applied when you click this button
+              </p>
             </div>
           )}
         </div>
