@@ -82,10 +82,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       console.log("User ID:", userId);
       
-      const eventData = insertEventSchema.parse({
+      // Convert datetime strings to Date objects
+      const eventDataWithDates = {
         ...req.body,
         hostId: userId,
-      });
+        startTime: new Date(req.body.startTime),
+        endTime: new Date(req.body.endTime),
+      };
+      
+      const eventData = insertEventSchema.parse(eventDataWithDates);
       
       console.log("Parsed event data:", eventData);
       const event = await storage.createEvent(eventData);
