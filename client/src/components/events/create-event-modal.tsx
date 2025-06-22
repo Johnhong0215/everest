@@ -40,9 +40,28 @@ type CreateEventFormData = z.infer<typeof createEventFormSchema>;
 export default function CreateEventModal({ isOpen, onClose }: CreateEventModalProps) {
   const [selectedSport, setSelectedSport] = useState<string>('badminton');
   const [locationCoords, setLocationCoords] = useState<{lat: string, lng: string} | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
+
+  // Get user location for proximity-based search
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Geolocation not available:', error);
+        },
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+      );
+    }
+  }, []);
 
   const handleLocationChange = (location: string, coordinates?: { lat: number; lng: number }) => {
     form.setValue('location', location);
@@ -290,6 +309,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                       value={field.value}
                       onChange={handleLocationChange}
                       placeholder="Search for venue or address..."
+                      userLocation={userLocation}
                     />
                   </FormControl>
                   <FormMessage />

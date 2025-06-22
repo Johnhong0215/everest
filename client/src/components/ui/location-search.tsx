@@ -8,6 +8,7 @@ interface LocationSearchProps {
   onChange: (location: string, coordinates?: { lat: number; lng: number }) => void;
   placeholder?: string;
   className?: string;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 interface LocationSuggestion {
@@ -21,13 +22,28 @@ export default function LocationSearch({
   value, 
   onChange, 
   placeholder = "Search location...",
-  className = ""
+  className = "",
+  userLocation
 }: LocationSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentUserLocation, setCurrentUserLocation] = useState(userLocation);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
+
+  // Calculate distance between two coordinates
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -38,6 +54,7 @@ export default function LocationSearch({
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
+          setCurrentUserLocation(coords);
           onChange('Current Location', coords);
           setIsOpen(false);
         },
@@ -58,11 +75,31 @@ export default function LocationSearch({
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}&countrycodes=us`
-      );
+      // Search with proximity bias if user location is available
+      let url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
+      
+      if (currentUserLocation) {
+        url += `&viewbox=${currentUserLocation.lng-0.5},${currentUserLocation.lat-0.5},${currentUserLocation.lng+0.5},${currentUserLocation.lat+0.5}&bounded=1`;
+      }
+
+      const response = await fetch(url);
       const data = await response.json();
-      setSuggestions(data);
+      
+      // Sort by distance if user location is available
+      let sortedData = data;
+      if (currentUserLocation) {
+        sortedData = data.map((item: any) => ({
+          ...item,
+          distance: calculateDistance(
+            currentUserLocation.lat,
+            currentUserLocation.lng,
+            parseFloat(item.lat),
+            parseFloat(item.lon)
+          )
+        })).sort((a: any, b: any) => a.distance - b.distance);
+      }
+      
+      setSuggestions(sortedData.slice(0, 8));
     } catch (error) {
       console.error('Error searching locations:', error);
       setSuggestions([]);
@@ -98,9 +135,19 @@ export default function LocationSearch({
       lng: parseFloat(suggestion.lon)
     };
     
-    onChange(suggestion.display_name, coordinates);
+    // Extract a clean location name for display
+    const locationParts = suggestion.display_name.split(',');
+    const cleanLocation = locationParts.slice(0, 2).join(', ').trim();
+    
+    onChange(cleanLocation, coordinates);
+    setSuggestions([]);
     setIsOpen(false);
-    inputRef.current?.blur();
+    
+    // Update the input value directly
+    if (inputRef.current) {
+      inputRef.current.value = cleanLocation;
+      inputRef.current.blur();
+    }
   };
 
   // Clear search
@@ -180,22 +227,29 @@ export default function LocationSearch({
           
           {!loading && suggestions.length > 0 && (
             <>
-              {suggestions.map((suggestion) => (
+              {suggestions.map((suggestion, index) => (
                 <button
-                  key={suggestion.place_id}
+                  key={suggestion.place_id || index}
                   onClick={() => handleSuggestionSelect(suggestion)}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                  className="w-full px-4 py-3 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
                 >
-                  <div className="flex items-start space-x-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-gray-900 truncate">
-                        {suggestion.display_name.split(',')[0]}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {suggestion.display_name}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3 min-w-0 flex-1">
+                      <MapPin className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {suggestion.display_name.split(',').slice(0, 2).join(', ')}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate mt-0.5">
+                          {suggestion.display_name.split(',').slice(2).join(', ')}
+                        </div>
                       </div>
                     </div>
+                    {(suggestion as any).distance && (
+                      <div className="text-xs text-gray-400 font-medium ml-2 flex-shrink-0">
+                        {(suggestion as any).distance.toFixed(1)} mi
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}

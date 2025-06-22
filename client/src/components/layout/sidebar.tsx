@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +26,25 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ filters, onFiltersChange, className }: SidebarProps) {
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Get user location for proximity-based search
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Geolocation not available:', error);
+        },
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+      );
+    }
+  }, []);
 
   const updateFilters = useCallback((key: string, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
@@ -139,6 +157,7 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
               value={filters.location}
               onChange={(location) => updateFilters('location', location)}
               placeholder="Search for location..."
+              userLocation={userLocation}
             />
             <div className="mt-3">
               <Label className="text-sm text-gray-600">
