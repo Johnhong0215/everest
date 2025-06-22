@@ -109,20 +109,34 @@ export default function MapView({ events, onJoin, onOpenChat, onCancel, onModify
 
   return (
     <div className="space-y-6">
-      {/* Map Placeholder with Location Info */}
-      <div className="h-96 bg-gradient-to-br from-blue-50 to-green-50 rounded-lg border-2 border-dashed border-blue-200 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <MapPin className="w-12 h-12 text-everest-blue mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Interactive Map View</h3>
-          <p className="text-gray-600 mb-4">
-            Your location: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+      {/* Interactive Map */}
+      <div className="relative h-96 bg-white rounded-lg border overflow-hidden">
+        <iframe
+          src={`https://www.openstreetmap.org/export/embed.html?bbox=${userLocation.lng - 0.1},${userLocation.lat - 0.1},${userLocation.lng + 0.1},${userLocation.lat + 0.1}&layer=mapnik&marker=${userLocation.lat},${userLocation.lng}`}
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          style={{ border: 0 }}
+          allowFullScreen
+          title="Interactive Map"
+        />
+        
+        {/* Map Controls Overlay */}
+        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-md">
+          <div className="flex items-center space-x-2 text-sm">
+            <MapPin className="w-4 h-4 text-everest-blue" />
+            <span className="font-medium">Your Location</span>
+          </div>
+          <p className="text-xs text-gray-600 mt-1">
+            {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
           </p>
-          <div className="text-sm text-gray-500">
-            {eventsWithLocation.length > 0 ? (
-              <p>{eventsWithLocation.length} events with location data found</p>
-            ) : (
-              <p>No events with coordinates available</p>
-            )}
+        </div>
+
+        {/* Events Count Overlay */}
+        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-md">
+          <div className="text-center">
+            <div className="text-lg font-bold text-everest-blue">{eventsWithLocation.length}</div>
+            <div className="text-xs text-gray-600">Events Found</div>
           </div>
         </div>
       </div>

@@ -183,23 +183,7 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
         <FilterContent />
       </aside>
 
-      {/* Mobile Filter Button */}
-      <div className="lg:hidden fixed bottom-4 right-4 z-50">
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button size="lg" className="bg-everest-blue hover:bg-blue-700 rounded-full shadow-lg">
-              <Filter className="w-5 h-5 mr-2" />
-              Filters
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-80">
-            <SheetHeader>
-              <SheetTitle>Find Your Game</SheetTitle>
-            </SheetHeader>
-            <FilterContent />
-          </SheetContent>
-        </Sheet>
-      </div>
+
     </>
   );
 }

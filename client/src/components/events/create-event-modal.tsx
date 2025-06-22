@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import LocationSearch from "@/components/ui/location-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,28 +39,17 @@ type CreateEventFormData = z.infer<typeof createEventFormSchema>;
 
 export default function CreateEventModal({ isOpen, onClose }: CreateEventModalProps) {
   const [selectedSport, setSelectedSport] = useState<string>('badminton');
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{lat: string, lng: string} | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
 
-  // Get user's current location on modal open
-  useEffect(() => {
-    if (isOpen && !userLocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.log('Geolocation error:', error);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
+  const handleLocationChange = (location: string, lat?: string, lng?: string) => {
+    form.setValue('location', location);
+    if (lat && lng) {
+      setLocationCoords({ lat, lng });
     }
-  }, [isOpen, userLocation]);
+  };
 
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventFormSchema),
@@ -131,8 +121,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sportConfig: data.sportConfig || {},
       currentPlayers: 1, // Host counts as first player
       description: '', // No description field
-      latitude: userLocation?.lat?.toString() || null,
-      longitude: userLocation?.lng?.toString() || null,
+      latitude: locationCoords?.lat || null,
+      longitude: locationCoords?.lng || null,
     };
     
     console.log('Sending to API:', eventData);
@@ -148,10 +138,10 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="create-event-description">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Create New Event</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="create-event-description">
             Fill in the details below to create a new sports event for others to join.
           </DialogDescription>
         </DialogHeader>
@@ -296,14 +286,11 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 <FormItem>
                   <FormLabel>Location</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      <Input placeholder="Venue name and address" {...field} />
-                      {userLocation && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          📍 Current location detected for map display
-                        </div>
-                      )}
-                    </div>
+                    <LocationSearch
+                      value={field.value}
+                      onChange={handleLocationChange}
+                      placeholder="Search for venue or address..."
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
