@@ -45,7 +45,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16 w-full">
+        <div className="flex items-center justify-between h-16 w-full">
           {/* Left: Logo */}
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-everest-blue rounded-lg flex items-center justify-center">
@@ -54,53 +54,47 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
             <span className="text-xl font-bold text-gray-900">Everest</span>
           </div>
 
-          {/* Center: Navigation Links */}
-          <div className="hidden md:flex items-center justify-center flex-1 space-x-8">
-            <button 
-              onClick={onOpenBookings}
-              className="text-gray-600 hover:text-gray-900 font-medium"
-            >
-              My Bookings
-            </button>
-            <button 
-              onClick={onOpenChat}
-              className="text-gray-600 hover:text-gray-900 relative font-medium"
-            >
-              <div className="flex items-center space-x-1">
-                <MessageCircle className="w-4 h-4" />
-                <span>Chat</span>
-                {unreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </div>
-            </button>
-            <button 
-              onClick={onOpenRequests}
-              className="text-gray-600 hover:text-gray-900 relative font-medium"
-            >
-              <div className="flex items-center space-x-1">
-                <Calendar className="w-4 h-4" />
-                <span>Requests</span>
-                {pendingRequestsCount > 0 && (
-                  <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
-                    {pendingRequestsCount}
-                  </Badge>
-                )}
-              </div>
-            </button>
-            <Button 
-              onClick={onCreateEvent}
-              className="bg-everest-blue hover:bg-blue-700"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Create Event
-            </Button>
-          </div>
+          {/* Right: Navigation Links + User Avatar */}
+          <div className="flex items-center space-x-6 mr-2">
+            {/* Desktop Navigation Links */}
+            <div className="hidden md:flex items-center space-x-6">
+              <button 
+                onClick={onOpenBookings}
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                My Bookings
+              </button>
+              <button 
+                onClick={onOpenChat}
+                className="text-gray-600 hover:text-gray-900 relative font-medium"
+              >
+                <div className="flex items-center space-x-1">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat</span>
+                  {unreadCount > 0 && (
+                    <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </div>
+              </button>
+              <button 
+                onClick={onOpenRequests}
+                className="text-gray-600 hover:text-gray-900 relative font-medium"
+              >
+                <div className="flex items-center space-x-1">
+                  <Calendar className="w-4 h-4" />
+                  <span>Requests</span>
+                  {pendingRequestsCount > 0 && (
+                    <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                      {pendingRequestsCount}
+                    </Badge>
+                  )}
+                </div>
+              </button>
+            </div>
 
-          {/* Right: User Avatar */}
-          <div className="flex items-center">
+            {/* User Avatar */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -132,14 +126,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center space-x-2 ml-auto">
-            <Button 
-              onClick={onCreateEvent}
-              size="sm"
-              className="bg-everest-blue hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
+          <div className="md:hidden flex items-center ml-auto mr-2">
             <Button
               variant="ghost"
               size="sm"
