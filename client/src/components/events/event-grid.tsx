@@ -193,11 +193,17 @@ export default function EventGrid({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-                <Sidebar 
-                  filters={filters}
-                  onFiltersChange={onFiltersChange}
-                  className="p-0"
-                />
+                <div className="space-y-4">
+                  <div className="border-b pb-4">
+                    <h2 className="text-lg font-semibold">Filter Events</h2>
+                    <p className="text-sm text-gray-600">Find the perfect game for you</p>
+                  </div>
+                  <Sidebar 
+                    filters={filters}
+                    onFiltersChange={onFiltersChange}
+                    className="p-0"
+                  />
+                </div>
               </SheetContent>
             </Sheet>
             <h1 className="text-2xl font-bold text-gray-900">Discover Events</h1>

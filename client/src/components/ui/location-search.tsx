@@ -51,18 +51,53 @@ export default function LocationSearch({ value, onChange, placeholder = "Search 
 
     setIsSearching(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1`
+      // Get user's current location for proximity-based search
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=10&addressdetails=1&viewbox=${longitude-0.5},${latitude+0.5},${longitude+0.5},${latitude-0.5}&bounded=1`
+          );
+          const data = await response.json();
+          
+          // Sort results by distance from user location
+          const resultsWithDistance = data.map((result: LocationResult) => ({
+            ...result,
+            distance: calculateDistance(latitude, longitude, parseFloat(result.lat), parseFloat(result.lon))
+          })).sort((a: any, b: any) => a.distance - b.distance);
+          
+          setResults(resultsWithDistance.slice(0, 5));
+          setShowResults(true);
+          setIsSearching(false);
+        },
+        async () => {
+          // Fallback to regular search if geolocation fails
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1`
+          );
+          const data = await response.json();
+          setResults(data);
+          setShowResults(true);
+          setIsSearching(false);
+        }
       );
-      const data = await response.json();
-      setResults(data);
-      setShowResults(true);
     } catch (error) {
       console.error('Location search error:', error);
       setResults([]);
-    } finally {
       setIsSearching(false);
     }
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,16 +200,23 @@ export default function LocationSearch({ value, onChange, placeholder = "Search 
               className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
               onClick={() => handleLocationSelect(result)}
             >
-              <div className="flex items-start space-x-3">
-                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {result.display_name.split(',')[0]}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {result.display_name}
-                  </p>
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3 flex-1 min-w-0">
+                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {result.display_name.split(',')[0]}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {result.display_name}
+                    </p>
+                  </div>
                 </div>
+                {(result as any).distance && (
+                  <div className="text-xs text-gray-400 ml-2 flex-shrink-0">
+                    {(result as any).distance.toFixed(1)} mi
+                  </div>
+                )}
               </div>
             </button>
           ))}
