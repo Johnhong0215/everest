@@ -1,18 +1,18 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { MapPin, Filter } from "lucide-react";
 import LocationSearch from "@/components/ui/location-search";
 import { SPORTS, SKILL_LEVELS } from "@/lib/constants";
 
 interface SidebarProps {
-  filters: {
+  appliedFilters: {
     sports: string[];
     date: string;
     skillLevel: string;
@@ -21,228 +21,188 @@ interface SidebarProps {
     priceMax: number;
     search: string;
   };
-  onFiltersChange: (filters: any) => void;
+  pendingFilters: {
+    location: string;
+    radius: number;
+    priceMax: number;
+    search: string;
+  };
+  onImmediateFilterChange: (key: string, value: any) => void;
+  onPendingFilterChange: (key: string, value: any) => void;
   onApplyFilters: () => void;
   hasPendingChanges: boolean;
   className?: string;
 }
 
-export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasPendingChanges, className }: SidebarProps) {
+export default function Sidebar({ 
+  appliedFilters, 
+  pendingFilters, 
+  onImmediateFilterChange, 
+  onPendingFilterChange, 
+  onApplyFilters, 
+  hasPendingChanges, 
+  className 
+}: SidebarProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  
-  // Local state for filters that need Apply button
-  const [localLocation, setLocalLocation] = useState(filters.location);
-  const [localRadius, setLocalRadius] = useState(filters.radius);
-  const [localPriceMax, setLocalPriceMax] = useState(filters.priceMax);
-  const [localSearch, setLocalSearch] = useState(filters.search);
 
-  // Sync local state with filters when they change externally
-  useEffect(() => {
-    setLocalLocation(filters.location);
-    setLocalRadius(filters.radius);
-    setLocalPriceMax(filters.priceMax);
-    setLocalSearch(filters.search);
-  }, [filters.location, filters.radius, filters.priceMax, filters.search]);
-
-  // Get user location for proximity-based search
+  // Get user location for location search
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({
             lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lng: position.coords.longitude,
           });
         },
         (error) => {
-          console.log('Geolocation not available:', error);
-        },
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+          console.warn('Failed to get user location:', error);
+        }
       );
     }
   }, []);
 
-  // Update filters for immediate application (sports, date, skill level)
-  const updateImmediateFilters = useCallback((key: string, value: any) => {
-    const newFilters = { ...filters, [key]: value };
-    onFiltersChange(newFilters);
-  }, [filters, onFiltersChange]);
-
-  // Update local state and trigger parent update for pending filters
-  const updatePendingFilters = useCallback(() => {
-    const newFilters = {
-      ...filters,
-      location: localLocation,
-      radius: localRadius,
-      priceMax: localPriceMax,
-      search: localSearch,
-    };
-    onFiltersChange(newFilters);
-  }, [filters, localLocation, localRadius, localPriceMax, localSearch, onFiltersChange]);
-
-  const toggleSport = (sportId: string) => {
-    const newSports = filters.sports.includes(sportId)
-      ? filters.sports.filter(s => s !== sportId)
-      : [...filters.sports, sportId];
-    updateImmediateFilters('sports', newSports);
+  // Handle location change (same as CreateEventModal)
+  const handleLocationChange = (location: string, coordinates?: { lat: number; lng: number }) => {
+    onPendingFilterChange('location', location);
   };
 
-  const FilterContent = () => (
-    <div className="p-6 space-y-6">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Find Your Game</h2>
-          
-          {/* Sport Filters */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Sports</h3>
-            <div className="space-y-2">
-              {SPORTS.map((sport) => (
-                <div key={sport.id} className="flex items-center space-x-3">
-                  <Checkbox
-                    id={`sport-${sport.id}`}
-                    checked={filters.sports.includes(sport.id)}
-                    onCheckedChange={() => toggleSport(sport.id)}
-                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                  />
-                  <label
-                    htmlFor={`sport-${sport.id}`}
-                    className="flex items-center space-x-2 cursor-pointer text-sm text-gray-700"
-                  >
-                    <div className={`w-6 h-6 bg-${sport.color} rounded-full flex items-center justify-center`}>
-                      <div className="w-4 h-4 text-white">
-                        <div className="w-full h-full bg-current rounded-sm" />
-                      </div>
-                    </div>
-                    <span>{sport.name}</span>
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
+  // Handle sports filter change (immediate)
+  const handleSportToggle = (sport: string) => {
+    const newSports = appliedFilters.sports.includes(sport)
+      ? appliedFilters.sports.filter((s: string) => s !== sport)
+      : [...appliedFilters.sports, sport];
+    
+    onImmediateFilterChange('sports', newSports);
+  };
 
-          {/* Date & Time */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Date & Time</h3>
-            <Input
-              type="date"
-              value={filters.date}
-              onChange={(e) => updateImmediateFilters('date', e.target.value)}
-              className="w-full mb-2"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Time" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="morning">Morning</SelectItem>
-                  <SelectItem value="afternoon">Afternoon</SelectItem>
-                  <SelectItem value="evening">Evening</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any duration</SelectItem>
-                  <SelectItem value="1-2">1-2 hours</SelectItem>
-                  <SelectItem value="2+">2+ hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+  // Handle other immediate filter changes
+  const handleDateChange = (date: string) => {
+    onImmediateFilterChange('date', date);
+  };
 
-          {/* Skill Level */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Skill Level</h3>
-            <RadioGroup
-              value={filters.skillLevel}
-              onValueChange={(value) => updateImmediateFilters('skillLevel', value)}
-            >
-              {SKILL_LEVELS.map((level) => (
-                <div key={level.value} className="flex items-center space-x-2">
-                  <RadioGroupItem 
-                    value={level.value} 
-                    id={level.value}
-                    className="border-everest-blue data-[state=checked]:bg-everest-blue"
-                  />
-                  <Label htmlFor={level.value} className="text-sm text-gray-700">
-                    {level.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
-          {/* Location */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Location</h3>
-            <LocationSearch
-              value={localLocation}
-              onChange={setLocalLocation}
-              placeholder="Search for location..."
-              userLocation={userLocation}
-            />
-            <div className="mt-3">
-              <Label className="text-sm text-gray-600">
-                Distance: <span className="font-medium">{localRadius} miles</span>
-              </Label>
-              <Slider
-                value={[localRadius]}
-                onValueChange={(value) => setLocalRadius(value[0])}
-                max={25}
-                min={1}
-                step={1}
-                className="mt-1"
-              />
-            </div>
-          </div>
-
-          {/* Price Range */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
-            <div className="px-1">
-              <Slider
-                value={[localPriceMax]}
-                onValueChange={(value) => setLocalPriceMax(value[0])}
-                max={100}
-                min={0}
-                step={5}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>$0</span>
-                <span className="font-medium">Up to ${localPriceMax}</span>
-                <span>$100+</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Apply Button */}
-          {hasPendingChanges && (
-            <div className="mb-6 pt-4 border-t border-gray-200">
-              <Button 
-                onClick={() => {
-                  updatePendingFilters();
-                  onApplyFilters();
-                }}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Apply Filters
-              </Button>
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                Changes will be applied when you click this button
-              </p>
-            </div>
-          )}
-        </div>
-    </div>
-  );
+  const handleSkillLevelChange = (skillLevel: string) => {
+    onImmediateFilterChange('skillLevel', skillLevel);
+  };
 
   return (
-    <div className={className}>
-      <FilterContent />
+    <div className={`h-full overflow-y-auto ${className}`}>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-2">
+          <Filter className="w-5 h-5" />
+          <h2 className="text-lg font-semibold">Filters</h2>
+        </div>
+
+        {/* Search */}
+        <div className="space-y-2">
+          <Label htmlFor="search">Search Events</Label>
+          <Input
+            id="search"
+            placeholder="Search by title, description..."
+            value={pendingFilters.search}
+            onChange={(e) => onPendingFilterChange('search', e.target.value)}
+          />
+        </div>
+
+        {/* Sports */}
+        <div className="space-y-3">
+          <Label>Sports</Label>
+          <div className="flex flex-wrap gap-2">
+            {SPORTS.map((sport) => (
+              <Badge
+                key={sport.id}
+                variant={appliedFilters.sports.includes(sport.id) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => handleSportToggle(sport.id)}
+              >
+                {sport.name}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Date */}
+        <div className="space-y-2">
+          <Label htmlFor="date">Date</Label>
+          <Input
+            id="date"
+            type="date"
+            value={appliedFilters.date}
+            onChange={(e) => handleDateChange(e.target.value)}
+          />
+        </div>
+
+        {/* Skill Level */}
+        <div className="space-y-2">
+          <Label>Skill Level</Label>
+          <Select value={appliedFilters.skillLevel} onValueChange={handleSkillLevelChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Any skill level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Any skill level</SelectItem>
+              {SKILL_LEVELS.map((level) => (
+                <SelectItem key={level.value} value={level.value}>
+                  {level.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Separator />
+
+        {/* Location */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Location
+          </Label>
+          <LocationSearch
+            value={pendingFilters.location}
+            onChange={handleLocationChange}
+            placeholder="Search for venue or address..."
+            userLocation={userLocation}
+          />
+        </div>
+
+        {/* Distance */}
+        <div className="space-y-3">
+          <Label>Distance: {pendingFilters.radius} km</Label>
+          <Slider
+            value={[pendingFilters.radius]}
+            onValueChange={(value) => onPendingFilterChange('radius', value[0])}
+            max={50}
+            min={1}
+            step={1}
+            className="w-full"
+          />
+        </div>
+
+        {/* Price Range */}
+        <div className="space-y-3">
+          <Label>Max Price: ${pendingFilters.priceMax}</Label>
+          <Slider
+            value={[pendingFilters.priceMax]}
+            onValueChange={(value) => onPendingFilterChange('priceMax', value[0])}
+            max={200}
+            min={0}
+            step={5}
+            className="w-full"
+          />
+        </div>
+
+        {/* Apply Button */}
+        {hasPendingChanges && (
+          <Button
+            onClick={onApplyFilters}
+            className="w-full"
+            size="lg"
+          >
+            Apply Filters
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

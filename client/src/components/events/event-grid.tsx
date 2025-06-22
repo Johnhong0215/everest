@@ -264,13 +264,9 @@ export default function EventGrid({
                     <h2 className="text-lg font-semibold">Filter Events</h2>
                     <p className="text-sm text-gray-600">Find the perfect game for you</p>
                   </div>
-                  <Sidebar 
-                    filters={filters}
-                    onFiltersChange={onFiltersChange}
-                    onApplyFilters={() => {}} // Mobile sidebar applies changes immediately
-                    hasPendingChanges={false}
-                    className="p-0"
-                  />
+                  <div className="text-sm text-gray-500">
+                    Mobile filtering coming soon
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>

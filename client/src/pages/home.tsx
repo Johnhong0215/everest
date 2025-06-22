@@ -14,18 +14,7 @@ export default function Home() {
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  // UI filters (what user sees and can adjust)
-  const [uiFilters, setUiFilters] = useState({
-    sports: [] as string[],
-    date: '',
-    skillLevel: '',
-    location: '',
-    radius: 5,
-    priceMax: 100,
-    search: '',
-  });
-
-  // Applied filters (for API queries)
+  // Applied filters (for API queries - what's actually being searched)
   const [appliedFilters, setAppliedFilters] = useState({
     sports: [] as string[],
     date: '',
@@ -36,33 +25,39 @@ export default function Home() {
     search: '',
   });
 
-  // Handle immediate filter changes (sports, date, skill level apply immediately)
-  const handleFiltersChange = useCallback((newFilters: typeof uiFilters) => {
-    setUiFilters(newFilters);
-    
-    // For sports, date, and skill level - apply immediately
-    const immediateFilters = {
-      ...appliedFilters,
-      sports: newFilters.sports,
-      date: newFilters.date,
-      skillLevel: newFilters.skillLevel,
-    };
-    
-    setAppliedFilters(immediateFilters);
-  }, [appliedFilters]);
+  // Pending filters (what's currently being edited in the sidebar)
+  const [pendingFilters, setPendingFilters] = useState({
+    location: '',
+    radius: 5,
+    priceMax: 100,
+    search: '',
+  });
 
-  // Apply button handler for location, distance, and price filters
+  // Handle immediate filter changes (sports, date, skill level apply immediately)
+  const handleImmediateFiltersChange = useCallback((key: string, value: any) => {
+    setAppliedFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Handle pending filter changes (location, distance, price)
+  const handlePendingFiltersChange = useCallback((key: string, value: any) => {
+    setPendingFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Apply button handler for pending filters
   const handleApplyFilters = useCallback(() => {
-    setAppliedFilters(uiFilters);
-  }, [uiFilters]);
+    setAppliedFilters(prev => ({
+      ...prev,
+      ...pendingFilters
+    }));
+  }, [pendingFilters]);
 
   // Check if there are pending filter changes
   const hasPendingChanges = useMemo(() => (
-    uiFilters.location !== appliedFilters.location ||
-    uiFilters.radius !== appliedFilters.radius ||
-    uiFilters.priceMax !== appliedFilters.priceMax ||
-    uiFilters.search !== appliedFilters.search
-  ), [uiFilters, appliedFilters]);
+    pendingFilters.location !== appliedFilters.location ||
+    pendingFilters.radius !== appliedFilters.radius ||
+    pendingFilters.priceMax !== appliedFilters.priceMax ||
+    pendingFilters.search !== appliedFilters.search
+  ), [pendingFilters, appliedFilters]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -76,8 +71,10 @@ export default function Home() {
       <div className="flex">
         <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block">
           <Sidebar 
-            filters={uiFilters}
-            onFiltersChange={handleFiltersChange}
+            appliedFilters={appliedFilters}
+            pendingFilters={pendingFilters}
+            onImmediateFilterChange={handleImmediateFiltersChange}
+            onPendingFilterChange={handlePendingFiltersChange}
             onApplyFilters={handleApplyFilters}
             hasPendingChanges={hasPendingChanges}
           />
@@ -89,7 +86,7 @@ export default function Home() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onCreateEvent={() => setIsCreateEventOpen(true)}
-            onFiltersChange={handleFiltersChange}
+            onFiltersChange={() => {}}
             onOpenChat={(eventId) => {
               setActiveEventId(eventId);
               setIsChatOpen(true);
