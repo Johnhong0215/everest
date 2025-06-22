@@ -27,7 +27,7 @@ const createEventFormSchema = insertEventSchema.extend({
 type CreateEventFormData = z.infer<typeof createEventFormSchema>;
 
 export default function CreateEventModal({ isOpen, onClose }: CreateEventModalProps) {
-  const [selectedSport, setSelectedSport] = useState<string>('');
+  const [selectedSport, setSelectedSport] = useState<string>('badminton');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -51,22 +51,28 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
   const createEventMutation = useMutation({
     mutationFn: async (data: CreateEventFormData) => {
-      return await apiRequest('POST', '/api/events', data);
+      console.log('Sending data to API:', data);
+      const response = await apiRequest('POST', '/api/events', data);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Event created successfully:', data);
       toast({
         title: "Event Created",
         description: "Your event has been created successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-events'] });
       onClose();
       form.reset();
+      setSelectedSport('badminton');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Create event error:', error);
+      const errorMessage = error.message || "Failed to create event. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to create event. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -78,7 +84,19 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const onSubmit = (data: CreateEventFormData) => {
     console.log('Form data:', data);
     console.log('Form errors:', form.formState.errors);
-    createEventMutation.mutate(data);
+    console.log('Form is valid:', form.formState.isValid);
+    
+    // Ensure proper data types and format
+    const eventData = {
+      ...data,
+      maxPlayers: Number(data.maxPlayers),
+      startTime: new Date(data.startTime),
+      endTime: new Date(data.endTime),
+      sportConfig: data.sportConfig || {},
+    };
+    
+    console.log('Processed event data:', eventData);
+    createEventMutation.mutate(eventData);
   };
 
   const handleSportSelect = (sportId: string) => {

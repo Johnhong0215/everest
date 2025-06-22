@@ -78,17 +78,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/events', isAuthenticated, async (req: any, res) => {
     try {
+      console.log("Creating event with body:", req.body);
       const userId = req.user.claims.sub;
+      console.log("User ID:", userId);
+      
       const eventData = insertEventSchema.parse({
         ...req.body,
         hostId: userId,
       });
-
+      
+      console.log("Parsed event data:", eventData);
       const event = await storage.createEvent(eventData);
+      console.log("Created event:", event);
+      
       res.status(201).json(event);
     } catch (error) {
       console.error("Error creating event:", error);
       if (error instanceof z.ZodError) {
+        console.error("Validation errors:", error.errors);
         return res.status(400).json({ message: "Invalid event data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create event" });
