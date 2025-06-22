@@ -190,6 +190,25 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
               )}
             />
 
+            {/* Event Description */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe the event, skill level, what to bring..."
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Sport-Specific Configuration */}
             {selectedSport && sportConfig && (
               <div className={`bg-${selectedSportData?.color} bg-opacity-5 p-4 rounded-lg border border-${selectedSportData?.color} border-opacity-20`}>
