@@ -35,18 +35,18 @@ const CheckoutForm = ({ event, onClose }: CheckoutFormProps) => {
     setIsProcessing(true);
 
     try {
-      // Simulate payment processing for development
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await apiRequest('POST', '/api/bookings', { eventId: event.id });
       
       toast({
         title: "Booking Confirmed",
-        description: "Your booking has been confirmed! (Development mode - no payment processed)",
+        description: "Your booking has been confirmed successfully!",
       });
       onClose();
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error.message || "An unexpected error occurred. Please try again.";
       toast({
         title: "Booking Failed",
-        description: "An unexpected error occurred. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

@@ -1,21 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
-
-// Temporarily disable Stripe for development
-// if (!process.env.STRIPE_SECRET_KEY) {
-//   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-// }
-
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-//   apiVersion: "2023-10-16",
-// });
-const stripe = null; // Temporarily disabled
 
 // WebSocket connections by user ID
 const connections = new Map<string, WebSocket>();
@@ -306,23 +295,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment routes - temporarily disabled for development
-  app.post("/api/create-payment-intent", isAuthenticated, async (req: any, res) => {
-    // Temporarily return success without actual payment processing
-    res.json({ 
-      clientSecret: "mock_client_secret",
-      message: "Payment system temporarily disabled for development" 
-    });
-  });
-
-  app.get('/api/my-earnings', isAuthenticated, async (req: any, res) => {
+  // Simple booking creation without payment processing
+  app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const earnings = await storage.getEarnings(userId);
-      res.json(earnings);
+      const { eventId } = req.body;
+      
+      // Check if event exists and has capacity
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      if ((event.currentPlayers || 0) >= event.maxPlayers) {
+        return res.status(400).json({ message: "Event is full" });
+      }
+      
+      // Check if user already has a booking for this event
+      const existingBookings = await storage.getBookingsByUser(userId);
+      const hasExistingBooking = existingBookings.some(b => b.eventId === eventId);
+      
+      if (hasExistingBooking) {
+        return res.status(400).json({ message: "You already have a booking for this event" });
+      }
+      
+      // Create booking
+      const booking = await storage.createBooking({
+        eventId,
+        userId,
+        status: "confirmed",
+      });
+      
+      res.status(201).json(booking);
     } catch (error) {
-      console.error("Error fetching earnings:", error);
-      res.status(500).json({ message: "Failed to fetch earnings" });
+      console.error("Error creating booking:", error);
+      res.status(500).json({ message: "Failed to create booking" });
     }
   });
 
