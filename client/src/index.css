@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Everest brand colors */
+  --everest-blue: hsl(215, 81%, 56%);
+  --everest-green: hsl(160, 84%, 39%);
+  --everest-orange: hsl(24, 90%, 49%);
+  
+  /* Sport-themed colors */
+  --sport-badminton: hsl(150, 84%, 44%);
+  --sport-basketball: hsl(24, 90%, 49%);
+  --sport-soccer: hsl(160, 84%, 39%);
+  --sport-tennis: hsl(261, 83%, 58%);
+  --sport-volleyball: hsl(0, 91%, 71%);
+  --sport-tabletennis: hsl(43, 96%, 56%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .sidebar-transition {
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .modal-backdrop {
+    backdrop-filter: blur(4px);
+  }
+  
+  .card-hover {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .everest-blue {
+    color: var(--everest-blue);
+  }
+  
+  .bg-everest-blue {
+    background-color: var(--everest-blue);
+  }
+  
+  .everest-green {
+    color: var(--everest-green);
+  }
+  
+  .bg-everest-green {
+    background-color: var(--everest-green);
+  }
+  
+  .everest-orange {
+    color: var(--everest-orange);
+  }
+  
+  .bg-everest-orange {
+    background-color: var(--everest-orange);
+  }
+  
+  .sport-badminton {
+    color: var(--sport-badminton);
+  }
+  
+  .bg-sport-badminton {
+    background-color: var(--sport-badminton);
+  }
+  
+  .sport-basketball {
+    color: var(--sport-basketball);
+  }
+  
+  .bg-sport-basketball {
+    background-color: var(--sport-basketball);
+  }
+  
+  .sport-soccer {
+    color: var(--sport-soccer);
+  }
+  
+  .bg-sport-soccer {
+    background-color: var(--sport-soccer);
+  }
+  
+  .sport-tennis {
+    color: var(--sport-tennis);
+  }
+  
+  .bg-sport-tennis {
+    background-color: var(--sport-tennis);
+  }
+  
+  .sport-volleyball {
+    color: var(--sport-volleyball);
+  }
+  
+  .bg-sport-volleyball {
+    background-color: var(--sport-volleyball);
+  }
+  
+  .sport-tabletennis {
+    color: var(--sport-tabletennis);
+  }
+  
+  .bg-sport-tabletennis {
+    background-color: var(--sport-tabletennis);
+  }
+}

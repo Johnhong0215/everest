@@ -1,0 +1,372 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { insertEventSchema } from "@shared/schema";
+import { SPORTS, SPORT_CONFIGS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
+import { z } from "zod";
+
+interface CreateEventModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const createEventFormSchema = insertEventSchema.extend({
+  sportConfig: z.record(z.string(), z.any()),
+});
+
+type CreateEventFormData = z.infer<typeof createEventFormSchema>;
+
+export default function CreateEventModal({ isOpen, onClose }: CreateEventModalProps) {
+  const [selectedSport, setSelectedSport] = useState<string>('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const form = useForm<CreateEventFormData>({
+    resolver: zodResolver(createEventFormSchema),
+    defaultValues: {
+      title: '',
+      description: '',
+      sport: 'badminton',
+      skillLevel: 'intermediate',
+      genderMix: 'mixed',
+      startTime: new Date(),
+      endTime: new Date(),
+      location: '',
+      maxPlayers: 4,
+      pricePerPerson: '12.00',
+      sportConfig: {},
+      notes: '',
+    },
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: async (data: CreateEventFormData) => {
+      return await apiRequest('POST', '/api/events', data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event Created",
+        description: "Your event has been created successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      onClose();
+      form.reset();
+    },
+    onError: (error) => {
+      console.error('Create event error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const selectedSportData = SPORTS.find(s => s.id === selectedSport);
+  const sportConfig = selectedSport ? SPORT_CONFIGS[selectedSport as keyof typeof SPORT_CONFIGS] : null;
+
+  const onSubmit = (data: CreateEventFormData) => {
+    createEventMutation.mutate(data);
+  };
+
+  const handleSportSelect = (sportId: string) => {
+    setSelectedSport(sportId);
+    form.setValue('sport', sportId as any);
+    // Reset sport config when changing sports
+    form.setValue('sportConfig', {});
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">Create New Event</DialogTitle>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Sport Selection */}
+            <div>
+              <Label className="text-sm font-medium mb-3 block">Select Sport</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {SPORTS.map((sport) => (
+                  <button
+                    key={sport.id}
+                    type="button"
+                    onClick={() => handleSportSelect(sport.id)}
+                    className={`flex flex-col items-center p-4 border-2 rounded-lg transition-colors ${
+                      selectedSport === sport.id
+                        ? `border-${sport.color} bg-${sport.color} bg-opacity-10`
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 bg-${sport.color} rounded-full flex items-center justify-center mb-2`}>
+                      <div className="w-5 h-5 text-white">
+                        <div className="w-full h-full bg-current rounded-sm" />
+                      </div>
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      selectedSport === sport.id ? `text-${sport.color}` : 'text-gray-600'
+                    }`}>
+                      {sport.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Event Title */}
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Event Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Evening Doubles Badminton" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Sport-Specific Configuration */}
+            {selectedSport && sportConfig && (
+              <div className={`bg-${selectedSportData?.color} bg-opacity-5 p-4 rounded-lg border border-${selectedSportData?.color} border-opacity-20`}>
+                <h3 className={`text-lg font-semibold text-${selectedSportData?.color} mb-4`}>
+                  {selectedSportData?.name} Settings
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(sportConfig).map(([key, options]) => (
+                    <div key={key}>
+                      <Label className="text-sm font-medium mb-2 block capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </Label>
+                      <Select
+                        onValueChange={(value) => {
+                          const currentConfig = form.getValues('sportConfig') || {};
+                          form.setValue('sportConfig', { ...currentConfig, [key]: value });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={`Select ${key}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(options as string[]).map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Date & Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="startTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date & Time</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        {...field}
+                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date & Time</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        {...field}
+                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Location */}
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Venue name and address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Players & Settings */}
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="maxPlayers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Max Players</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={2}
+                        max={22}
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="skillLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Skill Level</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {SKILL_LEVELS.map((level) => (
+                          <SelectItem key={level.value} value={level.value}>
+                            {level.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="genderMix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender Mix</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {GENDER_MIX.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Cost */}
+            <FormField
+              control={form.control}
+              name="pricePerPerson"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cost per Person</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <Input
+                        placeholder="12.00"
+                        className="pl-8"
+                        {...field}
+                      />
+                    </div>
+                  </FormControl>
+                  <p className="text-sm text-gray-500">
+                    This covers court rental split among players + 5% platform fee
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Additional Notes */}
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Additional Notes (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Any special instructions or requirements..."
+                      rows={3}
+                      {...field}
+                      value={field.value || ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-everest-blue hover:bg-blue-700"
+                disabled={createEventMutation.isPending}
+              >
+                {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
