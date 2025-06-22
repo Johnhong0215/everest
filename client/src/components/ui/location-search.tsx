@@ -6,6 +6,7 @@ import { MapPin, Navigation, X } from 'lucide-react';
 interface LocationSearchProps {
   value: string;
   onChange: (location: string, coordinates?: { lat: number; lng: number }) => void;
+  onInputChange?: (location: string) => void;
   placeholder?: string;
   className?: string;
   userLocation?: { lat: number; lng: number } | null;
@@ -21,6 +22,7 @@ interface LocationSuggestion {
 export default function LocationSearch({ 
   value, 
   onChange, 
+  onInputChange,
   placeholder = "Search location...",
   className = "",
   userLocation
@@ -111,7 +113,11 @@ export default function LocationSearch({
   // Handle input change with debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    onChange(newValue);
+    
+    // Call the input change handler if provided (for debounced filtering)
+    if (onInputChange) {
+      onInputChange(newValue);
+    }
     
     if (searchTimeout.current) {
       clearTimeout(searchTimeout.current);

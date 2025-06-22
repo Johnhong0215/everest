@@ -76,20 +76,26 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
     onFiltersChange({ ...filters, [key]: value });
   }, [filters, onFiltersChange]);
 
-  // Debounced location handler to prevent triggering on every character
+  // Immediate location handler for UI updates
   const handleLocationChange = useCallback((location: string, coordinates?: { lat: number; lng: number }) => {
+    // Immediately update filters for location selection from dropdown
+    updateFilters('location', location);
+  }, [updateFilters]);
+
+  // Debounced location input handler
+  const handleLocationInputChange = useCallback((location: string) => {
     // Clear any existing timeout
     if (locationTimeoutRef.current) {
       clearTimeout(locationTimeoutRef.current);
     }
 
-    // Only apply filter change after user stops typing for 500ms
+    // Only apply filter change after user stops typing for 800ms
     locationTimeoutRef.current = setTimeout(() => {
       updateFilters('location', location);
-    }, 500);
+    }, 800);
   }, [updateFilters]);
 
-  // Debounced radius handler
+  // Immediate radius handler for UI updates
   const handleRadiusChange = useCallback((value: number[]) => {
     setTempRadius(value[0]);
     
@@ -98,13 +104,13 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
       clearTimeout(radiusTimeoutRef.current);
     }
 
-    // Only apply filter change after user stops adjusting for 300ms
+    // Apply filter change after user stops adjusting for 500ms
     radiusTimeoutRef.current = setTimeout(() => {
       updateFilters('radius', value[0]);
-    }, 300);
+    }, 500);
   }, [updateFilters]);
 
-  // Debounced price handler
+  // Immediate price handler for UI updates
   const handlePriceChange = useCallback((value: number[]) => {
     setTempPriceMax(value[0]);
     
@@ -113,10 +119,10 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
       clearTimeout(priceTimeoutRef.current);
     }
 
-    // Only apply filter change after user stops adjusting for 300ms
+    // Apply filter change after user stops adjusting for 500ms
     priceTimeoutRef.current = setTimeout(() => {
       updateFilters('priceMax', value[0]);
-    }, 300);
+    }, 500);
   }, [updateFilters]);
 
   const toggleSport = (sportId: string) => {
@@ -220,6 +226,7 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
             <LocationSearch
               value={filters.location}
               onChange={handleLocationChange}
+              onInputChange={handleLocationInputChange}
               placeholder="Search for location..."
               userLocation={userLocation}
             />
