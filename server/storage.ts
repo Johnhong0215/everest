@@ -46,6 +46,7 @@ export interface IStorage {
     offset?: number;
   }): Promise<EventWithHost[]>;
   updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined>;
+  updateEventPlayerCount(id: number, playerCount: number): Promise<boolean>;
   deleteEvent(id: number): Promise<boolean>;
   getEventsByHost(hostId: string): Promise<EventWithHost[]>;
 
@@ -54,6 +55,7 @@ export interface IStorage {
   getBooking(id: number): Promise<BookingWithEventAndUser | undefined>;
   getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]>;
   getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]>;
+  getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]>;
   updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
   cancelBooking(id: number): Promise<boolean>;
 
@@ -234,6 +236,14 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
+  async updateEventPlayerCount(id: number, playerCount: number): Promise<boolean> {
+    const result = await db
+      .update(events)
+      .set({ currentPlayers: playerCount, updatedAt: new Date() })
+      .where(eq(events.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
   async deleteEvent(id: number): Promise<boolean> {
     const result = await db.delete(events).where(eq(events.id, id));
     return (result.rowCount || 0) > 0;
@@ -334,6 +344,26 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(events, eq(bookings.eventId, events.id))
       .leftJoin(users, eq(events.hostId, users.id))
       .where(eq(bookings.eventId, eventId))
+      .orderBy(desc(bookings.createdAt));
+
+    const bookingUsers = await Promise.all(
+      result.map(row => this.getUser(row.bookings.userId))
+    );
+
+    return result.map((row, index) => ({
+      ...row.bookings,
+      event: { ...row.events!, host: row.users!, bookings: [] },
+      user: bookingUsers[index]!,
+    }));
+  }
+
+  async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
+    const result = await db
+      .select()
+      .from(bookings)
+      .leftJoin(events, eq(bookings.eventId, events.id))
+      .leftJoin(users, eq(events.hostId, users.id))
+      .where(and(eq(events.hostId, hostId), eq(bookings.status, "pending")))
       .orderBy(desc(bookings.createdAt));
 
     const bookingUsers = await Promise.all(

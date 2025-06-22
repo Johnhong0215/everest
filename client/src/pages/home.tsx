@@ -5,11 +5,13 @@ import EventGrid from "@/components/events/event-grid";
 import CreateEventModal from "@/components/events/create-event-modal";
 import MyBookingsModal from "@/components/bookings/my-bookings-modal";
 import ChatModal from "@/components/chat/chat-modal";
+import BookingRequestsModal from "@/components/notifications/booking-requests-modal";
 
 export default function Home() {
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [isBookingsOpen, setIsBookingsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [filters, setFilters] = useState({
@@ -28,6 +30,7 @@ export default function Home() {
         onCreateEvent={() => setIsCreateEventOpen(true)}
         onOpenBookings={() => setIsBookingsOpen(true)}
         onOpenChat={() => setIsChatOpen(true)}
+        onOpenRequests={() => setIsRequestsOpen(true)}
       />
       
       <div className="flex">
@@ -68,6 +71,11 @@ export default function Home() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         eventId={activeEventId}
+      />
+      
+      <BookingRequestsModal 
+        isOpen={isRequestsOpen}
+        onClose={() => setIsRequestsOpen(false)}
       />
     </div>
   );

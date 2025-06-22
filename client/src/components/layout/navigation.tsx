@@ -16,9 +16,10 @@ interface NavigationProps {
   onCreateEvent: () => void;
   onOpenBookings: () => void;
   onOpenChat: () => void;
+  onOpenRequests: () => void;
 }
 
-export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }: NavigationProps) {
+export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, onOpenRequests }: NavigationProps) {
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -28,7 +29,14 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
     enabled: !!user,
   });
   
+  // Fetch pending booking requests count for hosts
+  const { data: pendingBookings = [] } = useQuery({
+    queryKey: ['/api/pending-bookings'],
+    enabled: !!user,
+  });
+  
   const unreadCount = Array.isArray(chats) ? chats.reduce((total: number, chat: any) => total + (chat.unreadCount || 0), 0) : 0;
+  const pendingRequestsCount = Array.isArray(pendingBookings) ? pendingBookings.length : 0;
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -64,6 +72,20 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
                 {unreadCount > 0 && (
                   <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
                     {unreadCount}
+                  </Badge>
+                )}
+              </div>
+            </button>
+            <button 
+              onClick={onOpenRequests}
+              className="text-gray-600 hover:text-gray-900 relative font-medium"
+            >
+              <div className="flex items-center space-x-1">
+                <Calendar className="w-4 h-4" />
+                <span>Requests</span>
+                {pendingRequestsCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                    {pendingRequestsCount}
                   </Badge>
                 )}
               </div>

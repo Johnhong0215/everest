@@ -51,14 +51,14 @@ export default function EventGrid({
     mutationFn: async (eventId: number) => {
       const response = await apiRequest('POST', '/api/bookings', {
         eventId,
-        status: 'confirmed'
+        status: 'pending'
       });
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Event Joined!",
-        description: "You have successfully joined the event.",
+        title: "Join Request Sent!",
+        description: "Your request to join has been sent to the host for approval.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
       queryClient.invalidateQueries({ queryKey: ['/api/my-bookings'] });
@@ -66,7 +66,7 @@ export default function EventGrid({
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to join event. Please try again.",
+        description: error.message || "Failed to send join request. Please try again.",
         variant: "destructive",
       });
     },
@@ -82,6 +82,43 @@ export default function EventGrid({
       return;
     }
     createBookingMutation.mutate(eventId);
+  };
+
+  // Delete event mutation
+  const deleteEventMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const response = await apiRequest('DELETE', `/api/events/${eventId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event Cancelled",
+        description: "Your event has been cancelled successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-events'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCancelEvent = (eventId: number) => {
+    if (confirm("Are you sure you want to cancel this event? This action cannot be undone.")) {
+      deleteEventMutation.mutate(eventId);
+    }
+  };
+
+  const handleModifyEvent = (eventId: number) => {
+    // TODO: Implement event modification modal
+    toast({
+      title: "Coming Soon",
+      description: "Event modification feature will be available soon.",
+    });
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -210,6 +247,9 @@ export default function EventGrid({
                     event={event}
                     onJoin={handleJoinEvent}
                     onOpenChat={onOpenChat}
+                    onCancel={handleCancelEvent}
+                    onModify={handleModifyEvent}
+                    currentUserId={user ? (user as any).id : undefined}
                   />
                 ))}
               </div>

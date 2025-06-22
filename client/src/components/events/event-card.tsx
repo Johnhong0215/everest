@@ -11,9 +11,12 @@ interface EventCardProps {
   event: EventWithHost;
   onJoin: (eventId: number) => void;
   onOpenChat?: (eventId: number) => void;
+  onCancel?: (eventId: number) => void;
+  onModify?: (eventId: number) => void;
+  currentUserId?: string;
 }
 
-export default function EventCard({ event, onJoin, onOpenChat }: EventCardProps) {
+export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId }: EventCardProps) {
   const sport = SPORTS.find(s => s.id === event.sport);
   const sportColor = sport?.color || 'sport-badminton';
   
@@ -21,8 +24,10 @@ export default function EventCard({ event, onJoin, onOpenChat }: EventCardProps)
     return format(date, 'PPp');
   };
 
-  const isEventFull = event.currentPlayers >= event.maxPlayers;
-  const spotsRemaining = event.maxPlayers - event.currentPlayers;
+  const currentPlayers = event.currentPlayers || 0;
+  const isEventFull = currentPlayers >= event.maxPlayers;
+  const spotsRemaining = event.maxPlayers - currentPlayers;
+  const isHost = currentUserId === event.hostId;
 
   return (
     <Card className="card-hover bg-white border border-gray-200">
@@ -100,20 +105,41 @@ export default function EventCard({ event, onJoin, onOpenChat }: EventCardProps)
         </div>
 
         <div className="flex space-x-2">
-          {isEventFull ? (
-            <Button disabled className="flex-1">
-              Event Full
-            </Button>
+          {isHost ? (
+            <>
+              <Button 
+                onClick={() => onModify?.(event.id)}
+                variant="outline"
+                className="flex-1"
+              >
+                Modify
+              </Button>
+              <Button 
+                onClick={() => onCancel?.(event.id)}
+                variant="destructive"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </>
           ) : (
-            <Button 
-              onClick={() => onJoin(event.id)}
-              className="flex-1 bg-everest-blue hover:bg-blue-700"
-            >
-              Join & Pay
-            </Button>
+            <>
+              {isEventFull ? (
+                <Button disabled className="flex-1">
+                  Event Full
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => onJoin(event.id)}
+                  className="flex-1 bg-everest-blue hover:bg-blue-700"
+                >
+                  Join & Pay
+                </Button>
+              )}
+            </>
           )}
           
-          {onOpenChat && (
+          {!isHost && onOpenChat && (
             <Button 
               variant="outline" 
               size="sm"

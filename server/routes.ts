@@ -3,8 +3,9 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertEventSchema, insertBookingSchema, insertChatMessageSchema } from "@shared/schema";
+import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events } from "@shared/schema";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
 // WebSocket connections by user ID
 const connections = new Map<string, WebSocket>();
@@ -82,12 +83,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       console.log("User ID:", userId);
       
-      // Convert datetime strings to Date objects
+      // Convert datetime strings to Date objects and set currentPlayers to 1 (host is playing)
       const eventDataWithDates = {
         ...req.body,
         hostId: userId,
         startTime: new Date(req.body.startTime),
         endTime: new Date(req.body.endTime),
+        currentPlayers: 1, // Host is automatically playing
       };
       
       const eventData = insertEventSchema.parse(eventDataWithDates);
@@ -216,6 +218,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/pending-bookings', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const pendingBookings = await storage.getPendingBookingsForHost(userId);
+      res.json(pendingBookings);
+    } catch (error) {
+      console.error("Error fetching pending bookings:", error);
+      res.status(500).json({ message: "Failed to fetch pending bookings" });
+    }
+  });
+
   app.get('/api/events/:id/bookings', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -237,16 +250,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/bookings/:id/status', isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const bookingId = parseInt(req.params.id);
       const { status } = req.body;
 
-      const booking = await storage.updateBookingStatus(bookingId, status);
-      
+      // Get booking and verify user is the event host
+      const booking = await storage.getBooking(bookingId);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      res.json(booking);
+      // Check if user is the host of the event
+      if (booking.event.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this booking" });
+      }
+
+      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
+      
+      if (!updatedBooking) {
+        return res.status(404).json({ message: "Failed to update booking" });
+      }
+
+      // If approved, increment event currentPlayers
+      if (status === 'confirmed') {
+        const event = booking.event;
+        // Manually update currentPlayers using direct database access
+        const newPlayerCount = (event.currentPlayers || 0) + 1;
+        await storage.updateEventPlayerCount(event.id, newPlayerCount);
+      }
+
+      res.json(updatedBooking);
     } catch (error) {
       console.error("Error updating booking status:", error);
       res.status(500).json({ message: "Failed to update booking status" });

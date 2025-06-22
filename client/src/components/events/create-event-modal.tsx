@@ -55,7 +55,6 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       maxPlayers: 4,
       pricePerPerson: '12.00',
       sportConfig: {},
-      notes: '',
     },
   });
 
@@ -111,8 +110,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       startTime: new Date(data.startTime),
       endTime: new Date(data.endTime),
       sportConfig: data.sportConfig || {},
-      currentPlayers: 0, // Initialize to 0
-      description: data.notes || '', // Use notes as description for API
+      currentPlayers: 1, // Host counts as first player
+      description: '', // No description field
     };
     
     console.log('Sending to API:', eventData);
@@ -376,25 +375,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
               )}
             />
 
-            {/* Additional Notes */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Additional Notes (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Any special instructions or requirements..."
-                      rows={3}
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
 
             {/* Action Buttons */}
             <div className="flex space-x-3 pt-4">
