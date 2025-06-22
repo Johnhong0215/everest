@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,11 @@ interface SidebarProps {
 
 export default function Sidebar({ filters, onFiltersChange, className }: SidebarProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [tempRadius, setTempRadius] = useState(filters.radius);
+  const [tempPriceMax, setTempPriceMax] = useState(filters.priceMax);
+  const locationTimeoutRef = useRef<NodeJS.Timeout>();
+  const radiusTimeoutRef = useRef<NodeJS.Timeout>();
+  const priceTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Get user location for proximity-based search
   useEffect(() => {
@@ -46,13 +51,72 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
     }
   }, []);
 
+  // Sync temp values with filters when they change externally
+  useEffect(() => {
+    setTempRadius(filters.radius);
+    setTempPriceMax(filters.priceMax);
+  }, [filters.radius, filters.priceMax]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (locationTimeoutRef.current) {
+        clearTimeout(locationTimeoutRef.current);
+      }
+      if (radiusTimeoutRef.current) {
+        clearTimeout(radiusTimeoutRef.current);
+      }
+      if (priceTimeoutRef.current) {
+        clearTimeout(priceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const updateFilters = useCallback((key: string, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
   }, [filters, onFiltersChange]);
 
   // Debounced location handler to prevent triggering on every character
   const handleLocationChange = useCallback((location: string, coordinates?: { lat: number; lng: number }) => {
-    updateFilters('location', location);
+    // Clear any existing timeout
+    if (locationTimeoutRef.current) {
+      clearTimeout(locationTimeoutRef.current);
+    }
+
+    // Only apply filter change after user stops typing for 500ms
+    locationTimeoutRef.current = setTimeout(() => {
+      updateFilters('location', location);
+    }, 500);
+  }, [updateFilters]);
+
+  // Debounced radius handler
+  const handleRadiusChange = useCallback((value: number[]) => {
+    setTempRadius(value[0]);
+    
+    // Clear any existing timeout
+    if (radiusTimeoutRef.current) {
+      clearTimeout(radiusTimeoutRef.current);
+    }
+
+    // Only apply filter change after user stops adjusting for 300ms
+    radiusTimeoutRef.current = setTimeout(() => {
+      updateFilters('radius', value[0]);
+    }, 300);
+  }, [updateFilters]);
+
+  // Debounced price handler
+  const handlePriceChange = useCallback((value: number[]) => {
+    setTempPriceMax(value[0]);
+    
+    // Clear any existing timeout
+    if (priceTimeoutRef.current) {
+      clearTimeout(priceTimeoutRef.current);
+    }
+
+    // Only apply filter change after user stops adjusting for 300ms
+    priceTimeoutRef.current = setTimeout(() => {
+      updateFilters('priceMax', value[0]);
+    }, 300);
   }, [updateFilters]);
 
   const toggleSport = (sportId: string) => {
@@ -155,17 +219,17 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
             <h3 className="text-sm font-medium text-gray-700 mb-3">Location</h3>
             <LocationSearch
               value={filters.location}
-              onChange={(location) => updateFilters('location', location)}
+              onChange={handleLocationChange}
               placeholder="Search for location..."
               userLocation={userLocation}
             />
             <div className="mt-3">
               <Label className="text-sm text-gray-600">
-                Distance: <span className="font-medium">{filters.radius} miles</span>
+                Distance: <span className="font-medium">{tempRadius} miles</span>
               </Label>
               <Slider
-                value={[filters.radius]}
-                onValueChange={(value) => updateFilters('radius', value[0])}
+                value={[tempRadius]}
+                onValueChange={handleRadiusChange}
                 max={25}
                 min={1}
                 step={1}
@@ -179,8 +243,8 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
             <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
             <div className="px-1">
               <Slider
-                value={[filters.priceMax]}
-                onValueChange={(value) => updateFilters('priceMax', value[0])}
+                value={[tempPriceMax]}
+                onValueChange={handlePriceChange}
                 max={100}
                 min={0}
                 step={5}
@@ -188,7 +252,7 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>$0</span>
-                <span className="font-medium">Up to ${filters.priceMax}</span>
+                <span className="font-medium">Up to ${tempPriceMax}</span>
                 <span>$100+</span>
               </div>
             </div>
