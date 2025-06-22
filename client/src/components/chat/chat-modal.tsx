@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -179,7 +179,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     chat.event.sport.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const isHost = activeEvent && user && activeEvent.hostId === user.id;
+  const isHost = activeEvent && user && typeof user === 'object' && 'id' in user && activeEvent.hostId === (user as any).id;
 
   if (!isAuthenticated) {
     return null;
@@ -246,7 +246,8 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                               {chat.event.title}
                             </p>
                             <span className="text-xs text-gray-500">
-                              {chat.lastMessage && format(new Date(chat.lastMessage.createdAt), 'h:mm a')}
+                              {chat.lastMessage && chat.lastMessage.createdAt && 
+                                format(new Date(chat.lastMessage.createdAt), 'h:mm a')}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 truncate">
@@ -320,8 +321,8 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <p className="text-gray-500">No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      messages.map((message) => {
-                        const isOwnMessage = user && message.senderId === user.id;
+                      messages.map((message): React.ReactNode => {
+                        const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
                         return (
                           <div
                             key={message.id}
@@ -347,7 +348,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                                     }
                                   </span>
                                   <span className="text-xs text-gray-500">
-                                    {format(new Date(message.createdAt), 'h:mm a')}
+                                    {message.createdAt ? format(new Date(message.createdAt), 'h:mm a') : ''}
                                   </span>
                                 </div>
                               )}
@@ -360,11 +361,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                               >
                                 <p className="text-sm">{message.content}</p>
                               </div>
-                              {isOwnMessage && (
+                              {isOwnMessage ? (
                                 <div className="text-xs text-gray-500 mt-1 text-right">
-                                  {format(new Date(message.createdAt), 'h:mm a')}
+                                  {message.createdAt ? format(new Date(message.createdAt), 'h:mm a') : ''}
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         );
@@ -411,7 +412,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                   )}
 
                   {/* Host Controls */}
-                  {isHost && activeEvent.status === 'published' && (
+                  {((isHost && activeEvent.status === 'published') ? (
                     <div className="mt-3 flex space-x-2">
                       <Button
                         size="sm"
@@ -432,7 +433,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         Cancel Event
                       </Button>
                     </div>
-                  )}
+                  ) : null) as React.ReactNode}
                 </div>
               </>
             ) : (

@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, List, Map, Filter } from "lucide-react";
 import EventCard from "./event-card";
-import Checkout from "@/components/payments/checkout";
 import { EventWithHost } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
 
 interface EventGridProps {
   filters: {
@@ -35,14 +37,51 @@ export default function EventGrid({
   const [searchQuery, setSearchQuery] = useState(filters.search);
   const [selectedEventForPayment, setSelectedEventForPayment] = useState<number | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: events = [], isLoading, error } = useQuery<EventWithHost[]>({
     queryKey: ['/api/events', filters],
     staleTime: 30000, // 30 seconds
   });
 
+  // Create booking mutation
+  const createBookingMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const response = await apiRequest('POST', '/api/bookings', {
+        eventId,
+        status: 'confirmed'
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event Joined!",
+        description: "You have successfully joined the event.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-bookings'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to join event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleJoinEvent = (eventId: number) => {
-    setSelectedEventForPayment(eventId);
+    if (!isAuthenticated) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to join events.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createBookingMutation.mutate(eventId);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -188,13 +227,7 @@ export default function EventGrid({
         )}
       </div>
 
-      {/* Payment Modal */}
-      {selectedEventForPayment && (
-        <Checkout
-          eventId={selectedEventForPayment}
-          onClose={() => setSelectedEventForPayment(null)}
-        />
-      )}
+
     </>
   );
 }
