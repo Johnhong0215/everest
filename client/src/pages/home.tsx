@@ -18,11 +18,11 @@ export default function Home() {
   const [appliedFilters, setAppliedFilters] = useState({
     sports: [] as string[],
     date: '',
-    skillLevel: '',
+    skillLevels: [] as string[],
+    genders: [] as string[],
     location: '',
     radius: 5,
     priceMax: 100,
-    search: '',
   });
 
   // Pending filters (what's currently being edited in the sidebar)
@@ -30,7 +30,6 @@ export default function Home() {
     location: '',
     radius: 5,
     priceMax: 100,
-    search: '',
   });
 
   // Handle immediate filter changes (sports, date, skill level apply immediately)
@@ -55,8 +54,7 @@ export default function Home() {
   const hasPendingChanges = useMemo(() => (
     pendingFilters.location !== appliedFilters.location ||
     pendingFilters.radius !== appliedFilters.radius ||
-    pendingFilters.priceMax !== appliedFilters.priceMax ||
-    pendingFilters.search !== appliedFilters.search
+    pendingFilters.priceMax !== appliedFilters.priceMax
   ), [pendingFilters, appliedFilters]);
 
   return (

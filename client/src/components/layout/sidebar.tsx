@@ -1,31 +1,28 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Filter } from "lucide-react";
 import LocationSearch from "@/components/ui/location-search";
-import { SPORTS, SKILL_LEVELS } from "@/lib/constants";
+import { SPORTS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
 
 interface SidebarProps {
   appliedFilters: {
     sports: string[];
     date: string;
-    skillLevel: string;
+    skillLevels: string[];
+    genders: string[];
     location: string;
     radius: number;
     priceMax: number;
-    search: string;
   };
   pendingFilters: {
     location: string;
     radius: number;
     priceMax: number;
-    search: string;
   };
   onImmediateFilterChange: (key: string, value: any) => void;
   onPendingFilterChange: (key: string, value: any) => void;
@@ -45,7 +42,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Get user location for location search
+  // Get user location for location search proximity
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -62,27 +59,54 @@ export default function Sidebar({
     }
   }, []);
 
-  // Handle location change (same as CreateEventModal)
+  // Handle location change with proximity-based suggestions
   const handleLocationChange = (location: string, coordinates?: { lat: number; lng: number }) => {
     onPendingFilterChange('location', location);
   };
 
-  // Handle sports filter change (immediate)
-  const handleSportToggle = (sport: string) => {
-    const newSports = appliedFilters.sports.includes(sport)
-      ? appliedFilters.sports.filter((s: string) => s !== sport)
-      : [...appliedFilters.sports, sport];
+  // Handle sports checkbox changes
+  const handleSportToggle = (sport: string, checked: boolean) => {
+    const newSports = checked
+      ? [...appliedFilters.sports, sport]
+      : appliedFilters.sports.filter((s: string) => s !== sport);
     
     onImmediateFilterChange('sports', newSports);
   };
 
-  // Handle other immediate filter changes
+  // Handle skill level checkbox changes
+  const handleSkillLevelToggle = (skillLevel: string, checked: boolean) => {
+    const newSkillLevels = checked
+      ? [...appliedFilters.skillLevels, skillLevel]
+      : appliedFilters.skillLevels.filter((s: string) => s !== skillLevel);
+    
+    onImmediateFilterChange('skillLevels', newSkillLevels);
+  };
+
+  // Handle gender checkbox changes
+  const handleGenderToggle = (gender: string, checked: boolean) => {
+    const newGenders = checked
+      ? [...appliedFilters.genders, gender]
+      : appliedFilters.genders.filter((g: string) => g !== gender);
+    
+    onImmediateFilterChange('genders', newGenders);
+  };
+
+  // Handle date change
   const handleDateChange = (date: string) => {
     onImmediateFilterChange('date', date);
   };
 
-  const handleSkillLevelChange = (skillLevel: string) => {
-    onImmediateFilterChange('skillLevel', skillLevel);
+  // Sport colors for visual consistency
+  const getSportColor = (sportId: string) => {
+    const colorMap: { [key: string]: string } = {
+      'badminton': 'text-green-600',
+      'basketball': 'text-orange-600',
+      'soccer': 'text-green-700',
+      'tennis': 'text-purple-600',
+      'volleyball': 'text-red-600',
+      'tabletennis': 'text-yellow-600'
+    };
+    return colorMap[sportId] || 'text-gray-600';
   };
 
   return (
@@ -93,30 +117,32 @@ export default function Sidebar({
           <h2 className="text-lg font-semibold">Filters</h2>
         </div>
 
-        {/* Search */}
-        <div className="space-y-2">
-          <Label htmlFor="search">Search Events</Label>
-          <Input
-            id="search"
-            placeholder="Search by title, description..."
-            value={pendingFilters.search}
-            onChange={(e) => onPendingFilterChange('search', e.target.value)}
-          />
-        </div>
-
-        {/* Sports */}
+        {/* Sports - Checkbox List */}
         <div className="space-y-3">
-          <Label>Sports</Label>
-          <div className="flex flex-wrap gap-2">
+          <Label className="text-base font-medium">Sports</Label>
+          <div className="space-y-2">
             {SPORTS.map((sport) => (
-              <Badge
-                key={sport.id}
-                variant={appliedFilters.sports.includes(sport.id) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => handleSportToggle(sport.id)}
-              >
-                {sport.name}
-              </Badge>
+              <div key={sport.id} className="flex items-center space-x-3">
+                <Checkbox
+                  id={`sport-${sport.id}`}
+                  checked={appliedFilters.sports.includes(sport.id)}
+                  onCheckedChange={(checked) => handleSportToggle(sport.id, checked === true)}
+                />
+                <label
+                  htmlFor={`sport-${sport.id}`}
+                  className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer ${getSportColor(sport.id)}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${sport.color === 'sport-badminton' ? 'bg-green-500' : 
+                      sport.color === 'sport-basketball' ? 'bg-orange-500' :
+                      sport.color === 'sport-soccer' ? 'bg-green-600' :
+                      sport.color === 'sport-tennis' ? 'bg-purple-500' :
+                      sport.color === 'sport-volleyball' ? 'bg-red-500' :
+                      sport.color === 'sport-tabletennis' ? 'bg-yellow-500' : 'bg-gray-500'}`}></div>
+                    {sport.name}
+                  </div>
+                </label>
+              </div>
             ))}
           </div>
         </div>
@@ -132,27 +158,53 @@ export default function Sidebar({
           />
         </div>
 
-        {/* Skill Level */}
-        <div className="space-y-2">
-          <Label>Skill Level</Label>
-          <Select value={appliedFilters.skillLevel} onValueChange={handleSkillLevelChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Any skill level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">Any skill level</SelectItem>
-              {SKILL_LEVELS.map((level) => (
-                <SelectItem key={level.value} value={level.value}>
+        {/* Skill Levels - Checkbox List */}
+        <div className="space-y-3">
+          <Label className="text-base font-medium">Skill Level</Label>
+          <div className="space-y-2">
+            {SKILL_LEVELS.map((level) => (
+              <div key={level.value} className="flex items-center space-x-3">
+                <Checkbox
+                  id={`skill-${level.value}`}
+                  checked={appliedFilters.skillLevels.includes(level.value)}
+                  onCheckedChange={(checked) => handleSkillLevelToggle(level.value, checked === true)}
+                />
+                <label
+                  htmlFor={`skill-${level.value}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
                   {level.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Gender - Checkbox List */}
+        <div className="space-y-3">
+          <Label className="text-base font-medium">Gender</Label>
+          <div className="space-y-2">
+            {GENDER_MIX.map((gender) => (
+              <div key={gender.value} className="flex items-center space-x-3">
+                <Checkbox
+                  id={`gender-${gender.value}`}
+                  checked={appliedFilters.genders.includes(gender.value)}
+                  onCheckedChange={(checked) => handleGenderToggle(gender.value, checked === true)}
+                />
+                <label
+                  htmlFor={`gender-${gender.value}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  {gender.label}
+                </label>
+              </div>
+            ))}
+          </div>
         </div>
 
         <Separator />
 
-        {/* Location */}
+        {/* Location - Proximity-based suggestions */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <MapPin className="w-4 h-4" />

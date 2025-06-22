@@ -19,11 +19,11 @@ interface EventGridProps {
   filters: {
     sports: string[];
     date: string;
-    skillLevel: string;
+    skillLevels: string[];
+    genders: string[];
     location: string;
     radius: number;
     priceMax: number;
-    search: string;
   };
   viewMode: 'list' | 'map';
   onViewModeChange: (mode: 'list' | 'map') => void;
@@ -40,7 +40,7 @@ export default function EventGrid({
   onOpenChat,
   onFiltersChange
 }: EventGridProps) {
-  const [searchQuery, setSearchQuery] = useState(filters.search);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedEventForPayment, setSelectedEventForPayment] = useState<number | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventWithHost | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -99,8 +99,8 @@ export default function EventGrid({
       if (filters.date) {
         params.append('date', filters.date);
       }
-      if (filters.skillLevel) {
-        params.append('skillLevel', filters.skillLevel);
+      if (filters.skillLevels.length > 0) {
+        params.append('skillLevels', filters.skillLevels.join(','));
       }
       if (filters.location) {
         params.append('location', filters.location);
@@ -111,8 +111,8 @@ export default function EventGrid({
       if (filters.priceMax) {
         params.append('priceMax', filters.priceMax.toString());
       }
-      if (filters.search) {
-        params.append('search', filters.search);
+      if (filters.genders.length > 0) {
+        params.append('genders', filters.genders.join(','));
       }
       
       const url = `/api/events${params.toString() ? `?${params.toString()}` : ''}`;
