@@ -46,36 +46,12 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16 w-full">
-          {/* Left: User Avatar */}
-          <div className="flex items-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} alt="Profile" />
-                    <AvatarFallback>
-                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" forceMount>
-                <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium leading-none">
-                    {(user as any)?.firstName && (user as any)?.lastName 
-                      ? `${(user as any).firstName} ${(user as any).lastName}`
-                      : (user as any)?.email
-                    }
-                  </p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {(user as any)?.email}
-                  </p>
-                </div>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Left: Logo */}
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-everest-blue rounded-lg flex items-center justify-center">
+              <Activity className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold text-gray-900">Everest</span>
           </div>
 
           {/* Center: Navigation Links */}
@@ -123,12 +99,36 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
             </Button>
           </div>
 
-          {/* Right: Logo */}
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-everest-blue rounded-lg flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">Everest</span>
+          {/* Right: User Avatar */}
+          <div className="flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} alt="Profile" />
+                    <AvatarFallback>
+                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" forceMount>
+                <div className="flex flex-col space-y-1 p-2">
+                  <p className="text-sm font-medium leading-none">
+                    {(user as any)?.firstName && (user as any)?.lastName 
+                      ? `${(user as any).firstName} ${(user as any).lastName}`
+                      : (user as any)?.email
+                    }
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {(user as any)?.email}
+                  </p>
+                </div>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile Menu Button */}

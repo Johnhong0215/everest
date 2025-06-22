@@ -245,7 +245,7 @@ export default function EventGrid({
       )}
 
       {/* Completely Fixed Header Region */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+      <div className="bg-white border-b border-gray-200 sticky top-16 z-30 shadow-sm">
         {/* Main Header Row */}
         <div className="px-4 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -317,12 +317,7 @@ export default function EventGrid({
             <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
           </form>
 
-          {/* Events Count */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              {isLoading ? 'Loading...' : `${events?.length || 0} events found`}
-            </p>
-          </div>
+
         </div>
       </div>
 
