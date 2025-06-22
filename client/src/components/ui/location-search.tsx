@@ -128,6 +128,13 @@ export default function LocationSearch({
     }
   };
 
+  // Sync input value with prop value
+  useEffect(() => {
+    if (inputRef.current && inputRef.current.value !== value) {
+      inputRef.current.value = value;
+    }
+  }, [value]);
+
   // Handle suggestion selection
   const handleSuggestionSelect = (suggestion: LocationSuggestion) => {
     const coordinates = {
@@ -139,15 +146,20 @@ export default function LocationSearch({
     const locationParts = suggestion.display_name.split(',');
     const cleanLocation = locationParts.slice(0, 2).join(', ').trim();
     
-    onChange(cleanLocation, coordinates);
+    // Close dropdown first
     setSuggestions([]);
     setIsOpen(false);
     
-    // Update the input value directly
-    if (inputRef.current) {
-      inputRef.current.value = cleanLocation;
-      inputRef.current.blur();
-    }
+    // Call onChange which will update the parent component's state
+    onChange(cleanLocation, coordinates);
+    
+    // Force update the input value after a small delay to ensure React has processed the state update
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.value = cleanLocation;
+        inputRef.current.blur();
+      }
+    }, 0);
   };
 
   // Clear search
@@ -230,7 +242,11 @@ export default function LocationSearch({
               {suggestions.map((suggestion, index) => (
                 <button
                   key={suggestion.place_id || index}
-                  onClick={() => handleSuggestionSelect(suggestion)}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSuggestionSelect(suggestion);
+                  }}
                   className="w-full px-4 py-3 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
                 >
                   <div className="flex items-start justify-between">
