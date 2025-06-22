@@ -256,8 +256,8 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                               {chat.event.title}
                             </p>
                             <span className="text-xs text-gray-500">
-                              {chat.lastMessage && chat.lastMessage.createdAt && 
-                                format(new Date(chat.lastMessage.createdAt), 'h:mm a')}
+                              {chat.lastMessage?.createdAt ? 
+                                format(new Date(chat.lastMessage.createdAt), 'h:mm a') : ''}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 truncate">
@@ -293,7 +293,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {format(new Date(activeEvent.startTime), 'MMM d, h:mm a')}
+                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, h:mm a') : 'TBD'}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />

@@ -367,7 +367,7 @@ export default function EventGrid({
                 onOpenChat={onOpenChat}
                 onCancel={handleCancelEvent}
                 onModify={handleModifyEvent}
-                currentUserId={user?.id || ''}
+                currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -379,7 +379,7 @@ export default function EventGrid({
                     onOpenChat={onOpenChat}
                     onCancel={handleCancelEvent}
                     onModify={handleModifyEvent}
-                    currentUserId={user?.id || ''}
+                    currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
                     userLocation={userLocation}
                   />
                 ))}
