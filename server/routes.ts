@@ -32,7 +32,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         sports,
         date,
-        skillLevel,
+        skillLevels,
+        genders,
         location,
         radius,
         priceMax,
@@ -44,7 +45,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters = {
         sports: sports ? (sports as string).split(',') : undefined,
         date: date as string,
-        skillLevel: skillLevel as string,
+        skillLevels: skillLevels ? (skillLevels as string).split(',') : undefined,
+        genders: genders ? (genders as string).split(',') : undefined,
         location: location as string,
         radius: radius ? parseInt(radius as string) : undefined,
         priceMax: priceMax ? parseFloat(priceMax as string) : undefined,

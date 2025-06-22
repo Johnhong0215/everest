@@ -82,6 +82,9 @@ export default function LocationSearch({
       
       if (currentUserLocation) {
         url += `&viewbox=${currentUserLocation.lng-0.5},${currentUserLocation.lat-0.5},${currentUserLocation.lng+0.5},${currentUserLocation.lat+0.5}&bounded=1`;
+        console.log('Searching with user location:', currentUserLocation);
+      } else {
+        console.log('No user location available for proximity search');
       }
 
       const response = await fetch(url);
@@ -136,6 +139,13 @@ export default function LocationSearch({
       setIsOpen(false);
     }
   };
+
+  // Update current user location when prop changes
+  useEffect(() => {
+    if (userLocation && !currentUserLocation) {
+      setCurrentUserLocation(userLocation);
+    }
+  }, [userLocation, currentUserLocation]);
 
   // Sync input value with prop value
   useEffect(() => {
