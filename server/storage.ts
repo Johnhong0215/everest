@@ -152,14 +152,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<EventWithHost[]> {
-    let query = db
-      .select()
-      .from(events)
-      .leftJoin(users, eq(events.hostId, users.id))
-      .leftJoin(bookings, eq(events.id, bookings.eventId))
-      .where(eq(events.status, "published"));
-
-    // Apply filters
+    // Build conditions
     const conditions = [eq(events.status, "published")];
 
     if (filters?.sports && filters.sports.length > 0) {
@@ -192,11 +185,12 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    if (conditions.length > 1) {
-      query = query.where(and(...conditions)!);
-    }
-
-    const result = await query
+    const result = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.hostId, users.id))
+      .leftJoin(bookings, eq(events.id, bookings.eventId))
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
       .orderBy(desc(events.createdAt))
       .limit(filters?.limit || 50)
       .offset(filters?.offset || 0);
@@ -236,7 +230,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEvent(id: number): Promise<boolean> {
     const result = await db.delete(events).where(eq(events.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getEventsByHost(hostId: string): Promise<EventWithHost[]> {
@@ -409,7 +403,7 @@ export class DatabaseStorage implements IStorage {
         sql`${events.hostId} = ${userId} OR ${bookings.userId} = ${userId}`
       );
 
-    const eventIds = [...new Set(userEvents.map(e => e.eventId))];
+    const eventIds = Array.from(new Set(userEvents.map(e => e.eventId)));
 
     if (eventIds.length === 0) return [];
 

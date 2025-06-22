@@ -7,13 +7,15 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
+// Temporarily disable Stripe for development
+// if (!process.env.STRIPE_SECRET_KEY) {
+//   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+// }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+//   apiVersion: "2023-10-16",
+// });
+const stripe = null; // Temporarily disabled
 
 // WebSocket connections by user ID
 const connections = new Map<string, WebSocket>();
@@ -179,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Event not found" });
       }
 
-      if (event.currentPlayers >= event.maxPlayers) {
+      if ((event.currentPlayers || 0) >= event.maxPlayers) {
         return res.status(400).json({ message: "Event is full" });
       }
 
@@ -304,44 +306,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment routes
+  // Payment routes - temporarily disabled for development
   app.post("/api/create-payment-intent", isAuthenticated, async (req: any, res) => {
-    try {
-      const { eventId, bookingId } = req.body;
-      
-      const event = await storage.getEvent(eventId);
-      if (!event) {
-        return res.status(404).json({ message: "Event not found" });
-      }
-
-      const amount = parseFloat(event.pricePerPerson);
-      const platformFee = amount * 0.05; // 5% platform fee
-      const totalAmount = amount + platformFee;
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalAmount * 100), // Convert to cents
-        currency: "usd",
-        metadata: {
-          eventId: eventId.toString(),
-          bookingId: bookingId.toString(),
-        },
-      });
-
-      // Create payment record
-      await storage.createPayment({
-        bookingId,
-        stripePaymentIntentId: paymentIntent.id,
-        amount: totalAmount.toString(),
-        platformFee: platformFee.toString(),
-        hostPayout: amount.toString(),
-        status: "pending",
-      });
-
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error: any) {
-      console.error("Error creating payment intent:", error);
-      res.status(500).json({ message: "Error creating payment intent: " + error.message });
-    }
+    // Temporarily return success without actual payment processing
+    res.json({ 
+      clientSecret: "mock_client_secret",
+      message: "Payment system temporarily disabled for development" 
+    });
   });
 
   app.get('/api/my-earnings', isAuthenticated, async (req: any, res) => {
@@ -400,7 +371,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (message.type === 'auth') {
           userId = message.userId;
-          connections.set(userId, ws);
+          if (userId) {
+            connections.set(userId, ws);
+          }
           return;
         }
 

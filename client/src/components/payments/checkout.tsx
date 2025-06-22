@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { useStripe, Elements, PaymentElement, useElements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,14 +12,9 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { EventWithHost } from "@shared/schema";
 import { SPORTS } from "@/lib/constants";
 import { format } from "date-fns";
-import { Calendar, MapPin, Users, DollarSign, Shield, Clock } from "lucide-react";
+import { Calendar, MapPin, Users, DollarSign, Shield, Clock, Info } from "lucide-react";
 
-// Make sure to call `loadStripe` outside of a component's render to avoid
-// recreating the `Stripe` object on every render.
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+// Temporarily disabled Stripe for development
 
 interface CheckoutProps {
   eventId: number;
@@ -34,44 +27,25 @@ interface CheckoutFormProps {
 }
 
 const CheckoutForm = ({ event, onClose }: CheckoutFormProps) => {
-  const stripe = useStripe();
-  const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
     setIsProcessing(true);
 
     try {
-      const { error } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}?payment_success=true`,
-        },
+      // Simulate payment processing for development
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "Booking Confirmed",
+        description: "Your booking has been confirmed! (Development mode - no payment processed)",
       });
-
-      if (error) {
-        toast({
-          title: "Payment Failed",
-          description: error.message || "An error occurred during payment.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Payment Successful",
-          description: "Your booking has been confirmed!",
-        });
-        onClose();
-      }
+      onClose();
     } catch (error) {
       toast({
-        title: "Payment Failed",
+        title: "Booking Failed",
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
@@ -118,7 +92,7 @@ const CheckoutForm = ({ event, onClose }: CheckoutFormProps) => {
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Users className="w-4 h-4 mr-2" />
-                  {event.currentPlayers + 1} / {event.maxPlayers} players
+                  {(event.currentPlayers || 0) + 1} / {event.maxPlayers} players
                 </div>
               </div>
               <div className="mt-3 flex items-center space-x-2">
@@ -169,19 +143,23 @@ const CheckoutForm = ({ event, onClose }: CheckoutFormProps) => {
         </CardContent>
       </Card>
 
-      {/* Payment Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="font-semibold text-gray-900 mb-3">Payment Details</h4>
-            <PaymentElement 
-              options={{
-                layout: 'tabs'
-              }}
-            />
-          </CardContent>
-        </Card>
+      {/* Development Notice */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-start space-x-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-2">Development Mode</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Payment processing is temporarily disabled. You can still create bookings for testing.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Booking Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex space-x-3">
           <Button
             type="button"
@@ -194,18 +172,18 @@ const CheckoutForm = ({ event, onClose }: CheckoutFormProps) => {
           </Button>
           <Button
             type="submit"
-            disabled={!stripe || isProcessing}
+            disabled={isProcessing}
             className="flex-1 bg-everest-blue hover:bg-blue-700"
           >
             {isProcessing ? (
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Processing...</span>
+                <span>Confirming...</span>
               </div>
             ) : (
               <div className="flex items-center space-x-2">
                 <DollarSign className="w-4 h-4" />
-                <span>Pay ${totalAmount.toFixed(2)}</span>
+                <span>Confirm Booking (${totalAmount.toFixed(2)})</span>
               </div>
             )}
           </Button>
@@ -216,8 +194,6 @@ const CheckoutForm = ({ event, onClose }: CheckoutFormProps) => {
 };
 
 export default function Checkout({ eventId, onClose }: CheckoutProps) {
-  const [clientSecret, setClientSecret] = useState("");
-  const [bookingId, setBookingId] = useState<number | null>(null);
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -244,90 +220,6 @@ export default function Checkout({ eventId, onClose }: CheckoutProps) {
     retry: false,
   });
 
-  // Create booking mutation
-  const createBookingMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest('POST', '/api/bookings', {
-        eventId,
-        status: 'pending'
-      });
-    },
-    onSuccess: (response) => {
-      const booking = response;
-      setBookingId(booking.id);
-      
-      // Create payment intent
-      return apiRequest('POST', '/api/create-payment-intent', {
-        eventId,
-        bookingId: booking.id
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Booking Failed",
-        description: "Failed to create booking. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Create payment intent mutation
-  const createPaymentMutation = useMutation({
-    mutationFn: async () => {
-      if (!bookingId) throw new Error('No booking ID');
-      return await apiRequest('POST', '/api/create-payment-intent', {
-        eventId,
-        bookingId
-      });
-    },
-    onSuccess: (response) => {
-      setClientSecret(response.clientSecret);
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Payment Setup Failed",
-        description: "Failed to set up payment. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Create booking and payment intent on component mount
-  useEffect(() => {
-    if (event && isAuthenticated && !bookingId && !createBookingMutation.isPending) {
-      createBookingMutation.mutate();
-    }
-  }, [event, isAuthenticated, bookingId, createBookingMutation]);
-
-  // Create payment intent after booking is created
-  useEffect(() => {
-    if (bookingId && !clientSecret && !createPaymentMutation.isPending) {
-      createPaymentMutation.mutate();
-    }
-  }, [bookingId, clientSecret, createPaymentMutation]);
-
   const handleClose = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/events'] });
     queryClient.invalidateQueries({ queryKey: ['/api/my-bookings'] });
@@ -345,10 +237,10 @@ export default function Checkout({ eventId, onClose }: CheckoutProps) {
           <DialogTitle className="text-2xl font-bold">Complete Your Booking</DialogTitle>
         </DialogHeader>
 
-        {eventLoading || createBookingMutation.isPending || createPaymentMutation.isPending ? (
+        {eventLoading ? (
           <div className="py-12 text-center">
             <div className="w-8 h-8 border-4 border-everest-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Setting up your booking...</p>
+            <p className="text-gray-600">Loading event details...</p>
           </div>
         ) : !event ? (
           <div className="py-12 text-center">
@@ -357,28 +249,8 @@ export default function Checkout({ eventId, onClose }: CheckoutProps) {
               Close
             </Button>
           </div>
-        ) : !clientSecret ? (
-          <div className="py-12 text-center">
-            <p className="text-gray-600 mb-4">Failed to set up payment. Please try again.</p>
-            <Button onClick={handleClose} variant="outline">
-              Close
-            </Button>
-          </div>
         ) : (
-          <Elements 
-            stripe={stripePromise} 
-            options={{ 
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: {
-                  colorPrimary: '#2563EB',
-                }
-              }
-            }}
-          >
-            <CheckoutForm event={event} onClose={handleClose} />
-          </Elements>
+          <CheckoutForm event={event} onClose={handleClose} />
         )}
       </DialogContent>
     </Dialog>
