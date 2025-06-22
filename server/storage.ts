@@ -164,9 +164,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.date) {
-      const startOfDay = new Date(filters.date);
-      const endOfDay = new Date(filters.date);
-      endOfDay.setDate(endOfDay.getDate() + 1);
+      // Handle timezone-aware date filtering
+      const filterDate = new Date(filters.date + 'T00:00:00.000Z');
+      const startOfDay = new Date(filterDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(filterDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      
       conditions.push(
         and(
           gte(events.startTime, startOfDay),

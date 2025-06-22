@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, MapPin, Users, Navigation } from "lucide-react";
 import { EventWithHost } from "@shared/schema";
 import { SPORTS } from "@/lib/constants";
-import { format } from "date-fns";
+import { formatDateForDisplay } from "@/lib/dateUtils";
 
 interface EventCardProps {
   event: EventWithHost;
@@ -22,7 +22,7 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
   const sportColor = sport?.color || 'sport-badminton';
   
   const formatDateTime = (date: Date) => {
-    return format(date, 'PPp');
+    return formatDateForDisplay(date);
   };
 
   const currentPlayers = event.currentPlayers || 0;

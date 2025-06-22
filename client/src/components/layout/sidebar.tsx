@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { MapPin, Filter } from "lucide-react";
 import LocationSearch from "@/components/ui/location-search";
 import { SPORTS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
+import { getTodayString, getTomorrowString, getWeekFromNowString, getMonthFromNowString, isQuickFilterDate } from "@/lib/dateUtils";
 
 interface SidebarProps {
   appliedFilters: {
@@ -100,22 +101,21 @@ export default function Sidebar({
     onImmediateFilterChange('date', newDateFilter);
   };
 
-  // Get date filter identifiers (not actual dates)
+  // Get actual date strings for filtering using timezone-aware utilities
   const getDateFilters = () => {
     return {
-      today: 'today',
-      tomorrow: 'tomorrow', 
-      week: 'week',
-      month: 'month'
+      today: getTodayString(),
+      tomorrow: getTomorrowString(),
+      week: getWeekFromNowString(),
+      month: getMonthFromNowString()
     };
   };
 
   const dateFilters = getDateFilters();
 
-  // Check if the current date filter is a custom date (not a predefined filter)
+  // Check if the current date filter is a custom date (not a quick filter)
   const isCustomDate = (dateValue: string) => {
-    const predefinedValues = ['today', 'tomorrow', 'week', 'month'];
-    return dateValue && !predefinedValues.includes(dateValue);
+    return dateValue && !isQuickFilterDate(dateValue);
   };
 
   // Check if any filters are currently active

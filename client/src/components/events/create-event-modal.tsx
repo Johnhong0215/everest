@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { insertEventSchema } from "@shared/schema";
 import { SPORTS, SPORT_CONFIGS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
+import { toLocalDateTimeString, fromLocalDateTimeString } from "@/lib/dateUtils";
 import { z } from "zod";
 
 interface CreateEventModalProps {
@@ -77,8 +78,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sport: 'badminton',
       skillLevel: 'intermediate',
       genderMix: 'mixed',
-      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-      endTime: new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      startTime: toLocalDateTimeString(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+      endTime: toLocalDateTimeString(new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000)),
       location: '',
       maxPlayers: 4,
       pricePerPerson: '12.00',
@@ -135,8 +136,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       ...data,
       hostId: String((user as any).id), // Add the required hostId field
       maxPlayers: Number(data.maxPlayers),
-      startTime: new Date(data.startTime),
-      endTime: new Date(data.endTime),
+      startTime: fromLocalDateTimeString(data.startTime),
+      endTime: fromLocalDateTimeString(data.endTime),
       sportConfig: data.sportConfig || {},
       currentPlayers: 1, // Host counts as first player
       description: '', // No description field
