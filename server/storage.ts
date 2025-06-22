@@ -358,15 +358,8 @@ export class DatabaseStorage implements IStorage {
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [newBooking] = await db.insert(bookings).values(booking).returning();
     
-    // Update event current players count
-    await db
-      .update(events)
-      .set({ 
-        currentPlayers: sql`${events.currentPlayers} + 1`,
-        updatedAt: new Date()
-      })
-      .where(eq(events.id, booking.eventId));
-
+    // DO NOT increment player count here - only increment when booking is accepted
+    
     return newBooking;
   }
 

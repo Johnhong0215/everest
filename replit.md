@@ -116,6 +116,7 @@ Everest is a full-stack web application that connects sports enthusiasts for loc
 - June 22, 2025. Implementing map functionality, real-time chat, mobile responsive design, event filtering, and player count fixes
 - June 22, 2025. Implemented distance-based event sorting and date filter checkboxes
 - June 22, 2025. Added comprehensive timezone-aware date handling throughout the application
+- June 22, 2025. Implemented comprehensive booking status system (requested/accepted/rejected/cancelled) with proper player count logic that only increments when bookings are accepted
 
 ## User Preferences
 
