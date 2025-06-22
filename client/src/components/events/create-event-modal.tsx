@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { insertEventSchema } from "@shared/schema";
 import { SPORTS, SPORT_CONFIGS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
 import { z } from "zod";
@@ -34,6 +35,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const [selectedSport, setSelectedSport] = useState<string>('badminton');
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, isAuthenticated } = useAuth();
 
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventFormSchema),
@@ -90,9 +92,19 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     console.log('Form errors:', form.formState.errors);
     console.log('Form is valid:', form.formState.isValid);
     
+    if (!isAuthenticated || !user || typeof user !== 'object' || !('id' in user)) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create an event",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Ensure proper data types and format
     const eventData = {
       ...data,
+      hostId: String((user as any).id), // Add the required hostId field
       maxPlayers: Number(data.maxPlayers),
       startTime: new Date(data.startTime),
       endTime: new Date(data.endTime),
