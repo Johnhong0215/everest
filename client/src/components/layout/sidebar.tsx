@@ -271,7 +271,7 @@ export default function Sidebar({
         {hasActiveFilters && (
           <Button
             onClick={onRemoveFilters}
-            variant="outline"
+            variant="destructive"
             className="w-full"
             size="lg"
           >

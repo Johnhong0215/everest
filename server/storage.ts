@@ -37,7 +37,8 @@ export interface IStorage {
   getEvents(filters?: {
     sports?: string[];
     date?: string;
-    skillLevel?: string;
+    skillLevels?: string[];
+    genders?: string[];
     location?: string;
     radius?: number;
     priceMax?: number;
@@ -146,7 +147,8 @@ export class DatabaseStorage implements IStorage {
   async getEvents(filters?: {
     sports?: string[];
     date?: string;
-    skillLevel?: string;
+    skillLevels?: string[];
+    genders?: string[];
     location?: string;
     radius?: number;
     priceMax?: number;
@@ -173,8 +175,12 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    if (filters?.skillLevel && filters.skillLevel !== "any") {
-      conditions.push(eq(events.skillLevel, filters.skillLevel as any));
+    if (filters?.skillLevels && filters.skillLevels.length > 0) {
+      conditions.push(inArray(events.skillLevel, filters.skillLevels as any));
+    }
+
+    if (filters?.genders && filters.genders.length > 0) {
+      conditions.push(inArray(events.genderMix, filters.genders as any));
     }
 
     if (filters?.priceMax) {
