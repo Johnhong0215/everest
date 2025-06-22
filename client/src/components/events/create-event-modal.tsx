@@ -22,6 +22,10 @@ interface CreateEventModalProps {
 
 const createEventFormSchema = insertEventSchema.extend({
   sportConfig: z.record(z.string(), z.any()),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
+  maxPlayers: z.coerce.number().min(2).max(22),
+  pricePerPerson: z.string().min(1),
 });
 
 type CreateEventFormData = z.infer<typeof createEventFormSchema>;
@@ -114,7 +118,18 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form 
+            onSubmit={(e) => {
+              console.log('Form submit event triggered');
+              console.log('Form isValid:', form.formState.isValid);
+              console.log('Form errors:', form.formState.errors);
+              console.log('Form values:', form.getValues());
+              form.handleSubmit(onSubmit, (errors) => {
+                console.log('Form validation failed:', errors);
+              })(e);
+            }} 
+            className="space-y-6"
+          >
             {/* Sport Selection */}
             <div>
               <Label className="text-sm font-medium mb-3 block">Select Sport</Label>
@@ -206,9 +221,12 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <FormControl>
                       <Input
                         type="datetime-local"
-                        {...field}
                         value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
-                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            field.onChange(e.target.value);
+                          }
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -224,9 +242,12 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <FormControl>
                       <Input
                         type="datetime-local"
-                        {...field}
                         value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
-                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            field.onChange(e.target.value);
+                          }
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -380,6 +401,11 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 type="submit"
                 className="flex-1 bg-everest-blue hover:bg-blue-700"
                 disabled={createEventMutation.isPending}
+                onClick={(e) => {
+                  console.log('Submit button clicked');
+                  console.log('Form state:', form.formState);
+                  console.log('Form values:', form.getValues());
+                }}
               >
                 {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
               </Button>
