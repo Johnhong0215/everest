@@ -1,0 +1,217 @@
+1. App Name & Core Sports
+
+Everest launches with six sports. For each, hosts must specify these factors when creating an event:
+
+Badminton
+
+Format: Singles or Doubles
+
+Court Type: Indoor wood vs. outdoor concrete
+
+Shuttlecock: Feather vs. nylon (speed grade)
+
+Lighting: Daylight vs. evening floodlights
+
+Equipment: BYO racket vs. host-provided rental
+
+Skill Level: Beginner / Intermediate / Advanced
+
+Gender Mix: Men’s / Women’s / Mixed
+
+Group Size: 2 (singles) or 4 (doubles) + waitlist slots
+
+Cost Split: Total court fee ÷ players + platform fee
+
+Basketball
+
+Format: 3×3 half-court or 5×5 full-court
+
+Venue: Outdoor public court vs. indoor gym
+
+Hoop Height: Standard 10′ vs. adjustable
+
+Ball Supply: BYO ball vs. host-provided
+
+Skill Division: Casual pickup vs. competitive
+
+Team Size: Min/max per side + subs
+
+Referee: Self-officiated vs. paid official
+
+Duration: Timed quarters or “first to X points”
+
+Cost Split: Court reservation + any referee fee
+
+Soccer
+
+Format: 5-a-side, 7-a-side, or 11-a-side
+
+Pitch Surface: Grass, turf, or indoor dome
+
+Goal Type: Portable vs. regulation goals
+
+Ball Size: Size 3/4/5
+
+Referee Option: None vs. certified referee
+
+Match Length: Halves (e.g. 2×30 min)
+
+Cleats Requirement: Turf shoes vs. studs
+
+Team Composition: Coed or single-gender; age bracket filter
+
+Cost Split: Field rental + referee
+
+Tennis
+
+Format: Singles or Doubles
+
+Court Surface: Hard / Clay / Grass / Indoor carpet
+
+Ball Type: Pressurized vs. pressureless (number of cans)
+
+Scoring: Standard sets vs. pro-sets vs. tiebreak-only
+
+Skill Rating: USTA Tier (1.0–7.0) or custom
+
+Equipment Rental: Racquets / ball machine (optional)
+
+Court Lighting: Day vs. night play
+
+Cost Split: Court time ÷ players
+
+Volleyball
+
+Discipline: Indoor 6×6 or Beach 2×2/4×4
+
+Surface: Gym floor vs. sand depth
+
+Net Height: Men’s vs. Women’s regulation
+
+Ball Supply: Indoor vs. beach volleyballs
+
+Skill Level: Recreational vs. competitive
+
+Rotation Rules: Casual vs. strict
+
+Weather Backup: Indoor alternative for beach events
+
+Cost Split: Court rental + net system
+
+Table Tennis
+
+Format: Singles / Doubles / Mini-tournament
+
+Table Type: Regulation vs. portable
+
+Ball Grade: 3-star vs. training
+
+Paddle Rental: BYO vs. host-provided
+
+Scoring: Best-of-5/7 to 11 points
+
+Space & Lighting: Clearance and overhead lights
+
+Cost Split: Table rental ÷ players
+
+2. Core Pages & Flows
+
+A. Home / Discover
+
+Filters Sidebar (desktop) or slide-out (mobile) with:
+
+Sport checkboxes (the six above)
+
+Date & time picker
+
+Skill slider, gender mix dropdown, price range
+
+Radius slider + “Use my location” toggle
+
+Map/List view switch
+
+Event Feed: card grid or list
+
+Card shows sport icon, title (“7 pm Doubles Badminton”), date/time, location link, slots (e.g. 2 / 4), fee, host avatar & rating, “Join & Pay” button
+
+Map View: interactive Mapbox/Google pins with hover-tooltips
+
+Create Event: sticky “+” button opens full event form with all sport-specific factors
+
+B. My Bookings
+
+Tabs: Hosting | Joined
+
+Hosting:
+
+Data table: Event, Date/Time, Location, Requests vs. Confirmed, Payout Status
+
+“View Requests” side-panel: list of interested players with Accept/Decline buttons
+
+Edit and Cancel icons inline
+
+Earnings widget: total earned, pending, next payout date
+
+Mini-calendar highlighting hosted events
+
+Joined:
+
+Data table: Event, Host, Status (Awaiting Payment/Confirmation/Confirmed)
+
+Inline actions: Pay Now, Cancel RSVP, Add to Calendar
+
+Expandable Past Games section with ratings given/received and receipt PDF links
+
+C. Chat
+
+Conversations List (left panel): grouped by event and direct messages, with unread counts & search field
+
+Active Chat (right panel):
+
+Pinned header: sport icon, event title, time, location, “View Event” link
+
+Message feed: timestamps, read receipts, media & location sharing
+
+Composer: text input, emoji picker, file upload, “Share my live location” button
+
+Host controls: “Mark as Played” or “Cancel Event” button
+
+Mute/unmute and Leave Chat options
+
+D. Settings
+
+Side Nav: Profile | Payments | Notifications | Privacy & Safety | Account
+
+Profile: avatar upload, display name, bio, sport prefs checklist, skill sliders, phone & ID verification toggles
+
+Payments: Stripe Connect integration — linked cards/banks list + “Add new,” payout preferences (instant vs. weekly), transaction history table with filters, tax-doc downloads
+
+Notifications: toggle channels (Email/Push/SMS) for: new games, RSVP updates, payment reminders, chat messages; default reminder lead-time dropdown
+
+Privacy & Safety: blocked users list + unblock, signed waiver status, report logs
+
+Account: change email/password, enable 2FA, delete account button with confirmation modal
+
+3. Special Flows & Design Vibe
+
+Payment Flow: on “Join & Pay,” hold funds in escrow; release to host (minus commission) only after host taps “Mark as Played,” auto-refund on cancellation or no-show.
+
+Design: clean card layouts, sport-themed accent colors, intuitive icons, smooth sidebar and modal animations, mobile-first responsive with two-panel desktop.
+
+4. Tech Stack Suggestions
+
+Frontend: React + Tailwind CSS, React Router (or Next.js)
+
+Maps & Geolocation: Mapbox or Google Maps API
+
+Authentication & Database: Supabase Auth (magic links + OAuth) and Supabase Postgres DB
+
+Real-time: Supabase Realtime subscriptions for chat and live event updates
+
+Payments: Stripe Connect for escrow and payouts
+
+Backend: Supabase Functions or Node.js/Express serverless
+
+Chat: Supabase Realtime or Socket.io fallback
+
+Paste this into your AI environment to scaffold out Everest’s UI, routing, dummy-data flows, Supabase integration for auth, database, and real-time features, payment hooks, and chat components.
