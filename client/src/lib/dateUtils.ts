@@ -55,29 +55,30 @@ export const getTomorrowString = (): string => {
 };
 
 /**
- * Get date one week from now in YYYY-MM-DD format (local timezone)
+ * Get end of this week in YYYY-MM-DD format (local timezone)
  */
 export const getWeekFromNowString = (): string => {
-  const weekFromNow = new Date();
-  weekFromNow.setDate(weekFromNow.getDate() + 7);
+  const today = new Date();
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // Sunday is end of week
   
-  const year = weekFromNow.getFullYear();
-  const month = String(weekFromNow.getMonth() + 1).padStart(2, '0');
-  const day = String(weekFromNow.getDate()).padStart(2, '0');
+  const year = endOfWeek.getFullYear();
+  const month = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+  const day = String(endOfWeek.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
 };
 
 /**
- * Get date one month from now in YYYY-MM-DD format (local timezone)
+ * Get end of this month in YYYY-MM-DD format (local timezone)
  */
 export const getMonthFromNowString = (): string => {
-  const monthFromNow = new Date();
-  monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+  const today = new Date();
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
   
-  const year = monthFromNow.getFullYear();
-  const month = String(monthFromNow.getMonth() + 1).padStart(2, '0');
-  const day = String(monthFromNow.getDate()).padStart(2, '0');
+  const year = endOfMonth.getFullYear();
+  const month = String(endOfMonth.getMonth() + 1).padStart(2, '0');
+  const day = String(endOfMonth.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
 };

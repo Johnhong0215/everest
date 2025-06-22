@@ -101,13 +101,13 @@ export default function Sidebar({
     onImmediateFilterChange('date', newDateFilter);
   };
 
-  // Get actual date strings for filtering using timezone-aware utilities
+  // Get date filter identifiers for range filtering
   const getDateFilters = () => {
     return {
-      today: getTodayString(),
-      tomorrow: getTomorrowString(),
-      week: getWeekFromNowString(),
-      month: getMonthFromNowString()
+      today: 'today',
+      tomorrow: 'tomorrow',
+      week: 'week',
+      month: 'month'
     };
   };
 

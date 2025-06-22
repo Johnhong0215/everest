@@ -155,6 +155,8 @@ export class DatabaseStorage implements IStorage {
     search?: string;
     limit?: number;
     offset?: number;
+    userLat?: number;
+    userLng?: number;
   }): Promise<EventWithHost[]> {
     // Build conditions
     const conditions = [eq(events.status, "published")];
@@ -164,17 +166,46 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.date) {
-      // Handle timezone-aware date filtering
-      const filterDate = new Date(filters.date + 'T00:00:00.000Z');
-      const startOfDay = new Date(filterDate);
-      startOfDay.setUTCHours(0, 0, 0, 0);
-      const endOfDay = new Date(filterDate);
-      endOfDay.setUTCHours(23, 59, 59, 999);
+      // Handle different date filter types
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      let startDate: Date;
+      let endDate: Date;
+      
+      if (filters.date === 'today') {
+        startDate = new Date(today);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+      } else if (filters.date === 'tomorrow') {
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() + 1);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+      } else if (filters.date === 'week') {
+        // This week: from today to end of week (Sunday)
+        startDate = new Date(today);
+        endDate = new Date(today);
+        endDate.setDate(today.getDate() + (6 - today.getDay())); // End of week
+        endDate.setHours(23, 59, 59, 999);
+      } else if (filters.date === 'month') {
+        // This month: from today to end of month
+        startDate = new Date(today);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        // Custom date format (YYYY-MM-DD)
+        const filterDate = new Date(filters.date + 'T00:00:00.000Z');
+        startDate = new Date(filterDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        endDate = new Date(filterDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+      }
       
       conditions.push(
         and(
-          gte(events.startTime, startOfDay),
-          lte(events.startTime, endOfDay)
+          gte(events.startTime, startDate),
+          lte(events.startTime, endDate)
         )!
       );
     }
@@ -234,7 +265,32 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return Array.from(eventMap.values());
+    let eventsArray = Array.from(eventMap.values());
+
+    // Apply distance filtering if user location and radius are provided
+    if (filters?.userLat && filters?.userLng && filters?.radius) {
+      eventsArray = eventsArray.filter(event => {
+        if (!event.latitude || !event.longitude) return false;
+        
+        const eventLat = parseFloat(event.latitude);
+        const eventLng = parseFloat(event.longitude);
+        
+        // Calculate distance in miles using Haversine formula
+        const R = 3959; // Radius of Earth in miles
+        const dLat = (eventLat - filters.userLat!) * Math.PI / 180;
+        const dLng = (eventLng - filters.userLng!) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(filters.userLat! * Math.PI / 180) * Math.cos(eventLat * Math.PI / 180) * 
+          Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        return distance <= filters.radius!;
+      });
+    }
+
+    return eventsArray;
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {

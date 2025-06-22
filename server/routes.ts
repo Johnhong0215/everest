@@ -39,7 +39,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priceMax,
         search,
         limit = '50',
-        offset = '0'
+        offset = '0',
+        userLat,
+        userLng
       } = req.query;
 
       const filters = {
@@ -53,6 +55,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search: search as string,
         limit: parseInt(limit as string),
         offset: parseInt(offset as string),
+        userLat: userLat ? parseFloat(userLat as string) : undefined,
+        userLng: userLng ? parseFloat(userLng as string) : undefined,
       };
 
       const events = await storage.getEvents(filters);

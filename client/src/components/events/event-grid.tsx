@@ -128,6 +128,12 @@ export default function EventGrid({
         params.append('genders', filters.genders.join(','));
       }
       
+      // Add user location for distance filtering
+      if (userLocation) {
+        params.append('userLat', userLocation.lat.toString());
+        params.append('userLng', userLocation.lng.toString());
+      }
+      
       const url = `/api/events${params.toString() ? `?${params.toString()}` : ''}`;
       return fetch(url).then(res => {
         if (!res.ok) throw new Error('Failed to fetch events');
