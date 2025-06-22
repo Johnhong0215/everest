@@ -93,10 +93,24 @@ export default function Sidebar({
     onImmediateFilterChange('genders', newGenders);
   };
 
-  // Handle date change
-  const handleDateChange = (date: string) => {
-    onImmediateFilterChange('date', date);
+  // Handle date change - exclusive selection
+  const handleDateChange = (dateFilter: string) => {
+    // If clicking the same filter, deselect it
+    const newDateFilter = appliedFilters.date === dateFilter ? '' : dateFilter;
+    onImmediateFilterChange('date', newDateFilter);
   };
+
+  // Get date filter identifiers (not actual dates)
+  const getDateFilters = () => {
+    return {
+      today: 'today',
+      tomorrow: 'tomorrow', 
+      week: 'week',
+      month: 'month'
+    };
+  };
+
+  const dateFilters = getDateFilters();
 
   // Check if any filters are currently active
   const hasActiveFilters = 
@@ -159,15 +173,63 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Date */}
-        <div className="space-y-2">
-          <Label htmlFor="date">Date</Label>
-          <Input
-            id="date"
-            type="date"
-            value={appliedFilters.date}
-            onChange={(e) => handleDateChange(e.target.value)}
-          />
+        {/* Date - Checkbox List with Exclusive Selection */}
+        <div className="space-y-3">
+          <Label className="text-base font-medium">Date</Label>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="date-today"
+                checked={appliedFilters.date === dateFilters.today}
+                onCheckedChange={() => handleDateChange(dateFilters.today)}
+              />
+              <label
+                htmlFor="date-today"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Today
+              </label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="date-tomorrow"
+                checked={appliedFilters.date === dateFilters.tomorrow}
+                onCheckedChange={() => handleDateChange(dateFilters.tomorrow)}
+              />
+              <label
+                htmlFor="date-tomorrow"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Tomorrow
+              </label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="date-week"
+                checked={appliedFilters.date === dateFilters.week}
+                onCheckedChange={() => handleDateChange(dateFilters.week)}
+              />
+              <label
+                htmlFor="date-week"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                This Week
+              </label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="date-month"
+                checked={appliedFilters.date === dateFilters.month}
+                onCheckedChange={() => handleDateChange(dateFilters.month)}
+              />
+              <label
+                htmlFor="date-month"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                This Month
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* Skill Levels - Checkbox List */}

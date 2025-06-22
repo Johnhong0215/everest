@@ -89,7 +89,20 @@ export default function EventGrid({
     }
   };
 
-  const { data: events = [], isLoading, error } = useQuery<EventWithHost[]>({
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in kilometers
+  };
+
+  const { data: rawEvents = [], isLoading, error } = useQuery<EventWithHost[]>({
     queryKey: ['/api/events', filters],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -122,6 +135,30 @@ export default function EventGrid({
       });
     },
     staleTime: 30000, // 30 seconds
+  });
+
+  // Sort events by distance (closest first, then events without location data)
+  const events = rawEvents.sort((a, b) => {
+    if (!userLocation) return 0; // No sorting if user location is not available
+    
+    const aHasLocation = a.latitude && a.longitude;
+    const bHasLocation = b.latitude && b.longitude;
+    
+    // Events with location data come first
+    if (aHasLocation && !bHasLocation) return -1;
+    if (!aHasLocation && bHasLocation) return 1;
+    if (!aHasLocation && !bHasLocation) return 0;
+    
+    // Both have location data, sort by distance
+    const latA = typeof a.latitude === 'string' ? parseFloat(a.latitude) : a.latitude;
+    const lonA = typeof a.longitude === 'string' ? parseFloat(a.longitude) : a.longitude;
+    const latB = typeof b.latitude === 'string' ? parseFloat(b.latitude) : b.latitude;
+    const lonB = typeof b.longitude === 'string' ? parseFloat(b.longitude) : b.longitude;
+    
+    const distanceA = calculateDistance(userLocation.lat, userLocation.lng, latA!, lonA!);
+    const distanceB = calculateDistance(userLocation.lat, userLocation.lng, latB!, lonB!);
+    
+    return distanceA - distanceB;
   });
 
   // Create booking mutation
