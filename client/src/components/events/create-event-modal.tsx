@@ -39,8 +39,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sport: 'badminton',
       skillLevel: 'intermediate',
       genderMix: 'mixed',
-      startTime: new Date(),
-      endTime: new Date(),
+      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+      endTime: new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // Tomorrow + 2 hours
       location: '',
       maxPlayers: 4,
       pricePerPerson: '12.00',
@@ -76,6 +76,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const sportConfig = selectedSport ? SPORT_CONFIGS[selectedSport as keyof typeof SPORT_CONFIGS] : null;
 
   const onSubmit = (data: CreateEventFormData) => {
+    console.log('Form data:', data);
+    console.log('Form errors:', form.formState.errors);
     createEventMutation.mutate(data);
   };
 

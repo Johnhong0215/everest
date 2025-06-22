@@ -110,6 +110,7 @@ Everest is a full-stack web application that connects sports enthusiasts for loc
 
 ## Changelog
 - June 22, 2025. Initial setup
+- June 22, 2025. Removed Stripe payment system, fixed startup issues, improved UI components
 
 ## User Preferences
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -20,6 +21,14 @@ interface NavigationProps {
 export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }: NavigationProps) {
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Fetch chat notifications count
+  const { data: chats = [] } = useQuery({
+    queryKey: ['/api/my-chats'],
+    enabled: !!user,
+  });
+  
+  const unreadCount = Array.isArray(chats) ? chats.reduce((total: number, chat: any) => total + (chat.unreadCount || 0), 0) : 0;
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -38,7 +47,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="flex items-center space-x-8 ml-auto">
             <button 
               onClick={onOpenBookings}
               className="text-gray-600 hover:text-gray-900 font-medium"
@@ -52,10 +61,12 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
               <div className="flex items-center space-x-1">
                 <MessageCircle className="w-4 h-4" />
                 <span>Chat</span>
+                {unreadCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                    {unreadCount}
+                  </Badge>
+                )}
               </div>
-              <Badge variant="destructive" className="absolute -top-2 -right-2 w-5 h-5 p-0 flex items-center justify-center text-xs">
-                3
-              </Badge>
             </button>
             <Button 
               onClick={onCreateEvent}
@@ -64,17 +75,15 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
               <Plus className="w-4 h-4 mr-2" />
               Create Event
             </Button>
-          </div>
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-3">
+            {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.profileImageUrl || undefined} alt="Profile" />
+                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} alt="Profile" />
                     <AvatarFallback>
-                      {user?.firstName?.[0] || user?.email?.[0] || 'U'}
+                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -82,13 +91,13 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
               <DropdownMenuContent align="end" forceMount>
                 <div className="flex flex-col space-y-1 p-2">
                   <p className="text-sm font-medium leading-none">
-                    {user?.firstName && user?.lastName 
-                      ? `${user.firstName} ${user.lastName}`
-                      : user?.email
+                    {(user as any)?.firstName && (user as any)?.lastName 
+                      ? `${(user as any).firstName} ${(user as any).lastName}`
+                      : (user as any)?.email
                     }
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email}
+                    {(user as any)?.email}
                   </p>
                 </div>
                 <DropdownMenuItem onClick={onOpenBookings}>
@@ -140,7 +149,9 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat }
             >
               <MessageCircle className="w-4 h-4 mr-2" />
               Chat
-              <Badge variant="destructive" className="ml-auto">3</Badge>
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="ml-auto">{unreadCount}</Badge>
+              )}
             </Button>
             <Button 
               onClick={() => {

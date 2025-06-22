@@ -43,20 +43,25 @@ export default function Sidebar({ filters, onFiltersChange }: SidebarProps) {
             <h3 className="text-sm font-medium text-gray-700 mb-3">Sports</h3>
             <div className="space-y-2">
               {SPORTS.map((sport) => (
-                <label key={sport.id} className="flex items-center space-x-3 cursor-pointer">
+                <div key={sport.id} className="flex items-center space-x-3">
                   <Checkbox
+                    id={`sport-${sport.id}`}
                     checked={filters.sports.includes(sport.id)}
                     onCheckedChange={() => toggleSport(sport.id)}
-                    className={`border-${sport.color} data-[state=checked]:bg-${sport.color}`}
+                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                   />
-                  <div className={`w-6 h-6 bg-${sport.color} rounded-full flex items-center justify-center`}>
-                    <div className="w-4 h-4 text-white">
-                      {/* Sport icons would go here */}
-                      <div className="w-full h-full bg-current rounded-sm" />
+                  <label
+                    htmlFor={`sport-${sport.id}`}
+                    className="flex items-center space-x-2 cursor-pointer text-sm text-gray-700"
+                  >
+                    <div className={`w-6 h-6 bg-${sport.color} rounded-full flex items-center justify-center`}>
+                      <div className="w-4 h-4 text-white">
+                        <div className="w-full h-full bg-current rounded-sm" />
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-sm text-gray-700">{sport.name}</span>
-                </label>
+                    <span>{sport.name}</span>
+                  </label>
+                </div>
               ))}
             </div>
           </div>
