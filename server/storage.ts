@@ -137,8 +137,13 @@ export class DatabaseStorage implements IStorage {
     const host = result[0].users!;
     const eventBookings = result.filter(r => r.bookings).map(r => r.bookings!) as Booking[];
 
+    // Calculate current players dynamically: host (1) + accepted bookings
+    const acceptedBookings = eventBookings.filter(b => b.status === 'accepted');
+    const currentPlayers = 1 + acceptedBookings.length; // Host counts as 1
+
     return {
       ...event,
+      currentPlayers, // Override with dynamically calculated value
       host,
       bookings: eventBookings,
     };
@@ -267,6 +272,16 @@ export class DatabaseStorage implements IStorage {
 
     let eventsArray = Array.from(eventMap.values());
 
+    // Calculate current players dynamically for each event
+    eventsArray = eventsArray.map(event => {
+      const acceptedBookings = event.bookings.filter(b => b.status === 'accepted');
+      const currentPlayers = 1 + acceptedBookings.length; // Host counts as 1
+      return {
+        ...event,
+        currentPlayers,
+      };
+    });
+
     // Apply distance filtering if user location and radius are provided
     if (filters?.userLat && filters?.userLng && filters?.radius) {
       eventsArray = eventsArray.filter(event => {
@@ -351,7 +366,15 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return Array.from(eventMap.values());
+    // Calculate current players dynamically for each event
+    return Array.from(eventMap.values()).map(event => {
+      const acceptedBookings = event.bookings.filter(b => b.status === 'accepted');
+      const currentPlayers = 1 + acceptedBookings.length; // Host counts as 1
+      return {
+        ...event,
+        currentPlayers,
+      };
+    });
   }
 
   // Booking operations

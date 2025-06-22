@@ -174,7 +174,7 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
                               }
                             </p>
                             <p className="text-xs text-gray-500">
-                              Requested {request.createdAt ? format(new Date(request.createdAt as string), 'MMM d, h:mm a') : 'Recently'}
+                              Requested {request.createdAt ? format(typeof request.createdAt === 'string' ? new Date(request.createdAt) : request.createdAt, 'MMM d, h:mm a') : 'Recently'}
                             </p>
                           </div>
                         </div>

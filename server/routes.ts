@@ -438,10 +438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update booking status
       const updatedBooking = await storage.updateBookingStatus(bookingId, status);
       
-      // If accepted, increment event player count
-      if (status === 'accepted') {
-        await storage.updateEventPlayerCount(booking.eventId, (booking.event.currentPlayers || 1) + 1);
-      }
+      // Player count is now calculated dynamically, no manual manipulation needed
       
       res.json(updatedBooking);
     } catch (error) {
@@ -474,8 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update booking status to cancelled
       const updatedBooking = await storage.updateBookingStatus(bookingId, 'cancelled');
       
-      // Decrement event player count
-      await storage.updateEventPlayerCount(booking.eventId, Math.max(1, (booking.event.currentPlayers || 1) - 1));
+      // Player count is now calculated dynamically, no manual manipulation needed
       
       res.json(updatedBooking);
     } catch (error) {
