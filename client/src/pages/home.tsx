@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Navigation from "@/components/layout/navigation";
 import Sidebar from "@/components/layout/sidebar";
 import EventGrid from "@/components/events/event-grid";
@@ -14,7 +14,8 @@ export default function Home() {
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [filters, setFilters] = useState({
+  // UI filters (for immediate display)
+  const [uiFilters, setUiFilters] = useState({
     sports: [] as string[],
     date: '',
     skillLevel: '',
@@ -23,6 +24,55 @@ export default function Home() {
     priceMax: 100,
     search: '',
   });
+
+  // Committed filters (for API queries)
+  const [committedFilters, setCommittedFilters] = useState({
+    sports: [] as string[],
+    date: '',
+    skillLevel: '',
+    location: '',
+    radius: 5,
+    priceMax: 100,
+    search: '',
+  });
+
+  const filterTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Debounced filter update function
+  const handleFiltersChange = useCallback((newFilters: typeof uiFilters) => {
+    // Immediately update UI state
+    setUiFilters(newFilters);
+
+    // For certain filters, commit immediately (sports, date, skillLevel)
+    const hasImmediateChange = (
+      JSON.stringify(newFilters.sports) !== JSON.stringify(uiFilters.sports) ||
+      newFilters.date !== uiFilters.date ||
+      newFilters.skillLevel !== uiFilters.skillLevel
+    );
+
+    if (hasImmediateChange) {
+      setCommittedFilters(newFilters);
+      return;
+    }
+
+    // For location, radius, priceMax, and search - use debouncing
+    if (filterTimeoutRef.current) {
+      clearTimeout(filterTimeoutRef.current);
+    }
+
+    filterTimeoutRef.current = setTimeout(() => {
+      setCommittedFilters(newFilters);
+    }, 800);
+  }, [uiFilters]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (filterTimeoutRef.current) {
+        clearTimeout(filterTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,18 +86,18 @@ export default function Home() {
       <div className="flex">
         <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block">
           <Sidebar 
-            filters={filters}
-            onFiltersChange={setFilters}
+            filters={uiFilters}
+            onFiltersChange={handleFiltersChange}
           />
         </aside>
         
         <main className="flex-1 lg:pl-0">
           <EventGrid 
-            filters={filters}
+            filters={committedFilters}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onCreateEvent={() => setIsCreateEventOpen(true)}
-            onFiltersChange={setFilters}
+            onFiltersChange={handleFiltersChange}
             onOpenChat={(eventId) => {
               setActiveEventId(eventId);
               setIsChatOpen(true);
