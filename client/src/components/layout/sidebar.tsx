@@ -22,10 +22,12 @@ interface SidebarProps {
     search: string;
   };
   onFiltersChange: (filters: any) => void;
+  onApplyFilters: () => void;
+  hasPendingChanges: boolean;
   className?: string;
 }
 
-export default function Sidebar({ filters, onFiltersChange, className }: SidebarProps) {
+export default function Sidebar({ filters, onFiltersChange, onApplyFilters, hasPendingChanges, className }: SidebarProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Get user location for proximity-based search
@@ -188,6 +190,18 @@ export default function Sidebar({ filters, onFiltersChange, className }: Sidebar
               </div>
             </div>
           </div>
+
+          {/* Apply Button */}
+          {hasPendingChanges && (
+            <div className="mb-6 pt-4 border-t border-gray-200">
+              <Button 
+                onClick={onApplyFilters}
+                className="w-full bg-everest-blue hover:bg-everest-blue/90 text-white"
+              >
+                Apply Filters
+              </Button>
+            </div>
+          )}
         </div>
     </div>
   );

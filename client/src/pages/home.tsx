@@ -14,7 +14,7 @@ export default function Home() {
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  // UI filters (for immediate display)
+  // UI filters (what user sees and can adjust)
   const [uiFilters, setUiFilters] = useState({
     sports: [] as string[],
     date: '',
@@ -25,8 +25,8 @@ export default function Home() {
     search: '',
   });
 
-  // Committed filters (for API queries)
-  const [committedFilters, setCommittedFilters] = useState({
+  // Applied filters (for API queries)
+  const [appliedFilters, setAppliedFilters] = useState({
     sports: [] as string[],
     date: '',
     skillLevel: '',
@@ -36,43 +36,33 @@ export default function Home() {
     search: '',
   });
 
-  const filterTimeoutRef = useRef<NodeJS.Timeout>();
-
-  // Debounced filter update function
+  // Handle immediate filter changes (sports, date, skill level apply immediately)
   const handleFiltersChange = useCallback((newFilters: typeof uiFilters) => {
-    // Immediately update UI state
     setUiFilters(newFilters);
+    
+    // For sports, date, and skill level - apply immediately
+    const immediateFilters = {
+      ...appliedFilters,
+      sports: newFilters.sports,
+      date: newFilters.date,
+      skillLevel: newFilters.skillLevel,
+    };
+    
+    setAppliedFilters(immediateFilters);
+  }, [appliedFilters]);
 
-    // For certain filters, commit immediately (sports, date, skillLevel)
-    const hasImmediateChange = (
-      JSON.stringify(newFilters.sports) !== JSON.stringify(uiFilters.sports) ||
-      newFilters.date !== uiFilters.date ||
-      newFilters.skillLevel !== uiFilters.skillLevel
-    );
-
-    if (hasImmediateChange) {
-      setCommittedFilters(newFilters);
-      return;
-    }
-
-    // For location, radius, priceMax, and search - use debouncing
-    if (filterTimeoutRef.current) {
-      clearTimeout(filterTimeoutRef.current);
-    }
-
-    filterTimeoutRef.current = setTimeout(() => {
-      setCommittedFilters(newFilters);
-    }, 800);
+  // Apply button handler for location, distance, and price filters
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters(uiFilters);
   }, [uiFilters]);
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (filterTimeoutRef.current) {
-        clearTimeout(filterTimeoutRef.current);
-      }
-    };
-  }, []);
+  // Check if there are pending filter changes
+  const hasPendingChanges = (
+    uiFilters.location !== appliedFilters.location ||
+    uiFilters.radius !== appliedFilters.radius ||
+    uiFilters.priceMax !== appliedFilters.priceMax ||
+    uiFilters.search !== appliedFilters.search
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -88,12 +78,14 @@ export default function Home() {
           <Sidebar 
             filters={uiFilters}
             onFiltersChange={handleFiltersChange}
+            onApplyFilters={handleApplyFilters}
+            hasPendingChanges={hasPendingChanges}
           />
         </aside>
         
         <main className="flex-1 lg:pl-0">
           <EventGrid 
-            filters={committedFilters}
+            filters={appliedFilters}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onCreateEvent={() => setIsCreateEventOpen(true)}

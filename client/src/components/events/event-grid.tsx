@@ -267,6 +267,8 @@ export default function EventGrid({
                   <Sidebar 
                     filters={filters}
                     onFiltersChange={onFiltersChange}
+                    onApplyFilters={() => {}} // Mobile sidebar applies changes immediately
+                    hasPendingChanges={false}
                     className="p-0"
                   />
                 </div>
