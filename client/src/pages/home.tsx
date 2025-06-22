@@ -50,6 +50,27 @@ export default function Home() {
     }));
   }, [pendingFilters]);
 
+  // Remove all filters handler
+  const handleRemoveFilters = useCallback(() => {
+    const defaultFilters = {
+      sports: [] as string[],
+      date: '',
+      skillLevels: [] as string[],
+      genders: [] as string[],
+      location: '',
+      radius: 5,
+      priceMax: 100,
+    };
+    const defaultPending = {
+      location: '',
+      radius: 5,
+      priceMax: 100,
+    };
+    
+    setAppliedFilters(defaultFilters);
+    setPendingFilters(defaultPending);
+  }, []);
+
   // Check if there are pending filter changes
   const hasPendingChanges = useMemo(() => (
     pendingFilters.location !== appliedFilters.location ||
@@ -59,26 +80,29 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation 
-        onCreateEvent={() => setIsCreateEventOpen(true)}
-        onOpenBookings={() => setIsBookingsOpen(true)}
-        onOpenChat={() => setIsChatOpen(true)}
-        onOpenRequests={() => setIsRequestsOpen(true)}
-      />
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
+        <Navigation 
+          onCreateEvent={() => setIsCreateEventOpen(true)}
+          onOpenBookings={() => setIsBookingsOpen(true)}
+          onOpenChat={() => setIsChatOpen(true)}
+          onOpenRequests={() => setIsRequestsOpen(true)}
+        />
+      </div>
       
-      <div className="flex">
-        <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block">
+      <div className="flex pt-16">
+        <aside className="w-80 bg-white shadow-sm border-r border-gray-200 hidden lg:block fixed left-0 top-16 bottom-0 z-40 overflow-y-auto">
           <Sidebar 
             appliedFilters={appliedFilters}
             pendingFilters={pendingFilters}
             onImmediateFilterChange={handleImmediateFiltersChange}
             onPendingFilterChange={handlePendingFiltersChange}
             onApplyFilters={handleApplyFilters}
+            onRemoveFilters={handleRemoveFilters}
             hasPendingChanges={hasPendingChanges}
           />
         </aside>
         
-        <main className="flex-1 lg:pl-0">
+        <main className="flex-1 lg:ml-80">
           <EventGrid 
             filters={appliedFilters}
             viewMode={viewMode}

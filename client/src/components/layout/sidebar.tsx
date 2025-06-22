@@ -27,6 +27,7 @@ interface SidebarProps {
   onImmediateFilterChange: (key: string, value: any) => void;
   onPendingFilterChange: (key: string, value: any) => void;
   onApplyFilters: () => void;
+  onRemoveFilters: () => void;
   hasPendingChanges: boolean;
   className?: string;
 }
@@ -37,6 +38,7 @@ export default function Sidebar({
   onImmediateFilterChange, 
   onPendingFilterChange, 
   onApplyFilters, 
+  onRemoveFilters,
   hasPendingChanges, 
   className 
 }: SidebarProps) {
@@ -95,6 +97,16 @@ export default function Sidebar({
   const handleDateChange = (date: string) => {
     onImmediateFilterChange('date', date);
   };
+
+  // Check if any filters are currently active
+  const hasActiveFilters = 
+    appliedFilters.sports.length > 0 ||
+    appliedFilters.date !== '' ||
+    appliedFilters.skillLevels.length > 0 ||
+    appliedFilters.genders.length > 0 ||
+    appliedFilters.location !== '' ||
+    appliedFilters.radius !== 5 ||
+    appliedFilters.priceMax !== 100;
 
   // Sport colors for visual consistency
   const getSportColor = (sportId: string) => {
@@ -252,6 +264,18 @@ export default function Sidebar({
             size="lg"
           >
             Apply Filters
+          </Button>
+        )}
+
+        {/* Remove Filters Button */}
+        {hasActiveFilters && (
+          <Button
+            onClick={onRemoveFilters}
+            variant="outline"
+            className="w-full"
+            size="lg"
+          >
+            Remove Filters
           </Button>
         )}
       </div>
