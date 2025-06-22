@@ -245,6 +245,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEvent(id: number): Promise<boolean> {
+    // First delete all related bookings
+    await db.delete(bookings).where(eq(bookings.eventId, id));
+    
+    // Then delete all related chat messages
+    await db.delete(chatMessages).where(eq(chatMessages.eventId, id));
+    
+    // Finally delete the event
     const result = await db.delete(events).where(eq(events.id, id));
     return (result.rowCount || 0) > 0;
   }
