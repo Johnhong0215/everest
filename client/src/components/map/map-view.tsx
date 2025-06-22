@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, AlertCircle } from "lucide-react";
 import { EventWithHost } from "@shared/schema";
 import EventCard from "@/components/events/event-card";
-import InteractiveMap from "@/components/ui/interactive-map";
+import SimpleMap from "@/components/ui/simple-map";
 
 interface MapViewProps {
   events: EventWithHost[];
@@ -111,10 +111,11 @@ export default function MapView({ events, onJoin, onOpenChat, onCancel, onModify
   return (
     <div className="space-y-6">
       {/* Interactive Map with Event Pins */}
-      <InteractiveMap
+      <SimpleMap
         events={events}
         userLocation={userLocation}
-        onEventSelect={(event) => {
+        selectedEvent={selectedEvent}
+        onEventSelect={(event: EventWithHost) => {
           setSelectedEvent(event);
         }}
         className="h-96"

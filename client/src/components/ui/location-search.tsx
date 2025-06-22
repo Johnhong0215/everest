@@ -26,7 +26,6 @@ export default function LocationSearch({
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
 
@@ -39,7 +38,6 @@ export default function LocationSearch({
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
-          setUserLocation(coords);
           onChange('Current Location', coords);
           setIsOpen(false);
         },
@@ -61,26 +59,10 @@ export default function LocationSearch({
     setLoading(true);
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1&dedupe=1`
+        `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}&countrycodes=us`
       );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch locations');
-      }
-      
       const data = await response.json();
-      console.log('Location search results:', data);
-      
-      // Filter and format results for better display
-      const filteredData = data.filter((item: any) => 
-        item.display_name && item.lat && item.lon
-      ).map((item: any) => ({
-        ...item,
-        place_id: item.place_id || item.osm_id || Math.random().toString()
-      }));
-      
-      setSuggestions(filteredData);
-      setIsOpen(true);
+      setSuggestions(data);
     } catch (error) {
       console.error('Error searching locations:', error);
       setSuggestions([]);
@@ -98,12 +80,11 @@ export default function LocationSearch({
       clearTimeout(searchTimeout.current);
     }
     
-    // Only search and show dropdown if value has meaningful length
     if (newValue.length >= 3) {
       searchTimeout.current = setTimeout(() => {
         searchLocations(newValue);
-      }, 300); // Reduced delay back to 300ms for better UX
-      setIsOpen(true);
+        setIsOpen(true);
+      }, 300);
     } else {
       setSuggestions([]);
       setIsOpen(false);
@@ -117,16 +98,9 @@ export default function LocationSearch({
       lng: parseFloat(suggestion.lon)
     };
     
-    // Extract a cleaner location name for display
-    const locationParts = suggestion.display_name.split(',');
-    const cleanLocation = locationParts.slice(0, 2).join(', ').trim();
-    
-    onChange(cleanLocation, coordinates);
-    setSuggestions([]);
+    onChange(suggestion.display_name, coordinates);
     setIsOpen(false);
-    if (inputRef.current) {
-      inputRef.current.blur();
-    }
+    inputRef.current?.blur();
   };
 
   // Clear search
@@ -140,19 +114,16 @@ export default function LocationSearch({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const container = inputRef.current?.parentElement;
-      if (container && !container.contains(event.target as Node)) {
+      if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [isOpen]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className={`relative ${className}`}>
@@ -196,47 +167,42 @@ export default function LocationSearch({
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {loading && (
-            <div className="px-4 py-3 text-sm text-gray-500 flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-              <span>Searching locations...</span>
+            <div className="px-4 py-3 text-sm text-gray-500">
+              Searching locations...
             </div>
           )}
           
           {!loading && suggestions.length === 0 && value.length >= 3 && (
             <div className="px-4 py-3 text-sm text-gray-500">
-              No locations found for "{value}"
+              No locations found
             </div>
           )}
           
           {!loading && suggestions.length > 0 && (
-            <div className="py-1">
-              {suggestions.map((suggestion, index) => (
+            <>
+              {suggestions.map((suggestion) => (
                 <button
-                  key={suggestion.place_id || index}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSuggestionSelect(suggestion);
-                  }}
-                  className="w-full px-4 py-3 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors duration-150"
+                  key={suggestion.place_id}
+                  onClick={() => handleSuggestionSelect(suggestion)}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
                 >
-                  <div className="flex items-start space-x-3">
-                    <MapPin className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex items-start space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-gray-900 truncate">
-                        {suggestion.display_name.split(',').slice(0, 2).join(', ')}
+                        {suggestion.display_name.split(',')[0]}
                       </div>
-                      <div className="text-xs text-gray-500 truncate mt-0.5">
-                        {suggestion.display_name.split(',').slice(2).join(', ')}
+                      <div className="text-xs text-gray-500 truncate">
+                        {suggestion.display_name}
                       </div>
                     </div>
                   </div>
                 </button>
               ))}
-            </div>
+            </>
           )}
           
-          {!loading && value.length < 3 && value.length > 0 && (
+          {!loading && value.length < 3 && (
             <div className="px-4 py-3 text-sm text-gray-500">
               Type at least 3 characters to search
             </div>
