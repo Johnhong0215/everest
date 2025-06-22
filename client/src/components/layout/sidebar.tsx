@@ -112,6 +112,12 @@ export default function Sidebar({
 
   const dateFilters = getDateFilters();
 
+  // Check if the current date filter is a custom date (not a predefined filter)
+  const isCustomDate = (dateValue: string) => {
+    const predefinedValues = ['today', 'tomorrow', 'week', 'month'];
+    return dateValue && !predefinedValues.includes(dateValue);
+  };
+
   // Check if any filters are currently active
   const hasActiveFilters = 
     appliedFilters.sports.length > 0 ||
@@ -173,9 +179,11 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Date - Checkbox List with Exclusive Selection */}
+        {/* Date - Quick Filters + Custom Date */}
         <div className="space-y-3">
           <Label className="text-base font-medium">Date</Label>
+          
+          {/* Quick Date Filters */}
           <div className="space-y-2">
             <div className="flex items-center space-x-3">
               <Checkbox
@@ -229,6 +237,18 @@ export default function Sidebar({
                 This Month
               </label>
             </div>
+          </div>
+
+          {/* Custom Date Input */}
+          <div className="mt-3">
+            <Label htmlFor="custom-date" className="text-sm text-gray-600">Or select specific date:</Label>
+            <Input
+              id="custom-date"
+              type="date"
+              value={isCustomDate(appliedFilters.date) ? appliedFilters.date : ''}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="mt-1"
+            />
           </div>
         </div>
 
