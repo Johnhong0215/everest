@@ -253,20 +253,18 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-gray-900 truncate">
-                              {(user && typeof user === 'object' && 'id' in user && (user as any).id === chat.event.hostId) ? 
-                                `Event: ${chat.event.title}` : 
-                                `${chat.event.host?.firstName && chat.event.host?.lastName ? 
-                                  `${chat.event.host.firstName} ${chat.event.host.lastName}` : 
-                                  chat.event.host?.email?.split('@')[0] || 'Host'}`
-                              }
+                              {chat.event.host?.firstName && chat.event.host?.lastName ? 
+                                `${chat.event.host.firstName} ${chat.event.host.lastName}` : 
+                                chat.event.host?.email?.split('@')[0] || 'Host'}
+                              {(user && typeof user === 'object' && 'id' in user && (user as any).id !== chat.event.hostId) ? ' (Host)' : null}
                             </p>
                             <span className="text-xs text-gray-500">
                               {chat.lastMessage?.createdAt ? 
-                                format(new Date(chat.lastMessage.createdAt), 'h:mm a') : ''}
+                                format(new Date(chat.lastMessage.createdAt), 'MMM d, h:mm a') : 'No messages'}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 truncate">
-                            {chat.lastMessage ? chat.lastMessage.content : 'Start a conversation...'}
+                            {chat.lastMessage ? chat.lastMessage.content : 'No messages yet'}
                           </p>
                         </div>
                         {chat.unreadCount > 0 && (
@@ -308,9 +306,22 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
-                      View Event
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm">
+                        View Event
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setActiveEventId(null);
+                          // TODO: Implement leave chat functionality
+                        }}
+                        className="text-gray-500 hover:text-red-500"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
