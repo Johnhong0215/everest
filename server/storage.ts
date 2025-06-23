@@ -63,7 +63,7 @@ export interface IStorage {
   // Chat operations
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(eventId: number, limit?: number, offset?: number): Promise<ChatMessageWithSender[]>;
-  getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number }[]>;
+  getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: any; unreadCount: number; otherParticipant: any }[]>;
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -504,7 +504,19 @@ export class DatabaseStorage implements IStorage {
 
   async getChatMessages(eventId: number, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
     const result = await db
-      .select()
+      .select({
+        id: chatMessages.id,
+        eventId: chatMessages.eventId,
+        senderId: chatMessages.senderId,
+        content: chatMessages.content,
+        messageType: chatMessages.messageType,
+        metadata: chatMessages.metadata,
+        createdAt: chatMessages.createdAt,
+        senderFirstName: users.firstName,
+        senderLastName: users.lastName,
+        senderEmail: users.email,
+        senderProfileImageUrl: users.profileImageUrl,
+      })
       .from(chatMessages)
       .leftJoin(users, eq(chatMessages.senderId, users.id))
       .where(eq(chatMessages.eventId, eventId))
@@ -513,12 +525,31 @@ export class DatabaseStorage implements IStorage {
       .offset(offset);
 
     return result.map(row => ({
-      ...row.chat_messages,
-      sender: row.users!,
+      id: row.id,
+      eventId: row.eventId,
+      senderId: row.senderId,
+      content: row.content,
+      messageType: row.messageType,
+      metadata: row.metadata,
+      createdAt: row.createdAt,
+      sender: {
+        id: row.senderId,
+        firstName: row.senderFirstName,
+        lastName: row.senderLastName,
+        email: row.senderEmail,
+        profileImageUrl: row.senderProfileImageUrl,
+        createdAt: null,
+        updatedAt: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        phoneVerified: false,
+        idVerified: false,
+        bio: null,
+      },
     }));
   }
 
-  async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number }[]> {
+  async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
     // Get events where user is either host or has an accepted booking
     const userEvents = await db
       .select({ eventId: events.id })
@@ -550,12 +581,54 @@ export class DatabaseStorage implements IStorage {
         const event = eventResult[0].events;
         const host = eventResult[0].users!;
 
-        const messages = await db
-          .select()
+        // Get the last message with sender information
+        const lastMessageResult = await db
+          .select({
+            id: chatMessages.id,
+            eventId: chatMessages.eventId,
+            senderId: chatMessages.senderId,
+            content: chatMessages.content,
+            messageType: chatMessages.messageType,
+            metadata: chatMessages.metadata,
+            createdAt: chatMessages.createdAt,
+            senderFirstName: users.firstName,
+            senderLastName: users.lastName,
+            senderEmail: users.email,
+          })
           .from(chatMessages)
+          .leftJoin(users, eq(chatMessages.senderId, users.id))
           .where(eq(chatMessages.eventId, eventId))
           .orderBy(desc(chatMessages.createdAt))
           .limit(1);
+
+        const lastMessage = lastMessageResult.length > 0 ? {
+          ...lastMessageResult[0],
+          sender: {
+            id: lastMessageResult[0].senderId,
+            firstName: lastMessageResult[0].senderFirstName,
+            lastName: lastMessageResult[0].senderLastName,
+            email: lastMessageResult[0].senderEmail,
+          }
+        } : null;
+
+        // Determine the other participant (not the current user)
+        let otherParticipant = null;
+        if (event.hostId === userId) {
+          // Current user is host, find a participant
+          const participantResult = await db
+            .select()
+            .from(bookings)
+            .leftJoin(users, eq(bookings.userId, users.id))
+            .where(and(eq(bookings.eventId, eventId), eq(bookings.status, 'accepted')))
+            .limit(1);
+          
+          if (participantResult.length > 0) {
+            otherParticipant = participantResult[0].users;
+          }
+        } else {
+          // Current user is participant, other participant is the host
+          otherParticipant = host;
+        }
 
         const unreadCount = await db
           .select({ count: count() })
@@ -570,14 +643,15 @@ export class DatabaseStorage implements IStorage {
         return {
           eventId,
           event: { ...event, host },
-          lastMessage: messages[0] || null,
+          lastMessage,
           unreadCount: unreadCount[0]?.count || 0,
+          otherParticipant,
         };
       })
     );
 
-    // Return all chats, including those without messages
-    return chats.filter(chat => chat !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number }[];
+    // Return all chats where there's another participant
+    return chats.filter(chat => chat !== null && chat.otherParticipant !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
   }
 
   // Payment operations

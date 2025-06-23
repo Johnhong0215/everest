@@ -26,8 +26,9 @@ interface ChatModalProps {
 interface EventChat {
   eventId: number;
   event: EventWithHost;
-  lastMessage: ChatMessageWithSender | null;
+  lastMessage: any;
   unreadCount: number;
+  otherParticipant: any;
 }
 
 export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) {
@@ -253,10 +254,10 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-gray-900 truncate">
-                              {chat.event.host?.firstName && chat.event.host?.lastName ? 
-                                `${chat.event.host.firstName} ${chat.event.host.lastName}` : 
-                                chat.event.host?.email?.split('@')[0] || 'Host'}
-                              {(user && typeof user === 'object' && 'id' in user && (user as any).id !== chat.event.hostId) ? ' (Host)' : null}
+                              {chat.otherParticipant?.firstName && chat.otherParticipant?.lastName ? 
+                                `${chat.otherParticipant.firstName} ${chat.otherParticipant.lastName}` : 
+                                chat.otherParticipant?.email?.split('@')[0] || 'Unknown User'}
+                              {chat.otherParticipant?.id === chat.event.hostId ? ' (Host)' : ''}
                             </p>
                             <span className="text-xs text-gray-500">
                               {chat.lastMessage?.createdAt ? 
