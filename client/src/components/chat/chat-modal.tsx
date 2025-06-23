@@ -253,7 +253,12 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-gray-900 truncate">
-                              {chat.event.title}
+                              {(user && typeof user === 'object' && 'id' in user && (user as any).id === chat.event.hostId) ? 
+                                `Event: ${chat.event.title}` : 
+                                `${chat.event.host?.firstName && chat.event.host?.lastName ? 
+                                  `${chat.event.host.firstName} ${chat.event.host.lastName}` : 
+                                  chat.event.host?.email?.split('@')[0] || 'Host'}`
+                              }
                             </p>
                             <span className="text-xs text-gray-500">
                               {chat.lastMessage?.createdAt ? 
@@ -342,9 +347,9 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                           >
                             {!isOwnMessage && (
                               <Avatar className="w-8 h-8">
-                                <AvatarImage src={message.sender.profileImageUrl || undefined} />
+                                <AvatarImage src={message.sender?.profileImageUrl || undefined} />
                                 <AvatarFallback className="text-xs">
-                                  {message.sender.firstName?.[0] || message.sender.email?.[0] || 'U'}
+                                  {message.sender?.firstName?.[0] || message.sender?.email?.[0] || 'U'}
                                 </AvatarFallback>
                               </Avatar>
                             )}
@@ -352,9 +357,9 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                               {!isOwnMessage && (
                                 <div className="flex items-center space-x-2 mb-1">
                                   <span className="text-sm font-medium text-gray-900">
-                                    {message.sender.firstName && message.sender.lastName 
+                                    {message.sender?.firstName && message.sender?.lastName 
                                       ? `${message.sender.firstName} ${message.sender.lastName.charAt(0)}.`
-                                      : message.sender.email?.split('@')[0]
+                                      : message.sender?.email?.split('@')[0] || 'Unknown User'
                                     }
                                   </span>
                                   <span className="text-xs text-gray-500">

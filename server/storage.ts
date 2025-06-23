@@ -538,8 +538,17 @@ export class DatabaseStorage implements IStorage {
     // Get last message for each event (including events with no messages)
     const chats = await Promise.all(
       eventIds.map(async (eventId) => {
-        const [event] = await db.select().from(events).where(eq(events.id, eventId));
-        if (!event) return null;
+        // Get event with host information
+        const eventResult = await db
+          .select()
+          .from(events)
+          .leftJoin(users, eq(events.hostId, users.id))
+          .where(eq(events.id, eventId));
+        
+        if (eventResult.length === 0) return null;
+        
+        const event = eventResult[0].events;
+        const host = eventResult[0].users!;
 
         const messages = await db
           .select()
@@ -560,7 +569,7 @@ export class DatabaseStorage implements IStorage {
 
         return {
           eventId,
-          event,
+          event: { ...event, host },
           lastMessage: messages[0] || null,
           unreadCount: unreadCount[0]?.count || 0,
         };
