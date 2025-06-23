@@ -357,6 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(offset as string)
       );
       
+      console.log(`Fetched ${messages.length} messages for event ${eventId}`);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);

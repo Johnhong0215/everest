@@ -534,10 +534,10 @@ export class DatabaseStorage implements IStorage {
       createdAt: row.createdAt,
       sender: {
         id: row.senderId,
-        firstName: row.senderFirstName,
-        lastName: row.senderLastName,
-        email: row.senderEmail,
-        profileImageUrl: row.senderProfileImageUrl,
+        firstName: row.senderFirstName || null,
+        lastName: row.senderLastName || null,
+        email: row.senderEmail || null,
+        profileImageUrl: row.senderProfileImageUrl || null,
       },
     })) as ChatMessageWithSender[];
   }

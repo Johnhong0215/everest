@@ -257,11 +257,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                               {chat.otherParticipant?.firstName && chat.otherParticipant?.lastName ? 
                                 `${chat.otherParticipant.firstName} ${chat.otherParticipant.lastName}` : 
                                 chat.otherParticipant?.email?.split('@')[0] || 'Unknown User'}
-                              {chat.otherParticipant?.id === chat.event.hostId ? ' (Host)' : ''}
+                              {chat.otherParticipant?.id === chat.event.hostId ? ' (H)' : ''}
                             </p>
                             <span className="text-xs text-gray-500">
                               {chat.lastMessage?.createdAt ? 
-                                format(new Date(chat.lastMessage.createdAt), 'MMM d, h:mm a') : 'No messages'}
+                                format(new Date(chat.lastMessage.createdAt), 'HH:mm') : 'No messages'}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 truncate">
@@ -370,11 +370,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                                   <span className="text-sm font-medium text-gray-900">
                                     {message.sender?.firstName && message.sender?.lastName 
                                       ? `${message.sender.firstName} ${message.sender.lastName.charAt(0)}.`
-                                      : message.sender?.email?.split('@')[0] || 'Unknown User'
+                                      : message.sender?.email?.split('@')[0] || 'User'
                                     }
                                   </span>
                                   <span className="text-xs text-gray-500">
-                                    {message.createdAt ? format(new Date(message.createdAt), 'h:mm a') : ''}
+                                    {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
                                   </span>
                                 </div>
                               )}
