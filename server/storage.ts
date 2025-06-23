@@ -538,15 +538,8 @@ export class DatabaseStorage implements IStorage {
         lastName: row.senderLastName,
         email: row.senderEmail,
         profileImageUrl: row.senderProfileImageUrl,
-        createdAt: null,
-        updatedAt: null,
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        phoneVerified: false,
-        idVerified: false,
-        bio: null,
       },
-    }));
+    })) as ChatMessageWithSender[];
   }
 
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {

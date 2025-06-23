@@ -292,17 +292,16 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                       {getSportIcon(activeEvent.sport)}
                       <div>
                         <h4 className="text-sm font-medium text-gray-900">
-                          {activeEvent.title}
+                          {activeEvent.title} - {activeEvent.sport}
                         </h4>
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, h:mm a') : 'TBD'}
+                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, yyyy h:mm a') : 'Date TBD'}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />
-                            {activeEvent.location ? activeEvent.location.substring(0, 30) : 'Location TBD'}
-                            {activeEvent.location && activeEvent.location.length > 30 && '...'}
+                            {activeEvent.location || 'Location TBD'}
                           </div>
                         </div>
                       </div>
