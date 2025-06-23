@@ -63,7 +63,7 @@ export interface IStorage {
   // Chat operations
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(eventId: number, limit?: number, offset?: number): Promise<ChatMessageWithSender[]>;
-  getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage; unreadCount: number }[]>;
+  getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number }[]>;
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -518,24 +518,29 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage; unreadCount: number }[]> {
-    // Get events where user is either host or participant
+  async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number }[]> {
+    // Get events where user is either host or has an accepted booking
     const userEvents = await db
       .select({ eventId: events.id })
       .from(events)
-      .leftJoin(bookings, eq(events.id, bookings.eventId))
+      .leftJoin(bookings, and(eq(events.id, bookings.eventId), eq(bookings.status, 'accepted')))
       .where(
-        sql`${events.hostId} = ${userId} OR ${bookings.userId} = ${userId}`
+        or(
+          eq(events.hostId, userId),
+          and(eq(bookings.userId, userId), eq(bookings.status, 'accepted'))
+        )
       );
 
     const eventIds = Array.from(new Set(userEvents.map(e => e.eventId)));
 
     if (eventIds.length === 0) return [];
 
-    // Get last message for each event
+    // Get last message for each event (including events with no messages)
     const chats = await Promise.all(
       eventIds.map(async (eventId) => {
         const [event] = await db.select().from(events).where(eq(events.id, eventId));
+        if (!event) return null;
+
         const messages = await db
           .select()
           .from(chatMessages)
@@ -562,10 +567,8 @@ export class DatabaseStorage implements IStorage {
       })
     );
 
-    return chats.filter(chat => chat.lastMessage).map(chat => ({
-      ...chat,
-      lastMessage: chat.lastMessage!,
-    }));
+    // Return all chats, including those without messages
+    return chats.filter(chat => chat !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number }[];
   }
 
   // Payment operations

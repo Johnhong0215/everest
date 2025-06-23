@@ -26,7 +26,7 @@ interface ChatModalProps {
 interface EventChat {
   eventId: number;
   event: EventWithHost;
-  lastMessage: ChatMessageWithSender;
+  lastMessage: ChatMessageWithSender | null;
   unreadCount: number;
 }
 
@@ -261,7 +261,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 truncate">
-                            {chat.lastMessage?.content || 'No messages yet'}
+                            {chat.lastMessage ? chat.lastMessage.content : 'Start a conversation...'}
                           </p>
                         </div>
                         {chat.unreadCount > 0 && (
@@ -297,8 +297,8 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />
-                            {activeEvent.location.substring(0, 30)}
-                            {activeEvent.location.length > 30 && '...'}
+                            {activeEvent.location ? activeEvent.location.substring(0, 30) : 'Location TBD'}
+                            {activeEvent.location && activeEvent.location.length > 30 && '...'}
                           </div>
                         </div>
                       </div>
