@@ -86,10 +86,17 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
 
   // Fetch messages for active event
   const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({
-    queryKey: ['/api/events', activeEventId, 'messages'],
+    queryKey: [`/api/events/${activeEventId}/messages`],
     enabled: !!activeEventId,
     retry: false,
   });
+
+  // Debug logging
+  React.useEffect(() => {
+    if (activeEventId && messages) {
+      console.log(`Messages for event ${activeEventId}:`, messages);
+    }
+  }, [activeEventId, messages]);
 
   // Mark event as played mutation (for hosts)
   const markPlayedMutation = useMutation({
@@ -297,11 +304,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, yyyy h:mm a') : 'Date TBD'}
+                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'Date not set'}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />
-                            {activeEvent.location || 'Location TBD'}
+                            {activeEvent.location || 'Location not set'}
                           </div>
                         </div>
                       </div>
