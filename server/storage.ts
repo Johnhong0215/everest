@@ -724,7 +724,7 @@ export class DatabaseStorage implements IStorage {
               otherParticipant = event.host;
             }
 
-            // Count unread messages
+            // Count unread messages (readBy is JSONB array)
             const unreadQuery = await db
               .select({ count: count() })
               .from(chatMessages)
@@ -732,7 +732,7 @@ export class DatabaseStorage implements IStorage {
                 and(
                   eq(chatMessages.eventId, eventId),
                   ne(chatMessages.senderId, userId),
-                  sql`NOT (${chatMessages.readBy} @> ARRAY[${userId}]::text[])`
+                  sql`NOT (${chatMessages.readBy}::jsonb ? ${userId})`
                 )
               );
 
