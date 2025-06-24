@@ -893,21 +893,30 @@ export class DatabaseStorage implements IStorage {
 
   async markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean> {
     try {
-      const messages = await db
-        .select({ id: chatMessages.id, readBy: chatMessages.readBy })
+      console.log(`Marking messages as read for event ${eventId}, user ${userId}`);
+      
+      // Get all messages for this event that the user hasn't read yet
+      const unreadMessages = await db
+        .select({ id: chatMessages.id, readBy: chatMessages.readBy, senderId: chatMessages.senderId })
         .from(chatMessages)
-        .where(eq(chatMessages.eventId, eventId));
+        .where(and(
+          eq(chatMessages.eventId, eventId),
+          ne(chatMessages.senderId, userId) // Don't mark own messages
+        ));
 
-      for (const message of messages) {
-        const currentReadBy = message.readBy || [];
+      let updatedCount = 0;
+      for (const message of unreadMessages) {
+        const currentReadBy = Array.isArray(message.readBy) ? message.readBy : [];
         if (!currentReadBy.includes(userId)) {
           await db
             .update(chatMessages)
             .set({ readBy: [...currentReadBy, userId] })
             .where(eq(chatMessages.id, message.id));
+          updatedCount++;
         }
       }
       
+      console.log(`Marked ${updatedCount} messages as read for user ${userId} in event ${eventId}`);
       return true;
     } catch (error) {
       console.error("Error marking all messages as read:", error);

@@ -69,17 +69,20 @@ export function useSocket() {
     };
   }, [isAuthenticated, user]);
 
-  const sendMessage = (eventId: number, content: string, messageType = 'text', metadata?: any) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'chat',
+  const sendMessage = useCallback((eventId: number, content: string, receiverId?: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && user) {
+      const messageData = {
+        type: 'chat_message',
         eventId,
         content,
-        messageType,
-        metadata,
-      }));
+        receiverId
+      };
+      console.log('Sending WebSocket message:', messageData);
+      wsRef.current.send(JSON.stringify(messageData));
+    } else {
+      console.error('Cannot send WebSocket message - socket not ready or user not authenticated');
     }
-  };
+  }, [user]);
 
   return {
     isConnected,

@@ -123,6 +123,14 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       const response = await apiRequest('GET', url);
       const messages = Array.isArray(response) ? response : [];
       console.log(`Received ${messages.length} messages:`, messages);
+      
+      // Force re-render by invalidating cache if we get messages
+      if (messages.length > 0) {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+        }, 100);
+      }
+      
       return messages;
     },
     enabled: !!activeEventId && isAuthenticated,
@@ -133,6 +141,16 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
   // Ensure messages is always an array
   const messages = Array.isArray(messagesData) ? messagesData : [];
+
+  // Combine real messages with optimistic messages
+  const allMessages = useMemo(() => {
+    const combined = [...messages, ...optimisticMessages]
+      .filter(msg => msg && msg.createdAt)
+      .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+    
+    console.log(`Total combined messages: ${combined.length} (real: ${messages.length}, optimistic: ${optimisticMessages.length})`);
+    return combined;
+  }, [messages, optimisticMessages]);
 
   // Debug logging
   React.useEffect(() => {
@@ -261,14 +279,14 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
   // Mark messages as read when entering chat - only once when there are actual messages
   useEffect(() => {
-    if (activeEventId && messages.length > 0 && otherParticipantId && isOpen) {
+    if (activeEventId && allMessages.length > 0 && otherParticipantId && isOpen) {
       const timer = setTimeout(() => {
-        console.log(`Marking messages as read for event ${activeEventId}`);
+        console.log(`Marking ${allMessages.length} messages as read for event ${activeEventId}`);
         markAllMessagesAsReadMutation.mutate(activeEventId);
-      }, 1000);
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [activeEventId, otherParticipantId, messages.length, isOpen]); // Include messages.length to ensure there are messages to mark
+  }, [activeEventId, otherParticipantId, allMessages.length, isOpen]); // Use allMessages instead of messages
 
   // Clear optimistic messages when switching events
   useEffect(() => {
@@ -306,15 +324,49 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     setOptimisticMessages(prev => [...prev, tempMessage]);
     setMessageInput("");
 
-    // Send actual message
-    sendMessage(activeEventId, messageContent);
-    
-    // Remove optimistic message when real message is confirmed
-    setTimeout(() => {
+    // Get the other participant ID (receiver)
+    const receiverId = otherParticipantId || (activeEvent?.hostId === (user as any).id ? 
+      activeChat?.otherParticipant?.id : activeEvent?.hostId);
+
+    if (!receiverId) {
+      toast({
+        title: "Error",
+        description: "Cannot determine message recipient",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log(`Sending message: "${messageContent}" to ${receiverId} for event ${activeEventId}`);
+
+    // Send via HTTP API (more reliable than WebSocket)
+    apiRequest('POST', `/api/events/${activeEventId}/messages`, {
+      content: messageContent,
+      receiverId,
+      messageType: 'text'
+    }).then((response) => {
+      console.log('Message sent via HTTP API:', response);
+      // Remove optimistic message and refresh
+      setTimeout(() => {
+        setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
+        queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+        queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      }, 200);
+    }).catch(error => {
+      console.error('Failed to send message via HTTP API:', error);
+      // Remove optimistic message on error
       setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
-      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
-    }, 1500);
+      toast({
+        title: "Failed to send message",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    });
+
+    // Also try WebSocket as secondary method
+    if (isConnected) {
+      sendMessage(activeEventId, messageContent, receiverId);
+    }
   };
 
   // Group messages by date, ensuring proper ordering
@@ -555,12 +607,13 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                           </div>
                         ))}
                       </div>
-                    ) : messages.length === 0 ? (
+                    ) : allMessages.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-gray-500">No messages yet. Start the conversation!</p>
+                        <p className="text-xs mt-2 text-gray-400">Debug: {messages.length} db messages, {optimisticMessages.length} pending</p>
                       </div>
                     ) : (
-                      groupMessagesByDate([...messages, ...optimisticMessages]).map((group) => (
+                      groupMessagesByDate(allMessages).map((group) => (
                         <div key={group.date}>
                           {/* Date Separator */}
                           <div className="flex items-center my-4">
@@ -656,7 +709,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                         value={messageInput}
                         onChange={(e) => setMessageInput(e.target.value)}
                         className="pr-12"
-                        disabled={!isConnected}
+                        disabled={!user}
                       />
                       <Button
                         type="button"
@@ -671,7 +724,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                       type="submit"
                       size="sm"
                       className="bg-everest-blue hover:bg-blue-700 h-9 w-9 p-0"
-                      disabled={!messageInput.trim() || !isConnected}
+                      disabled={!messageInput.trim() || !user}
                     >
                       <Send className="w-4 h-4" />
                     </Button>
