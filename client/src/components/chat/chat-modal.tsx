@@ -205,6 +205,26 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     }
   }, [socketMessages, activeEventId, queryClient]);
 
+  // Mark messages as read mutation
+  const markAllMessagesAsReadMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const response = await apiRequest('POST', `/api/events/${eventId}/messages/read`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+    },
+  });
+
+  // Mark messages as read when entering chat
+  useEffect(() => {
+    if (activeEventId && messages.length > 0) {
+      setTimeout(() => {
+        markAllMessagesAsReadMutation.mutate(activeEventId);
+      }, 500);
+    }
+  }, [activeEventId, messages, markAllMessagesAsReadMutation]);
+
   // Clear optimistic messages when switching events
   useEffect(() => {
     setOptimisticMessages([]);
@@ -378,10 +398,6 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         key={`${chat.eventId}-${chat.otherParticipant?.id || 'unknown'}`}
                         onClick={() => {
                           setActiveEventId(chat.eventId);
-                          // Mark messages as read when opening chat
-                          if (isUnread) {
-                            markAllMessagesAsRead.mutate(chat.eventId);
-                          }
                         }}
                         className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 text-left transition-colors ${
                           activeEventId === chat.eventId ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
