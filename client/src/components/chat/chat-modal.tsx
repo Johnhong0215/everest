@@ -65,6 +65,13 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  // Fetch user's event chats
+  const { data: eventChats = [], isLoading: chatsLoading } = useQuery<EventChat[]>({
+    queryKey: ['/api/my-chats'],
+    enabled: isAuthenticated,
+    retry: false,
+  });
+
   // Set active event when eventId prop changes
   useEffect(() => {
     if (eventId) {
@@ -81,13 +88,6 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       }
     }
   }, [eventId, receiverId, eventChats]);
-
-  // Fetch user's event chats
-  const { data: eventChats = [], isLoading: chatsLoading } = useQuery<EventChat[]>({
-    queryKey: ['/api/my-chats'],
-    enabled: isAuthenticated,
-    retry: false,
-  });
 
   // Fetch active event details directly with error handling
   const { data: activeEvent, error: eventError } = useQuery<EventWithHost>({
