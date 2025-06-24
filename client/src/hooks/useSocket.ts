@@ -13,12 +13,10 @@ export function useSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     
-    console.log('Connecting to WebSocket:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
       setIsConnected(true);
       // Authenticate the connection
       ws.send(JSON.stringify({
@@ -37,31 +35,11 @@ export function useSocket() {
     };
 
     ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('WebSocket message received:', data);
-        
-        if (data.type === 'new_message') {
-          // Store the complete message data correctly
-          setMessages(prev => [...prev, data]);
-          
-          // Show browser notification for new messages
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('New message', {
-              body: data.message?.content || 'You have a new message',
-              icon: '/favicon.ico'
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+      const data = JSON.parse(event.data);
+      if (data.type === 'chat') {
+        setMessages(prev => [...prev, data.message]);
       }
     };
-
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
 
     return () => {
       ws.close();
