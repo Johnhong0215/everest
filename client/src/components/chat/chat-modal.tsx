@@ -108,16 +108,19 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   const otherParticipantId = activeChat?.otherParticipant?.id;
 
   // Fetch messages for active event with specific participant
-  const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({
+  const { data: messagesData = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({
     queryKey: [`/api/events/${activeEventId}/messages`, otherParticipantId],
     queryFn: async () => {
       if (!activeEventId || !otherParticipantId) return [];
       const response = await apiRequest('GET', `/api/events/${activeEventId}/messages?otherUserId=${otherParticipantId}`);
-      return response;
+      return Array.isArray(response) ? response : [];
     },
     enabled: !!activeEventId && !!otherParticipantId && isAuthenticated,
     retry: false,
   });
+
+  // Ensure messages is always an array
+  const messages = Array.isArray(messagesData) ? messagesData : [];
 
   // Debug logging
   React.useEffect(() => {
@@ -211,7 +214,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
   // Listen for real-time messages and refresh immediately
   useEffect(() => {
-    if (socketMessages.length > 0) {
+    if (Array.isArray(socketMessages) && socketMessages.length > 0) {
       const newMessage = socketMessages[socketMessages.length - 1];
       
       // Always refresh chat list for unread counts and new conversations
@@ -295,6 +298,9 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
   // Group messages by date, ensuring proper ordering
   const groupMessagesByDate = (messages: ChatMessageWithSender[]) => {
+    // Ensure messages is an array
+    if (!Array.isArray(messages)) return [];
+    
     // Sort all messages by creation time first
     const sortedMessages = [...messages].sort((a, b) => 
       new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
@@ -345,13 +351,13 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     ) : null;
   };
 
-  const filteredChats = eventChats.filter(chat =>
+  const filteredChats = Array.isArray(eventChats) ? eventChats.filter(chat =>
     chat.event?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     chat.event?.sport?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (chat.otherParticipant?.firstName && chat.otherParticipant?.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (chat.otherParticipant?.lastName && chat.otherParticipant?.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (chat.otherParticipant?.email && chat.otherParticipant?.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  ) : [];
 
   const isHost = activeEvent && user && typeof user === 'object' && 'id' in user && activeEvent.hostId === (user as any).id;
 
