@@ -173,14 +173,14 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     }
   }, [messages, socketMessages, activeEventId]);
 
-  // Auto scroll to bottom when opening a chat
+  // Auto scroll to bottom when opening a chat or messages load
   useEffect(() => {
-    if (activeEventId && messages.length > 0) {
+    if (activeEventId) {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
       }, 100);
     }
-  }, [activeEventId]);
+  }, [activeEventId, messages]);
 
   // Listen for real-time messages and refresh immediately
   useEffect(() => {
@@ -407,16 +407,16 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                       {getSportIcon(activeEvent.sport)}
                       <div>
                         <h4 className="text-sm font-medium text-gray-900">
-                          {activeEvent.title} - {activeEvent.sport}
+                          {activeEvent?.title || 'Event'} - {activeEvent?.sport || 'Sport'}
                         </h4>
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'No date'}
+                            {activeEvent?.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'No date'}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />
-                            {activeEvent.location || 'No location'}
+                            {activeEvent?.location || 'No location'}
                           </div>
                         </div>
                       </div>
