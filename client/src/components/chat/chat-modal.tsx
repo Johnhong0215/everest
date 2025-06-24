@@ -239,23 +239,31 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   // Mark messages as read mutation
   const markAllMessagesAsReadMutation = useMutation({
     mutationFn: async (eventId: number) => {
+      console.log(`Sending read receipt for event ${eventId}`);
       const response = await apiRequest('POST', `/api/events/${eventId}/messages/read`);
       return response;
     },
     onSuccess: () => {
+      console.log('Messages marked as read, refreshing chat list');
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      // Also refresh the specific event messages to update read status
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
     },
+    onError: (error) => {
+      console.error('Failed to mark messages as read:', error);
+    }
   });
 
-  // Mark messages as read when entering chat - only once
+  // Mark messages as read when entering chat - only once when there are actual messages
   useEffect(() => {
-    if (activeEventId && messages.length > 0 && otherParticipantId) {
+    if (activeEventId && messages.length > 0 && otherParticipantId && isOpen) {
       const timer = setTimeout(() => {
+        console.log(`Marking messages as read for event ${activeEventId}`);
         markAllMessagesAsReadMutation.mutate(activeEventId);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [activeEventId, otherParticipantId]); // Remove messages dependency to prevent loops
+  }, [activeEventId, otherParticipantId, messages.length, isOpen]); // Include messages.length to ensure there are messages to mark
 
   // Clear optimistic messages when switching events
   useEffect(() => {

@@ -354,12 +354,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       
-      console.log(`Fetching messages for event ${eventId}, current user: ${req.user.id}, other user: ${otherUserId}`);
+      const userId = req.user?.id || req.user?.claims?.sub;
+      console.log(`Fetching messages for event ${eventId}, current user: ${userId}, other user: ${otherUserId}`);
       
-      if (otherUserId) {
+      if (otherUserId && userId) {
         // Get messages for specific conversation
-        const messages = await storage.getChatMessagesForConversation(eventId, req.user.id, otherUserId, limit, offset);
-        console.log(`Fetched ${messages.length} conversation messages between ${req.user.id} and ${otherUserId} in event ${eventId}`);
+        const messages = await storage.getChatMessagesForConversation(eventId, userId, otherUserId, limit, offset);
+        console.log(`Fetched ${messages.length} conversation messages between ${userId} and ${otherUserId} in event ${eventId}`);
         res.json(messages);
       } else {
         // Get all messages for event (fallback when no specific conversation)
@@ -376,7 +377,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/events/:id/messages/read', isAuthenticated, async (req: any, res) => {
     try {
       const eventId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
       
       const success = await storage.markAllMessagesAsRead(eventId, userId);
       
@@ -411,7 +416,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/my-chats', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
       const chats = await storage.getEventChats(userId);
       res.json(chats);
     } catch (error) {
