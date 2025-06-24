@@ -732,7 +732,7 @@ export class DatabaseStorage implements IStorage {
                 and(
                   eq(chatMessages.eventId, eventId),
                   ne(chatMessages.senderId, userId),
-                  not(sql`${userId} = ANY(${chatMessages.readBy})`)
+                  sql`NOT (${chatMessages.readBy} @> ARRAY[${userId}]::text[])`
                 )
               );
 
