@@ -13,6 +13,14 @@ export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
+
+  // Get total unread message count for notification
+  const { data: myChats = [] } = useQuery({
+    queryKey: ['/api/my-chats'],
+    retry: false,
+  });
+
+  const totalUnreadCount = myChats.reduce((total: number, chat: any) => total + (chat.unreadCount || 0), 0);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   // Applied filters (for API queries - what's actually being searched)
   const [appliedFilters, setAppliedFilters] = useState({

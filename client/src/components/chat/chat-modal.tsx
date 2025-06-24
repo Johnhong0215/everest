@@ -78,9 +78,9 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     retry: false,
   });
 
-  // Fetch active event details
+  // Fetch active event details directly
   const { data: activeEvent } = useQuery<EventWithHost>({
-    queryKey: ['/api/events', activeEventId],
+    queryKey: [`/api/events/${activeEventId}`],
     enabled: !!activeEventId,
     retry: false,
   });
@@ -166,21 +166,34 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     },
   });
 
-  // Auto scroll to bottom when new messages arrive
+  // Auto scroll to bottom when messages change or chat opens
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, socketMessages]);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, socketMessages, activeEventId]);
+
+  // Auto scroll to bottom when opening a chat
+  useEffect(() => {
+    if (activeEventId && messages.length > 0) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      }, 100);
+    }
+  }, [activeEventId]);
 
   // Listen for real-time messages and refresh immediately
   useEffect(() => {
-    if (activeEventId && socketMessages.length > 0) {
+    if (socketMessages.length > 0) {
       const newMessage = socketMessages[socketMessages.length - 1];
-      if (newMessage.eventId === activeEventId) {
-        // Clear any pending optimistic messages first
+      
+      // Always refresh chat list for unread counts
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      
+      // If message is for active chat, refresh messages
+      if (activeEventId && newMessage.eventId === activeEventId) {
         setOptimisticMessages([]);
-        // Refresh messages immediately when new message arrives
         queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
-        queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
       }
     }
   }, [socketMessages, activeEventId, queryClient]);
@@ -399,11 +412,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'No date set'}
+                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'No date'}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />
-                            {activeEvent.location || 'No location set'}
+                            {activeEvent.location || 'No location'}
                           </div>
                         </div>
                       </div>
