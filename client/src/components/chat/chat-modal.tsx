@@ -124,12 +124,8 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       const messages = Array.isArray(response) ? response : [];
       console.log(`Received ${messages.length} messages:`, messages);
       
-      // Force re-render by invalidating cache if we get messages
-      if (messages.length > 0) {
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
-        }, 100);
-      }
+      // Log message fetch results
+      console.log(`API returned ${messages.length} messages for event ${activeEventId}`);
       
       return messages;
     },
@@ -339,7 +335,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
     console.log(`Sending message: "${messageContent}" to ${receiverId} for event ${activeEventId}`);
 
-    // Send via HTTP API (more reliable than WebSocket)
+    // Send via HTTP API only (more reliable than WebSocket)
     apiRequest('POST', `/api/events/${activeEventId}/messages`, {
       content: messageContent,
       receiverId,
@@ -362,11 +358,6 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
         variant: "destructive",
       });
     });
-
-    // Also try WebSocket as secondary method
-    if (isConnected) {
-      sendMessage(activeEventId, messageContent, receiverId);
-    }
   };
 
   // Group messages by date, ensuring proper ordering
@@ -613,91 +604,38 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                         <p className="text-xs mt-2 text-gray-400">Debug: {messages.length} db messages, {optimisticMessages.length} pending</p>
                       </div>
                     ) : (
-                      groupMessagesByDate(allMessages).map((group) => (
-                        <div key={group.date}>
-                          {/* Date Separator */}
-                          <div className="flex items-center my-4">
-                            <div className="flex-1 border-t border-gray-200"></div>
-                            <span className="px-3 text-xs text-gray-500 bg-white">{group.date}</span>
-                            <div className="flex-1 border-t border-gray-200"></div>
-                          </div>
+                      <div className="space-y-4">
+                        {allMessages.map((message, index) => {
+                          const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
+                          const isPending = (message as any).isPending;
                           
-                          {/* Messages for this date */}
-                          {group.messages.map((message) => {
-                            const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
-                            const isRead = message.readBy && message.readBy.length > 1; // More than just sender
-                            const isPending = (message as any).isPending;
-                            
-                            return (
-                              <div
-                                key={message.id}
-                                className={`flex items-start space-x-3 mb-4 ${
-                                  isOwnMessage ? 'justify-end' : ''
-                                }`}
-                              >
-                                {!isOwnMessage && (
-                                  <Avatar className="w-8 h-8">
-                                    <AvatarImage src={message.sender?.profileImageUrl || undefined} />
-                                    <AvatarFallback className="text-xs">
-                                      {message.sender?.firstName?.[0] || message.sender?.email?.[0] || 'U'}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                )}
-                                <div className={`${isOwnMessage ? 'ml-auto' : ''}`} style={{ maxWidth: Math.min(300, Math.max(100, message.content.length * 8 + 40)) }}>
-                                  {!isOwnMessage && (
-                                    <div className="flex items-center space-x-2 mb-1">
-                                      <span className="text-sm font-medium text-gray-900">
-                                        {message.sender?.firstName && message.sender?.lastName 
-                                          ? `${message.sender.firstName} ${message.sender.lastName.charAt(0)}.`
-                                          : message.sender?.email?.split('@')[0] || 'User'
-                                        }
-                                      </span>
-                                      <span className="text-xs text-gray-500">
-                                        {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div
-                                    className={`rounded-lg p-3 relative ${
-                                      isOwnMessage
-                                        ? 'bg-everest-blue text-white'
-                                        : 'bg-gray-100 text-gray-900'
-                                    }`}
-                                  >
-                                    <p className="text-sm">{message.content}</p>
-                                    {isPending && (
-                                      <div className="absolute top-1 right-1">
-                                        <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
-                                      </div>
-                                    )}
-                                  </div>
-                                  {isOwnMessage && (
-                                    <div className="flex items-center justify-end space-x-2 mt-1">
-                                      <span className="text-xs text-gray-500">
-                                        {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
-                                      </span>
-                                      <span className="text-xs text-gray-500">
-                                        {isPending ? 'Sending...' : isRead ? 'Read' : 'Sent'}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                                {isOwnMessage && (
-                                  <Avatar className="w-8 h-8">
-                                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
-                                    <AvatarFallback className="text-xs">
-                                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                )}
+                          return (
+                            <div
+                              key={message.id}
+                              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                            >
+                              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                isOwnMessage 
+                                  ? 'bg-everest-blue text-white' 
+                                  : 'bg-gray-100 text-gray-800'
+                              } ${isPending ? 'opacity-50' : ''}`}>
+                                <p className="text-sm">{message.content}</p>
+                                <p className={`text-xs mt-1 ${
+                                  isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+                                }`}>
+                                  {new Date(message.createdAt!).toLocaleTimeString([], { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                  {isPending && ' (Sending...)'}
+                                </p>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ))
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                     <div ref={messagesEndRef} />
-                  </div>
                 </ScrollArea>
 
                 {/* Message Input */}
