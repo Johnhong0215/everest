@@ -586,35 +586,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
-        if (message.type === 'chat_message') {
-          const { eventId, content, receiverId } = message;
+        if (message.type === 'chat' && userId) {
+          // Get event to determine receiver
+          const event = await storage.getEvent(message.eventId);
+          if (!event) return;
           
-          if (!userId || !eventId || !content || !receiverId) {
-            console.error('Missing required fields for WebSocket message');
-            return;
+          // Determine receiver: if sender is host, receiver is the participant; if sender is participant, receiver is host
+          let receiverId: string;
+          if (event.hostId === userId) {
+            // Sender is host, need to find the participant (for now, assume first participant)
+            const bookings = await storage.getBookingsByEvent(message.eventId);
+            const acceptedBookings = bookings.filter(b => b.status === 'accepted');
+            if (acceptedBookings.length === 0) return; // No participants to send to
+            receiverId = acceptedBookings[0].userId; // Send to first participant for now
+          } else {
+            // Sender is participant, receiver is host
+            receiverId = event.hostId;
           }
-          
-          console.log(`WebSocket: Creating message from ${userId} to ${receiverId} for event ${eventId}: "${content}"`);
 
           const chatMessage = await storage.createChatMessage({
-            eventId,
+            eventId: message.eventId,
             senderId: userId,
-            receiverId,
-            content,
-            messageType: 'text',
+            receiverId: receiverId,
+            content: message.content,
+            messageType: message.messageType || 'text',
+            metadata: message.metadata,
             readBy: [userId], // Sender automatically reads their own message
           });
-          
-          console.log(`WebSocket: Message created with ID ${chatMessage.id}`);
 
           // Get the complete message with sender details
-          const messageWithSender = await storage.getChatMessages(eventId, 1, 0);
+          const messageWithSender = await storage.getChatMessages(message.eventId, 1, 0);
           const completeMessage = messageWithSender[0];
 
           // Broadcast to the specific receiver
           const broadcastMessage = {
             type: 'new_message',
-            eventId,
+            eventId: message.eventId,
             message: completeMessage,
           };
 
@@ -635,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (senderWs && senderWs.readyState === WebSocket.OPEN) {
             senderWs.send(JSON.stringify({
               type: 'message_sent',
-              eventId,
+              eventId: message.eventId,
               message: completeMessage,
             }));
             console.log(`✓ Sent confirmation to sender ${userId}`);
@@ -652,36 +659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`User ${userId} disconnected from WebSocket`);
       }
     });
-  });
-
-  // HTTP endpoint for sending messages (more reliable than WebSocket)
-  app.post('/api/events/:id/messages', isAuthenticated, async (req: any, res) => {
-    try {
-      const eventId = parseInt(req.params.id);
-      const { content, messageType = "text", receiverId } = req.body;
-      const senderId = req.user?.id || req.user?.claims?.sub;
-
-      console.log(`HTTP API: Creating message from ${senderId} to ${receiverId} for event ${eventId}: "${content}"`);
-
-      if (!content || !receiverId || !senderId) {
-        return res.status(400).json({ message: "Content, receiverId, and authenticated user are required" });
-      }
-
-      const message = await storage.createChatMessage({
-        eventId,
-        senderId,
-        receiverId,
-        content,
-        messageType,
-        readBy: [senderId] // Sender has read their own message
-      });
-
-      console.log(`HTTP API: Message created successfully with ID: ${message.id}`);
-      res.json(message);
-    } catch (error) {
-      console.error("HTTP API: Error creating message:", error);
-      res.status(500).json({ message: "Failed to create message" });
-    }
   });
 
   return httpServer;

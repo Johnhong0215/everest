@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,13 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     retry: false,
   });
 
+  // Log any errors for debugging
+  React.useEffect(() => {
+    if (eventError) {
+      console.error('Error fetching event:', eventError);
+    }
+  }, [eventError]);
+
   // Get the active chat to determine the other participant
   const activeChat = eventChats.find(chat => chat.eventId === activeEventId);
   const otherParticipantId = activeChat?.otherParticipant?.id || receiverId;
@@ -116,7 +123,6 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       const response = await apiRequest('GET', url);
       const messages = Array.isArray(response) ? response : [];
       console.log(`Received ${messages.length} messages:`, messages);
-      
       return messages;
     },
     enabled: !!activeEventId && isAuthenticated,
@@ -128,15 +134,80 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   // Ensure messages is always an array
   const messages = Array.isArray(messagesData) ? messagesData : [];
 
-  // Combine real messages with optimistic messages
-  const allMessages = useMemo(() => {
-    const combined = [...messages, ...optimisticMessages]
-      .filter(msg => msg && msg.createdAt)
-      .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
-    
-    console.log(`Total combined messages: ${combined.length} (real: ${messages.length}, optimistic: ${optimisticMessages.length})`);
-    return combined;
-  }, [messages, optimisticMessages]);
+  // Debug logging
+  React.useEffect(() => {
+    if (activeEventId) {
+      console.log(`Messages for event ${activeEventId}:`, messages);
+      console.log(`Active event ID: ${activeEventId}, Other participant: ${otherParticipantId}`);
+    }
+  }, [activeEventId, messages, otherParticipantId]);
+
+  // Delete chatroom mutation
+  const deleteChatroomMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      return await apiRequest('DELETE', `/api/events/${eventId}/chatroom`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Chatroom Deleted",
+        description: "The chatroom has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      setActiveEventId(null);
+      onClose();
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete chatroom. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cancel event mutation (for hosts)
+  const cancelEventMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      return await apiRequest('PUT', `/api/events/${eventId}`, { status: 'cancelled' });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event Cancelled",
+        description: "The event has been cancelled.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-events'] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to cancel event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Auto scroll to bottom when messages change or chat opens
   useEffect(() => {
@@ -163,26 +234,59 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
       
       // If message is for active chat, refresh messages and clear optimistic
-      if (newMessage.eventId === activeEventId) {
+      if (activeEventId && newMessage.eventId === activeEventId) {
+        setOptimisticMessages([]);
         queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
-        setOptimisticMessages(prev => prev.filter(msg => !msg.isPending));
       }
     }
   }, [socketMessages, activeEventId, queryClient]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const messageContent = messageInput.trim();
-    if (!messageContent || !activeEventId || !user) return;
+  // Mark messages as read mutation
+  const markAllMessagesAsReadMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      console.log(`Sending read receipt for event ${eventId}`);
+      const response = await apiRequest('POST', `/api/events/${eventId}/messages/read`);
+      return response;
+    },
+    onSuccess: () => {
+      console.log('Messages marked as read, refreshing chat list');
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      // Also refresh the specific event messages to update read status
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+    },
+    onError: (error) => {
+      console.error('Failed to mark messages as read:', error);
+    }
+  });
 
-    // Create temporary optimistic message
-    const tempId = Date.now();
+  // Mark messages as read when entering chat - only once when there are actual messages
+  useEffect(() => {
+    if (activeEventId && messages.length > 0 && otherParticipantId && isOpen) {
+      const timer = setTimeout(() => {
+        console.log(`Marking messages as read for event ${activeEventId}`);
+        markAllMessagesAsReadMutation.mutate(activeEventId);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeEventId, otherParticipantId, messages.length, isOpen]); // Include messages.length to ensure there are messages to mark
+
+  // Clear optimistic messages when switching events
+  useEffect(() => {
+    setOptimisticMessages([]);
+  }, [activeEventId]);
+
+  // Handle sending messages with optimistic updates
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !activeEventId || !isConnected || !user) return;
+
+    const messageContent = messageInput.trim();
+    const tempId = `temp-${Date.now()}`;
+    
     const tempMessage: ChatMessageWithSender = {
       id: tempId as any,
       eventId: activeEventId,
       senderId: (user as any).id,
-      receiverId: otherParticipantId || null,
       content: messageContent,
       messageType: "text",
       metadata: null,
@@ -194,10 +298,6 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
         lastName: (user as any).lastName || null,
         email: (user as any).email || null,
         profileImageUrl: (user as any).profileImageUrl || null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
       },
       isPending: true
     };
@@ -206,75 +306,48 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     setOptimisticMessages(prev => [...prev, tempMessage]);
     setMessageInput("");
 
-    // Get the other participant ID (receiver)
-    const receiverIdToUse = otherParticipantId || (activeEvent?.hostId === (user as any).id ? 
-      activeChat?.otherParticipant?.id : activeEvent?.hostId);
-
-    if (!receiverIdToUse) {
-      toast({
-        title: "Error",
-        description: "Cannot determine message recipient",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log(`Sending message: "${messageContent}" to ${receiverIdToUse} for event ${activeEventId}`);
-
-    // Send via HTTP API only (more reliable than WebSocket)
-    try {
-      const response = await apiRequest('POST', `/api/events/${activeEventId}/messages`, {
-        content: messageContent,
-        receiverId: receiverIdToUse,
-        messageType: 'text'
-      });
-      console.log('Message sent via HTTP API:', response);
-      
-      // Remove optimistic message and refresh
-      setTimeout(() => {
-        setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
-        queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
-        queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
-      }, 200);
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      // Remove failed optimistic message
+    // Send actual message
+    sendMessage(activeEventId, messageContent);
+    
+    // Remove optimistic message when real message is confirmed
+    setTimeout(() => {
       setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
-      
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
-    }
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+    }, 1500);
   };
 
-  // Group messages by date
+  // Group messages by date, ensuring proper ordering
   const groupMessagesByDate = (messages: ChatMessageWithSender[]) => {
+    // Ensure messages is an array
+    if (!Array.isArray(messages)) return [];
+    
+    // Sort all messages by creation time first
+    const sortedMessages = [...messages].sort((a, b) => 
+      new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+    );
+
     const groups: { date: string; messages: ChatMessageWithSender[] }[] = [];
     let currentDate = '';
     let currentGroup: ChatMessageWithSender[] = [];
 
-    messages.forEach(message => {
-      const messageDate = format(new Date(message.createdAt!), 'yyyy-MM-dd');
+    sortedMessages.forEach((message) => {
+      const messageDate = new Date(message.createdAt!);
+      let dateLabel = '';
       
-      if (messageDate !== currentDate) {
+      if (isToday(messageDate)) {
+        dateLabel = 'Today';
+      } else if (isYesterday(messageDate)) {
+        dateLabel = 'Yesterday';
+      } else {
+        dateLabel = format(messageDate, 'M/d/yyyy');
+      }
+
+      if (dateLabel !== currentDate) {
         if (currentGroup.length > 0) {
           groups.push({ date: currentDate, messages: currentGroup });
         }
-        currentDate = messageDate;
+        currentDate = dateLabel;
         currentGroup = [message];
       } else {
         currentGroup.push(message);
@@ -334,173 +407,244 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                   placeholder="Search conversations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-9"
                 />
               </div>
             </div>
 
             {/* Chat List */}
             <ScrollArea className="flex-1">
-              <div className="p-2">
-                {chatsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-sm text-gray-500">Loading conversations...</div>
-                  </div>
-                ) : filteredChats.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="text-sm text-gray-500">No conversations yet</div>
-                    <div className="text-xs text-gray-400 mt-1">Start by booking an event!</div>
-                  </div>
-                ) : (
-                  filteredChats.map((chat) => (
-                    <div
-                      key={chat.eventId}
-                      onClick={() => setActiveEventId(chat.eventId)}
-                      className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 mb-1 ${
-                        activeEventId === chat.eventId ? 'bg-blue-50 border border-blue-200' : ''
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={chat.otherParticipant?.profileImageUrl} />
-                          <AvatarFallback>
-                            {chat.otherParticipant?.firstName?.[0]}{chat.otherParticipant?.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {chat.otherParticipant?.firstName} {chat.otherParticipant?.lastName}
-                            </p>
-                            {chat.unreadCount > 0 && (
-                              <Badge variant="default" className="bg-blue-500 text-white text-xs">
-                                {chat.unreadCount}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">
-                            {chat.event?.title} • {chat.event?.sport}
-                          </p>
-                          {chat.lastMessage && (
-                            <p className="text-xs text-gray-400 truncate mt-1">
-                              {chat.lastMessage.content}
-                            </p>
-                          )}
+              {chatsLoading ? (
+                <div className="p-4 space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded w-3/4" />
+                          <div className="h-3 bg-gray-200 rounded w-1/2" />
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : filteredChats.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-gray-500 text-sm">No conversations found.</p>
+                </div>
+              ) : (
+                <div>
+                  {filteredChats.map((chat) => {
+                    const isUnread = chat.unreadCount > 0;
+                    const displayName = chat.otherParticipant?.firstName && chat.otherParticipant?.lastName 
+                      ? `${chat.otherParticipant.firstName} ${chat.otherParticipant.lastName}` 
+                      : chat.otherParticipant?.email?.split('@')[0] || 'Unknown User';
+                    const isHost = chat.otherParticipant?.id === chat.event?.host?.id;
+                    
+                    return (
+                      <button
+                        key={`${chat.eventId}-${chat.otherParticipant?.id || 'unknown'}`}
+                        onClick={() => {
+                          setActiveEventId(chat.eventId);
+                        }}
+                        className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 text-left transition-colors ${
+                          activeEventId === chat.eventId ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          {getSportIcon(chat.event?.sport || 'default')}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                                {displayName}{isHost ? ' (H)' : ''}
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                {isUnread && (
+                                  <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                                    {chat.unreadCount}
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  {chat.lastMessage?.createdAt ? 
+                                    format(new Date(chat.lastMessage.createdAt), 'HH:mm') : 'Start chat'}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">
+                              {chat.event?.title || 'Event'} - {chat.event?.sport || 'Sport'}
+                            </p>
+                            {chat.lastMessage ? (
+                              <p className={`text-xs truncate mt-1 ${isUnread ? 'font-medium text-gray-900' : 'text-gray-400'}`}>
+                                {chat.lastMessage.content}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-400 truncate mt-1 italic">
+                                No messages yet
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </ScrollArea>
           </div>
 
-          {/* Chat Content */}
+          {/* Chat Messages */}
           <div className="flex-1 flex flex-col">
-            {activeEventId && activeEvent ? (
+            {activeEvent ? (
               <>
                 {/* Chat Header */}
-                <div className="p-4 border-b border-gray-200 bg-white">
+                <div className="p-4 border-b border-gray-200 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       {getSportIcon(activeEvent.sport)}
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{activeEvent.title}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <h4 className="text-sm font-medium text-gray-900">
+                          {activeEvent?.title || 'Event'} - {activeEvent?.sport || 'Sport'}
+                        </h4>
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            {format(new Date(activeEvent.dateTime), 'MMM d, yyyy h:mm a')}
+                            <Calendar className="w-3 h-3 mr-1" />
+                            {activeEvent?.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'No date'}
                           </div>
                           <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            {activeEvent.location}
+                            <MapPin className="w-3 h-3 mr-1" />
+                            {activeEvent?.location || 'No location'}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm("Are you sure you want to delete this chatroom?")) {
-                          // Add delete chatroom functionality here
-                        }
-                      }}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm">
+                        View Event
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this chatroom? This will remove all messages for both participants.")) {
+                            deleteChatroomMutation.mutate(activeEventId);
+                          }
+                        }}
+                        className="text-gray-500 hover:text-red-500"
+                        disabled={deleteChatroomMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Messages */}
                 <ScrollArea className="flex-1 p-4">
-                  {messagesLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="text-sm text-gray-500">Loading messages...</div>
-                    </div>
-                  ) : allMessages.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="text-sm text-gray-500">No messages yet</div>
-                      <div className="text-xs text-gray-400 mt-1">Start the conversation!</div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {groupMessagesByDate(allMessages).map((group, groupIndex) => (
-                        <div key={groupIndex}>
+                  <div className="space-y-4">
+                    {messagesLoading ? (
+                      <div className="space-y-4">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div key={i} className="animate-pulse">
+                            <div className="flex items-start space-x-3">
+                              <div className="w-8 h-8 bg-gray-200 rounded-full" />
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 bg-gray-200 rounded w-1/4" />
+                                <div className="h-12 bg-gray-200 rounded w-3/4" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : messages.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">No messages yet. Start the conversation!</p>
+                      </div>
+                    ) : (
+                      groupMessagesByDate([...messages, ...optimisticMessages]).map((group) => (
+                        <div key={group.date}>
                           {/* Date Separator */}
                           <div className="flex items-center my-4">
-                            <Separator className="flex-1" />
-                            <span className="px-3 text-xs text-gray-500 bg-white">
-                              {isToday(new Date(group.date)) ? 'Today' :
-                               isYesterday(new Date(group.date)) ? 'Yesterday' :
-                               format(new Date(group.date), 'MMM d, yyyy')}
-                            </span>
-                            <Separator className="flex-1" />
+                            <div className="flex-1 border-t border-gray-200"></div>
+                            <span className="px-3 text-xs text-gray-500 bg-white">{group.date}</span>
+                            <div className="flex-1 border-t border-gray-200"></div>
                           </div>
-
+                          
                           {/* Messages for this date */}
-                          {group.messages.map((message, messageIndex) => {
-                            const isOwnMessage = message.senderId === (user as any)?.id;
-                            const showAvatar = !isOwnMessage && (
-                              messageIndex === 0 || 
-                              group.messages[messageIndex - 1]?.senderId !== message.senderId
-                            );
-                            const isPending = message.isPending;
-
+                          {group.messages.map((message) => {
+                            const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
+                            const isRead = message.readBy && message.readBy.length > 1; // More than just sender
+                            const isPending = (message as any).isPending;
+                            
                             return (
                               <div
-                                key={`${message.id}-${messageIndex}`}
-                                className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-2`}
+                                key={message.id}
+                                className={`flex items-start space-x-3 mb-4 ${
+                                  isOwnMessage ? 'justify-end' : ''
+                                }`}
                               >
-                                <div className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                                  {showAvatar && !isOwnMessage && (
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage src={message.sender?.profileImageUrl} />
-                                      <AvatarFallback className="text-xs">
-                                        {message.sender?.firstName?.[0]}{message.sender?.lastName?.[0]}
-                                      </AvatarFallback>
-                                    </Avatar>
+                                {!isOwnMessage && (
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={message.sender?.profileImageUrl || undefined} />
+                                    <AvatarFallback className="text-xs">
+                                      {message.sender?.firstName?.[0] || message.sender?.email?.[0] || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
+                                <div className={`${isOwnMessage ? 'ml-auto' : ''}`} style={{ maxWidth: Math.min(300, Math.max(100, message.content.length * 8 + 40)) }}>
+                                  {!isOwnMessage && (
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {message.sender?.firstName && message.sender?.lastName 
+                                          ? `${message.sender.firstName} ${message.sender.lastName.charAt(0)}.`
+                                          : message.sender?.email?.split('@')[0] || 'User'
+                                        }
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
+                                      </span>
+                                    </div>
                                   )}
-                                  <div className={`rounded-lg px-3 py-2 ${
-                                    isOwnMessage 
-                                      ? 'bg-blue-500 text-white' 
-                                      : 'bg-gray-100 text-gray-900'
-                                  } ${isPending ? 'opacity-60' : ''}`}>
-                                    <p className="text-sm break-words">
-                                      {message.content}
-                                      {isPending && ' (Sending...)'}
-                                    </p>
+                                  <div
+                                    className={`rounded-lg p-3 relative ${
+                                      isOwnMessage
+                                        ? 'bg-everest-blue text-white'
+                                        : 'bg-gray-100 text-gray-900'
+                                    }`}
+                                  >
+                                    <p className="text-sm">{message.content}</p>
+                                    {isPending && (
+                                      <div className="absolute top-1 right-1">
+                                        <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+                                      </div>
+                                    )}
                                   </div>
+                                  {isOwnMessage && (
+                                    <div className="flex items-center justify-end space-x-2 mt-1">
+                                      <span className="text-xs text-gray-500">
+                                        {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {isPending ? 'Sending...' : isRead ? 'Read' : 'Sent'}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
+                                {isOwnMessage && (
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
+                                    <AvatarFallback className="text-xs">
+                                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
                               </div>
                             );
                           })}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
+                      ))
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
                 </ScrollArea>
 
                 {/* Message Input */}
@@ -512,7 +656,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                         value={messageInput}
                         onChange={(e) => setMessageInput(e.target.value)}
                         className="pr-12"
-                        disabled={!user}
+                        disabled={!isConnected}
                       />
                       <Button
                         type="button"
@@ -527,7 +671,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                       type="submit"
                       size="sm"
                       className="bg-everest-blue hover:bg-blue-700 h-9 w-9 p-0"
-                      disabled={!messageInput.trim() || !user}
+                      disabled={!messageInput.trim() || !isConnected}
                     >
                       <Send className="w-4 h-4" />
                     </Button>
@@ -540,15 +684,16 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                   )}
 
                   {/* Host Controls */}
-                  {isHost && activeEvent?.status === 'published' && (
+                  {((isHost && activeEvent.status === 'published') ? (
                     <div className="mt-3 flex space-x-2">
                       <Button
                         size="sm"
                         onClick={() => {
-                          if (confirm("Are you sure you want to mark this event as played?")) {
-                            // Add mark as played functionality here
+                          if (confirm("Are you sure you want to cancel this event?")) {
+                            cancelEventMutation.mutate(activeEvent.id);
                           }
                         }}
+                        disabled={cancelEventMutation.isPending}
                         className="bg-everest-green hover:bg-green-700"
                       >
                         <CheckCircle className="w-4 h-4 mr-1" />
@@ -557,17 +702,14 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          if (confirm("Are you sure you want to cancel this event?")) {
-                            // Add cancel event functionality here
-                          }
-                        }}
+                        onClick={() => cancelEventMutation.mutate(activeEvent.id)}
+                        disabled={cancelEventMutation.isPending}
                       >
                         <X className="w-4 h-4 mr-1" />
                         Cancel Event
                       </Button>
                     </div>
-                  )}
+                  ) : null) as React.ReactNode}
                 </div>
               </>
             ) : (
