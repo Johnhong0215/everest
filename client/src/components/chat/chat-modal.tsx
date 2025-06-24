@@ -21,6 +21,7 @@ interface ChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   eventId: number | null;
+  receiverId?: string | null;
 }
 
 interface EventChat {
@@ -31,7 +32,7 @@ interface EventChat {
   otherParticipant: any;
 }
 
-export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) {
+export default function ChatModal({ isOpen, onClose, eventId, receiverId }: ChatModalProps) {
   const [activeEventId, setActiveEventId] = useState<number | null>(eventId);
   const [messageInput, setMessageInput] = useState("");
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessageWithSender[]>([]);
@@ -68,8 +69,18 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
   useEffect(() => {
     if (eventId) {
       setActiveEventId(eventId);
+      
+      // If receiverId is provided, find the correct chat conversation
+      if (receiverId && eventChats.length > 0) {
+        const targetChat = eventChats.find(chat => 
+          chat.eventId === eventId && chat.otherParticipant?.id === receiverId
+        );
+        if (targetChat) {
+          setActiveEventId(targetChat.eventId);
+        }
+      }
     }
-  }, [eventId]);
+  }, [eventId, receiverId, eventChats]);
 
   // Fetch user's event chats
   const { data: eventChats = [], isLoading: chatsLoading } = useQuery<EventChat[]>({
@@ -92,10 +103,19 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     }
   }, [eventError]);
 
-  // Fetch messages for active event
+  // Get the active chat to determine the other participant
+  const activeChat = eventChats.find(chat => chat.eventId === activeEventId);
+  const otherParticipantId = activeChat?.otherParticipant?.id;
+
+  // Fetch messages for active event with specific participant
   const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({
-    queryKey: [`/api/events/${activeEventId}/messages`],
-    enabled: !!activeEventId,
+    queryKey: [`/api/events/${activeEventId}/messages`, otherParticipantId],
+    queryFn: async () => {
+      if (!activeEventId || !otherParticipantId) return [];
+      const response = await apiRequest('GET', `/api/events/${activeEventId}/messages?otherUserId=${otherParticipantId}`);
+      return response;
+    },
+    enabled: !!activeEventId && !!otherParticipantId && isAuthenticated,
     retry: false,
   });
 
@@ -216,14 +236,15 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     },
   });
 
-  // Mark messages as read when entering chat
+  // Mark messages as read when entering chat - only once
   useEffect(() => {
-    if (activeEventId && messages.length > 0) {
-      setTimeout(() => {
+    if (activeEventId && messages.length > 0 && otherParticipantId) {
+      const timer = setTimeout(() => {
         markAllMessagesAsReadMutation.mutate(activeEventId);
-      }, 500);
+      }, 1000);
+      return () => clearTimeout(timer);
     }
-  }, [activeEventId, messages, markAllMessagesAsReadMutation]);
+  }, [activeEventId, otherParticipantId]); // Remove messages dependency to prevent loops
 
   // Clear optimistic messages when switching events
   useEffect(() => {
@@ -640,8 +661,12 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                     <div className="mt-3 flex space-x-2">
                       <Button
                         size="sm"
-                        onClick={() => markPlayedMutation.mutate(activeEvent.id)}
-                        disabled={markPlayedMutation.isPending}
+                        onClick={() => {
+                          if (confirm("Are you sure you want to cancel this event?")) {
+                            cancelEventMutation.mutate(activeEvent.id);
+                          }
+                        }}
+                        disabled={cancelEventMutation.isPending}
                         className="bg-everest-green hover:bg-green-700"
                       >
                         <CheckCircle className="w-4 h-4 mr-1" />

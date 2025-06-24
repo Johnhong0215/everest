@@ -14,6 +14,7 @@ export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
+  const [selectedReceiverId, setSelectedReceiverId] = useState<string | null>(null);
 
   // Get total unread message count for notification
   const { data: myChats = [] } = useQuery({
@@ -118,10 +119,7 @@ export default function Home() {
             onViewModeChange={setViewMode}
             onCreateEvent={() => setIsCreateEventOpen(true)}
             onFiltersChange={() => {}}
-            onOpenChat={(eventId) => {
-              setActiveEventId(eventId);
-              setIsChatOpen(true);
-            }}
+            onOpenChat={handleOpenChat}
           />
         </main>
       </div>
@@ -134,16 +132,14 @@ export default function Home() {
       <MyBookingsModal 
         isOpen={isBookingsOpen}
         onClose={() => setIsBookingsOpen(false)}
-        onOpenChat={(eventId) => {
-          setActiveEventId(eventId);
-          setIsChatOpen(true);
-        }}
+        onOpenChat={handleOpenChat}
       />
       
       <ChatModal 
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         eventId={activeEventId}
+        receiverId={selectedReceiverId}
       />
       
       <BookingRequestsModal 

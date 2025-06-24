@@ -18,7 +18,7 @@ import { format } from "date-fns";
 interface MyBookingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenChat: (eventId: number) => void;
+  onOpenChat: (eventId: number, receiverId?: string) => void;
 }
 
 interface Earnings {
@@ -450,7 +450,7 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => onOpenChat(booking.event.id)}
+                                  onClick={() => onOpenChat(booking.event.id, booking.event.hostId)}
                                   className="text-everest-blue hover:text-blue-700"
                                 >
                                   <MessageCircle className="w-4 h-4 mr-1" />

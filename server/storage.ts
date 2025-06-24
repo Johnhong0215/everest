@@ -63,6 +63,7 @@ export interface IStorage {
   // Chat operations
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(eventId: number, limit?: number, offset?: number): Promise<ChatMessageWithSender[]>;
+  getChatMessagesForConversation(eventId: number, userId1: string, userId2: string, limit?: number, offset?: number): Promise<ChatMessageWithSender[]>;
   getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: any; unreadCount: number; otherParticipant: any }[]>;
   markMessageAsRead(messageId: number, userId: string): Promise<boolean>;
   markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean>;
@@ -551,11 +552,70 @@ export class DatabaseStorage implements IStorage {
     })) as ChatMessageWithSender[];
   }
 
+  async getChatMessagesForConversation(eventId: number, userId1: string, userId2: string, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
+    try {
+      const messages = await db
+        .select({
+          id: chatMessages.id,
+          eventId: chatMessages.eventId,
+          senderId: chatMessages.senderId,
+          receiverId: chatMessages.receiverId,
+          content: chatMessages.content,
+          messageType: chatMessages.messageType,
+          metadata: chatMessages.metadata,
+          readBy: chatMessages.readBy,
+          createdAt: chatMessages.createdAt,
+          senderFirstName: users.firstName,
+          senderLastName: users.lastName,
+          senderEmail: users.email,
+          senderProfileImageUrl: users.profileImageUrl
+        })
+        .from(chatMessages)
+        .innerJoin(users, eq(chatMessages.senderId, users.id))
+        .where(and(
+          eq(chatMessages.eventId, eventId),
+          or(
+            and(eq(chatMessages.senderId, userId1), eq(chatMessages.receiverId, userId2)),
+            and(eq(chatMessages.senderId, userId2), eq(chatMessages.receiverId, userId1))
+          )
+        ))
+        .orderBy(asc(chatMessages.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return messages.map(msg => ({
+        id: msg.id,
+        eventId: msg.eventId,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        content: msg.content,
+        messageType: msg.messageType,
+        metadata: msg.metadata,
+        readBy: msg.readBy,
+        createdAt: msg.createdAt,
+        sender: {
+          id: msg.senderId,
+          firstName: msg.senderFirstName,
+          lastName: msg.senderLastName,
+          email: msg.senderEmail,
+          profileImageUrl: msg.senderProfileImageUrl
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching conversation messages:', error);
+      return [];
+    }
+  }
+
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
     try {
-      // Get all events where user has sent or received messages
-      const eventIdsWithMessages = await db
-        .selectDistinct({ eventId: chatMessages.eventId })
+      // Get all unique conversation pairs (eventId + other participant)
+      const conversations = await db
+        .selectDistinct({
+          eventId: chatMessages.eventId,
+          senderId: chatMessages.senderId,
+          receiverId: chatMessages.receiverId
+        })
         .from(chatMessages)
         .where(
           or(
@@ -564,91 +624,68 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      const uniqueEventIds = eventIdsWithMessages.map(e => e.eventId);
+      // Group by eventId and determine unique conversation partners
+      const conversationMap = new Map<string, {eventId: number, otherUserId: string}>();
+      
+      conversations.forEach(conv => {
+        const otherUserId = conv.senderId === userId ? conv.receiverId : conv.senderId;
+        const key = `${conv.eventId}-${otherUserId}`;
+        conversationMap.set(key, {
+          eventId: conv.eventId,
+          otherUserId
+        });
+      });
 
-      if (uniqueEventIds.length === 0) return [];
+      if (conversationMap.size === 0) return [];
 
-      const chats = await Promise.all(
-        uniqueEventIds.map(async (eventId) => {
+      const chats = await Promise.all(Array.from(conversationMap.values()).map(async (conv) => {
           try {
             // Get complete event details with host
+            // Get event details
             const eventQuery = await db
-              .select({
-                // Event fields
-                id: events.id,
-                hostId: events.hostId,
-                title: events.title,
-                description: events.description,
-                sport: events.sport,
-                skillLevel: events.skillLevel,
-                genderMix: events.genderMix,
-                startTime: events.startTime,
-                endTime: events.endTime,
-                location: events.location,
-                latitude: events.latitude,
-                longitude: events.longitude,
-                maxPlayers: events.maxPlayers,
-                currentPlayers: events.currentPlayers,
-                pricePerPerson: events.pricePerPerson,
-                status: events.status,
-                notes: events.notes,
-                sportConfig: events.sportConfig,
-                createdAt: events.createdAt,
-                updatedAt: events.updatedAt,
-                // Host fields
-                hostFirstName: users.firstName,
-                hostLastName: users.lastName,
-                hostEmail: users.email,
-                hostProfileImageUrl: users.profileImageUrl
-              })
+              .select()
               .from(events)
               .innerJoin(users, eq(events.hostId, users.id))
-              .where(eq(events.id, eventId))
+              .where(eq(events.id, conv.eventId))
               .limit(1);
 
             if (eventQuery.length === 0) return null;
 
-            const eventData = eventQuery[0];
+            const eventData = eventQuery[0].events;
             const event = {
-              id: eventData.id,
-              hostId: eventData.hostId,
-              title: eventData.title,
-              description: eventData.description,
-              sport: eventData.sport,
-              skillLevel: eventData.skillLevel,
-              genderMix: eventData.genderMix,
-              startTime: eventData.startTime,
-              endTime: eventData.endTime,
-              location: eventData.location,
-              latitude: eventData.latitude,
-              longitude: eventData.longitude,
-              maxPlayers: eventData.maxPlayers,
-              currentPlayers: eventData.currentPlayers,
-              pricePerPerson: eventData.pricePerPerson,
-              status: eventData.status,
-              notes: eventData.notes,
-              sportConfig: eventData.sportConfig,
-              createdAt: eventData.createdAt,
-              updatedAt: eventData.updatedAt,
-              host: {
-                id: eventData.hostId,
-                firstName: eventData.hostFirstName,
-                lastName: eventData.hostLastName,
-                email: eventData.hostEmail,
-                profileImageUrl: eventData.hostProfileImageUrl
-              }
+              ...eventData,
+              host: eventQuery[0].users
             };
 
-            // Get last message with sender details
+            // Get other participant details
+            const otherParticipantQuery = await db
+              .select()
+              .from(users)
+              .where(eq(users.id, conv.otherUserId))
+              .limit(1);
+
+            if (otherParticipantQuery.length === 0) return null;
+            const otherParticipant = otherParticipantQuery[0];
+
+            // Get unread message count for this specific conversation
+            const unreadCountQuery = await db
+              .select({ count: count() })
+              .from(chatMessages)
+              .where(and(
+                eq(chatMessages.eventId, conv.eventId),
+                eq(chatMessages.senderId, conv.otherUserId),
+                eq(chatMessages.receiverId, userId),
+                sql`NOT (${chatMessages.readBy} @> ${JSON.stringify([userId])})`
+              ));
+
+            const unreadCount = unreadCountQuery[0].count;
+
+            // Get last message for this specific conversation
             const lastMessageQuery = await db
               .select({
                 id: chatMessages.id,
-                eventId: chatMessages.eventId,
-                senderId: chatMessages.senderId,
                 content: chatMessages.content,
-                messageType: chatMessages.messageType,
-                metadata: chatMessages.metadata,
-                readBy: chatMessages.readBy,
+                senderId: chatMessages.senderId,
                 createdAt: chatMessages.createdAt,
                 senderFirstName: users.firstName,
                 senderLastName: users.lastName,
@@ -657,19 +694,18 @@ export class DatabaseStorage implements IStorage {
               })
               .from(chatMessages)
               .innerJoin(users, eq(chatMessages.senderId, users.id))
-              .where(eq(chatMessages.eventId, eventId))
+              .where(and(
+                eq(chatMessages.eventId, conv.eventId),
+                or(
+                  and(eq(chatMessages.senderId, userId), eq(chatMessages.receiverId, conv.otherUserId)),
+                  and(eq(chatMessages.senderId, conv.otherUserId), eq(chatMessages.receiverId, userId))
+                )
+              ))
               .orderBy(desc(chatMessages.createdAt))
               .limit(1);
 
             const lastMessage = lastMessageQuery.length > 0 ? {
-              id: lastMessageQuery[0].id,
-              eventId: lastMessageQuery[0].eventId,
-              senderId: lastMessageQuery[0].senderId,
-              content: lastMessageQuery[0].content,
-              messageType: lastMessageQuery[0].messageType,
-              metadata: lastMessageQuery[0].metadata,
-              readBy: lastMessageQuery[0].readBy || [],
-              createdAt: lastMessageQuery[0].createdAt,
+              ...lastMessageQuery[0],
               sender: {
                 id: lastMessageQuery[0].senderId,
                 firstName: lastMessageQuery[0].senderFirstName,
@@ -679,54 +715,11 @@ export class DatabaseStorage implements IStorage {
               }
             } : null;
 
-            // Determine the other participant in this conversation
-            let otherParticipant = null;
-            
-            if (eventData.hostId === userId) {
-              // User is host - find users who have sent messages to them
-              const messageParticipants = await db
-                .selectDistinct({
-                  id: users.id,
-                  firstName: users.firstName,
-                  lastName: users.lastName,
-                  email: users.email,
-                  profileImageUrl: users.profileImageUrl
-                })
-                .from(chatMessages)
-                .innerJoin(users, eq(chatMessages.senderId, users.id))
-                .where(and(
-                  eq(chatMessages.eventId, eventId),
-                  eq(chatMessages.receiverId, userId) // Messages sent TO the host
-                ))
-                .limit(1);
-
-              if (messageParticipants.length > 0) {
-                otherParticipant = messageParticipants[0];
-              }
-            } else {
-              // User is participant, host is other participant  
-              otherParticipant = event.host;
-            }
-
-            // Count unread messages (readBy is JSONB array)
-            const unreadQuery = await db
-              .select({ count: count() })
-              .from(chatMessages)
-              .where(
-                and(
-                  eq(chatMessages.eventId, eventId),
-                  ne(chatMessages.senderId, userId),
-                  sql`NOT (${chatMessages.readBy}::jsonb ? ${userId})`
-                )
-              );
-
-            const unreadCount = unreadQuery[0]?.count || 0;
-
-            // Only return if there's another participant and messages exist
-            if (!otherParticipant || !lastMessage) return null;
+            // Only return if there's a last message
+            if (!lastMessage) return null;
 
             return {
-              eventId,
+              eventId: conv.eventId,
               event,
               lastMessage,
               unreadCount,
@@ -734,26 +727,21 @@ export class DatabaseStorage implements IStorage {
             };
 
           } catch (error) {
-            console.error(`Error processing chat for event ${eventId}:`, error);
+            console.error(`Error processing chat for event ${conv.eventId} with user ${conv.otherUserId}:`, error);
             return null;
           }
         })
       );
 
-      // Filter out nulls and sort by most recent message
       const validChats = chats.filter(chat => chat !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
       
-      // Sort by most recent message first
-      validChats.sort((a, b) => {
-        if (!a.lastMessage && !b.lastMessage) return 0;
-        if (!a.lastMessage) return 1;
-        if (!b.lastMessage) return -1;
-        return new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
+      return validChats.sort((a, b) => {
+        const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+        const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+        return bTime - aTime;
       });
-      
-      return validChats;
     } catch (error) {
-      console.error("Error in getEventChats:", error);
+      console.error('Error fetching event chats:', error);
       return [];
     }
   }

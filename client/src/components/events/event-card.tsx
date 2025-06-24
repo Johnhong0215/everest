@@ -10,7 +10,7 @@ import { formatDateForDisplay } from "@/lib/dateUtils";
 interface EventCardProps {
   event: EventWithHost;
   onJoin: (eventId: number) => void;
-  onOpenChat?: (eventId: number) => void;
+  onOpenChat?: (eventId: number, receiverId?: string) => void;
   onCancel?: (eventId: number) => void;
   onModify?: (eventId: number) => void;
   currentUserId?: string;
@@ -210,7 +210,7 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => onOpenChat(event.id)}
+              onClick={() => onOpenChat(event.id, event.hostId)}
               className="px-3"
             >
               Chat

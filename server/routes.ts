@@ -350,23 +350,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/events/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
       const eventId = parseInt(req.params.id);
-      const { limit = '50', offset = '0' } = req.query;
-      const userId = req.user.claims.sub;
+      const otherUserId = req.query.otherUserId as string;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
       
-      const messages = await storage.getChatMessages(
-        eventId,
-        parseInt(limit as string),
-        parseInt(offset as string)
-      );
-      
-      // Mark all messages as read when fetching
-      await storage.markAllMessagesAsRead(eventId, userId);
-      
-      console.log(`Fetched ${messages.length} messages for event ${eventId}`);
-      res.json(messages);
+      if (otherUserId) {
+        // Get messages for specific conversation
+        const messages = await storage.getChatMessagesForConversation(eventId, req.user.id, otherUserId, limit, offset);
+        console.log(`Fetched ${messages.length} messages for event ${eventId} between ${req.user.id} and ${otherUserId}`);
+        res.json(messages);
+      } else {
+        // Legacy: get all messages for event
+        const messages = await storage.getChatMessages(eventId, limit, offset);
+        console.log(`Fetched ${messages.length} messages for event ${eventId}`);
+        res.json(messages);
+      }
     } catch (error) {
-      console.error("Error fetching messages:", error);
-      res.status(500).json({ message: "Failed to fetch messages" });
+      console.error('Error fetching messages:', error);
+      res.status(500).json({ message: 'Failed to fetch messages' });
     }
   });
 
