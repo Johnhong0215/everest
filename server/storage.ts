@@ -725,17 +725,16 @@ export class DatabaseStorage implements IStorage {
 
             const unreadCount = unreadQuery[0]?.count || 0;
 
-            // Only return chats where there are other participants
-            if (otherParticipants.length === 0) return null;
+            // Only return if there's another participant and messages exist
+            if (!otherParticipant || !lastMessage) return null;
 
-            // Return separate chat entries for each participant
-            return otherParticipants.map(participant => ({
+            return {
               eventId,
               event,
               lastMessage,
               unreadCount,
-              otherParticipant: participant
-            }));
+              otherParticipant
+            };
 
           } catch (error) {
             console.error(`Error processing chat for event ${eventId}:`, error);
@@ -744,19 +743,18 @@ export class DatabaseStorage implements IStorage {
         })
       );
 
-      // Flatten the array of arrays and filter out nulls
-      const flattenedChats = chats.flat().filter(chat => chat !== null);
+      // Filter out nulls and sort by most recent message
+      const validChats = chats.filter(chat => chat !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
       
-      // Only return chats that have messages or are between actual participants
-      const validChats = flattenedChats.filter(chat => {
-        // Always show if there's a last message
-        if (chat.lastMessage) return true;
-        
-        // For events without messages, only show if user has accepted booking or is host
-        return chat.otherParticipant !== null;
+      // Sort by most recent message first
+      validChats.sort((a, b) => {
+        if (!a.lastMessage && !b.lastMessage) return 0;
+        if (!a.lastMessage) return 1;
+        if (!b.lastMessage) return -1;
+        return new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
       });
       
-      return validChats as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
+      return validChats;
     } catch (error) {
       console.error("Error in getEventChats:", error);
       return [];
