@@ -576,9 +576,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (message.type === 'chat' && userId) {
+          // Get event to determine receiver
+          const event = await storage.getEvent(message.eventId);
+          if (!event) return;
+          
+          // Determine receiver: if sender is host, receiver is the participant; if sender is participant, receiver is host
+          let receiverId: string;
+          if (event.hostId === userId) {
+            // Sender is host, need to find the participant (for now, assume first participant)
+            const bookings = await storage.getBookingsByEvent(message.eventId);
+            const acceptedBookings = bookings.filter(b => b.status === 'accepted');
+            if (acceptedBookings.length === 0) return; // No participants to send to
+            receiverId = acceptedBookings[0].userId; // Send to first participant for now
+          } else {
+            // Sender is participant, receiver is host
+            receiverId = event.hostId;
+          }
+
           const chatMessage = await storage.createChatMessage({
             eventId: message.eventId,
             senderId: userId,
+            receiverId: receiverId,
             content: message.content,
             messageType: message.messageType || 'text',
             metadata: message.metadata,
@@ -589,31 +607,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const messageWithSender = await storage.getChatMessages(message.eventId, 1, 0);
           const completeMessage = messageWithSender[0];
 
-          // Broadcast to all participants of the event
-          const event = await storage.getEvent(message.eventId);
-          if (event) {
-            // Get ALL bookings for this event (not just accepted ones for chat)
-            const bookings = await storage.getBookingsByEvent(message.eventId);
-            const participants = [event.hostId, ...bookings.map(b => b.userId)];
-            
-            const broadcastMessage = {
-              type: 'new_message',
+          // Broadcast to the specific receiver
+          const broadcastMessage = {
+            type: 'new_message',
+            eventId: message.eventId,
+            message: completeMessage,
+          };
+
+          console.log(`Broadcasting message from ${userId} to receiver ${receiverId}`);
+          console.log(`Current connections:`, Array.from(connections.keys()));
+          
+          // Send to receiver
+          const receiverWs = connections.get(receiverId);
+          if (receiverWs && receiverWs.readyState === WebSocket.OPEN) {
+            receiverWs.send(JSON.stringify(broadcastMessage));
+            console.log(`✓ Sent message to receiver ${receiverId}`);
+          } else {
+            console.log(`✗ Receiver ${receiverId} not connected or WebSocket not open`);
+          }
+          
+          // Also send back to sender for confirmation
+          const senderWs = connections.get(userId);
+          if (senderWs && senderWs.readyState === WebSocket.OPEN) {
+            senderWs.send(JSON.stringify({
+              type: 'message_sent',
               eventId: message.eventId,
               message: completeMessage,
-            };
-
-            console.log(`Broadcasting message to ALL participants:`, participants);
-            console.log(`Current connections:`, Array.from(connections.keys()));
-            
-            participants.forEach(participantId => {
-              const participantWs = connections.get(participantId);
-              if (participantWs && participantWs.readyState === WebSocket.OPEN) {
-                participantWs.send(JSON.stringify(broadcastMessage));
-                console.log(`✓ Sent message to participant ${participantId}`);
-              } else {
-                console.log(`✗ Participant ${participantId} not connected or WebSocket not open`);
-              }
-            });
+            }));
+            console.log(`✓ Sent confirmation to sender ${userId}`);
           }
         }
       } catch (error) {

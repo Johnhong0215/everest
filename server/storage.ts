@@ -553,24 +553,18 @@ export class DatabaseStorage implements IStorage {
 
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
     try {
-      // Get all events where user is host
-      const hostedEvents = await db
-        .select({ eventId: events.id })
-        .from(events)
-        .where(eq(events.hostId, userId));
+      // Get all events where user has sent or received messages
+      const eventIdsWithMessages = await db
+        .selectDistinct({ eventId: chatMessages.eventId })
+        .from(chatMessages)
+        .where(
+          or(
+            eq(chatMessages.senderId, userId),
+            eq(chatMessages.receiverId, userId)
+          )
+        );
 
-      // Get all events where user has ANY bookings (for chat access)
-      const bookedEvents = await db
-        .select({ eventId: bookings.eventId })
-        .from(bookings)
-        .where(eq(bookings.userId, userId));
-
-      const allEventIds = [
-        ...hostedEvents.map(e => e.eventId),
-        ...bookedEvents.map(e => e.eventId)
-      ];
-
-      const uniqueEventIds = [...new Set(allEventIds)];
+      const uniqueEventIds = eventIdsWithMessages.map(e => e.eventId);
 
       if (uniqueEventIds.length === 0) return [];
 
@@ -685,30 +679,33 @@ export class DatabaseStorage implements IStorage {
               }
             } : null;
 
-            // Get ALL other participants for this event to create separate chat entries
-            const otherParticipants = [];
+            // Determine the other participant in this conversation
+            let otherParticipant = null;
             
             if (eventData.hostId === userId) {
-              // User is host, get ALL booking users (not just accepted for chat purposes)
-              const participantQueries = await db
-                .select({
+              // User is host - find users who have sent messages to them
+              const messageParticipants = await db
+                .selectDistinct({
                   id: users.id,
                   firstName: users.firstName,
                   lastName: users.lastName,
                   email: users.email,
                   profileImageUrl: users.profileImageUrl
                 })
-                .from(bookings)
-                .innerJoin(users, eq(bookings.userId, users.id))
+                .from(chatMessages)
+                .innerJoin(users, eq(chatMessages.senderId, users.id))
                 .where(and(
-                  eq(bookings.eventId, eventId),
-                  ne(bookings.userId, userId)
-                ));
+                  eq(chatMessages.eventId, eventId),
+                  eq(chatMessages.receiverId, userId) // Messages sent TO the host
+                ))
+                .limit(1);
 
-              otherParticipants.push(...participantQueries);
+              if (messageParticipants.length > 0) {
+                otherParticipant = messageParticipants[0];
+              }
             } else {
-              // User is participant, host is other participant
-              otherParticipants.push(event.host);
+              // User is participant, host is other participant  
+              otherParticipant = event.host;
             }
 
             // Count unread messages (readBy is JSONB array)

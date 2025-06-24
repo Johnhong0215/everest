@@ -130,6 +130,7 @@ export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => events.id),
   senderId: varchar("sender_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
   content: text("content").notNull(),
   messageType: varchar("message_type", { length: 50 }).default("text"), // text, image, location
   metadata: jsonb("metadata"), // For attachments, location data, etc.

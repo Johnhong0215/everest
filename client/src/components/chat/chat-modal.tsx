@@ -202,11 +202,6 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
         setOptimisticMessages([]);
         queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
       }
-      
-      // If no active chat but this is first message from sender, it should appear in preview
-      if (!activeEventId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
-      }
     }
   }, [socketMessages, activeEventId, queryClient]);
 

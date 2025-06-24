@@ -41,12 +41,12 @@ export function useSocket() {
         const data = JSON.parse(event.data);
         console.log('WebSocket message received:', data);
         
-        if (data.type === 'new_message') {
+        if (data.type === 'new_message' || data.type === 'message_sent') {
           // Store the complete message data correctly
           setMessages(prev => [...prev, data]);
           
-          // Show browser notification for new messages
-          if ('Notification' in window && Notification.permission === 'granted') {
+          // Show browser notification for new messages (only for received, not sent)
+          if (data.type === 'new_message' && 'Notification' in window && Notification.permission === 'granted') {
             new Notification('New message', {
               body: data.message?.content || 'You have a new message',
               icon: '/favicon.ico'
