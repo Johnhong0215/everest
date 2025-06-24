@@ -354,15 +354,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       
+      console.log(`Fetching messages for event ${eventId}, current user: ${req.user.id}, other user: ${otherUserId}`);
+      
       if (otherUserId) {
         // Get messages for specific conversation
         const messages = await storage.getChatMessagesForConversation(eventId, req.user.id, otherUserId, limit, offset);
-        console.log(`Fetched ${messages.length} messages for event ${eventId} between ${req.user.id} and ${otherUserId}`);
+        console.log(`Fetched ${messages.length} conversation messages between ${req.user.id} and ${otherUserId} in event ${eventId}`);
         res.json(messages);
       } else {
-        // Legacy: get all messages for event
+        // Get all messages for event (fallback when no specific conversation)
         const messages = await storage.getChatMessages(eventId, limit, offset);
-        console.log(`Fetched ${messages.length} messages for event ${eventId}`);
+        console.log(`Fetched ${messages.length} total messages for event ${eventId}`);
         res.json(messages);
       }
     } catch (error) {

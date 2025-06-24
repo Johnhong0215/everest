@@ -554,6 +554,8 @@ export class DatabaseStorage implements IStorage {
 
   async getChatMessagesForConversation(eventId: number, userId1: string, userId2: string, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
     try {
+      console.log(`Querying database for event ${eventId} between users ${userId1} and ${userId2}`);
+      
       const messages = await db
         .select({
           id: chatMessages.id,
@@ -583,6 +585,17 @@ export class DatabaseStorage implements IStorage {
         .limit(limit)
         .offset(offset);
 
+      console.log(`Found ${messages.length} messages in database for conversation between ${userId1} and ${userId2}`);
+      
+      if (messages.length === 0) {
+        // Debug: Check if there are any messages for this event at all
+        const allMessages = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(chatMessages)
+          .where(eq(chatMessages.eventId, eventId));
+        console.log(`Total messages for event ${eventId}: ${allMessages[0]?.count || 0}`);
+      }
+
       return messages.map(msg => ({
         id: msg.id,
         eventId: msg.eventId,
@@ -591,7 +604,7 @@ export class DatabaseStorage implements IStorage {
         content: msg.content,
         messageType: msg.messageType,
         metadata: msg.metadata,
-        readBy: msg.readBy,
+        readBy: msg.readBy || [],
         createdAt: msg.createdAt,
         sender: {
           id: msg.senderId,

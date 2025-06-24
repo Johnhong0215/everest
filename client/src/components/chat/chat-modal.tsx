@@ -105,17 +105,25 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
   // Get the active chat to determine the other participant
   const activeChat = eventChats.find(chat => chat.eventId === activeEventId);
-  const otherParticipantId = activeChat?.otherParticipant?.id;
+  const otherParticipantId = activeChat?.otherParticipant?.id || receiverId;
 
   // Fetch messages for active event with specific participant
   const { data: messagesData = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({
     queryKey: [`/api/events/${activeEventId}/messages`, otherParticipantId],
     queryFn: async () => {
-      if (!activeEventId || !otherParticipantId) return [];
-      const response = await apiRequest('GET', `/api/events/${activeEventId}/messages?otherUserId=${otherParticipantId}`);
+      if (!activeEventId) return [];
+      
+      // Try with otherParticipantId first, fallback to all messages
+      let url = `/api/events/${activeEventId}/messages`;
+      if (otherParticipantId) {
+        url += `?otherUserId=${otherParticipantId}`;
+      }
+      
+      console.log(`Fetching messages from: ${url}`);
+      const response = await apiRequest('GET', url);
       return Array.isArray(response) ? response : [];
     },
-    enabled: !!activeEventId && !!otherParticipantId && isAuthenticated,
+    enabled: !!activeEventId && isAuthenticated,
     retry: false,
   });
 
