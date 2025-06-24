@@ -298,8 +298,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
   };
 
   const filteredChats = eventChats.filter(chat =>
-    chat.event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.event.sport.toLowerCase().includes(searchQuery.toLowerCase())
+    chat.event?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chat.event?.sport?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (chat.otherParticipant?.firstName && chat.otherParticipant?.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (chat.otherParticipant?.lastName && chat.otherParticipant?.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (chat.otherParticipant?.email && chat.otherParticipant?.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const isHost = activeEvent && user && typeof user === 'object' && 'id' in user && activeEvent.hostId === (user as any).id;
@@ -356,41 +359,63 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                 </div>
               ) : (
                 <div>
-                  {filteredChats.map((chat) => (
-                    <button
-                      key={chat.eventId}
-                      onClick={() => setActiveEventId(chat.eventId)}
-                      className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 text-left transition-colors ${
-                        activeEventId === chat.eventId ? 'bg-blue-50 border-l-4 border-l-everest-blue' : ''
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        {getSportIcon(chat.event.sport)}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {chat.otherParticipant?.firstName && chat.otherParticipant?.lastName ? 
-                                `${chat.otherParticipant.firstName} ${chat.otherParticipant.lastName}` : 
-                                chat.otherParticipant?.email?.split('@')[0] || 'Unknown User'}
-                              {chat.otherParticipant?.id === chat.event.hostId ? ' (H)' : ''}
+                  {filteredChats.map((chat) => {
+                    const isUnread = chat.unreadCount > 0;
+                    const displayName = chat.otherParticipant?.firstName && chat.otherParticipant?.lastName 
+                      ? `${chat.otherParticipant.firstName} ${chat.otherParticipant.lastName}` 
+                      : chat.otherParticipant?.email?.split('@')[0] || 'Unknown User';
+                    const isHost = chat.otherParticipant?.id === chat.event?.host?.id;
+                    
+                    return (
+                      <button
+                        key={`${chat.eventId}-${chat.otherParticipant?.id || 'unknown'}`}
+                        onClick={() => {
+                          setActiveEventId(chat.eventId);
+                          // Mark messages as read when opening chat
+                          if (isUnread) {
+                            markAllMessagesAsRead.mutate(chat.eventId);
+                          }
+                        }}
+                        className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 text-left transition-colors ${
+                          activeEventId === chat.eventId ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          {getSportIcon(chat.event?.sport || 'default')}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                                {displayName}{isHost ? ' (H)' : ''}
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                {isUnread && (
+                                  <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                                    {chat.unreadCount}
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  {chat.lastMessage?.createdAt ? 
+                                    format(new Date(chat.lastMessage.createdAt), 'HH:mm') : 'Start chat'}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">
+                              {chat.event?.title || 'Event'} - {chat.event?.sport || 'Sport'}
                             </p>
-                            <span className="text-xs text-gray-500">
-                              {chat.lastMessage?.createdAt ? 
-                                format(new Date(chat.lastMessage.createdAt), 'HH:mm') : 'No messages'}
-                            </span>
+                            {chat.lastMessage ? (
+                              <p className={`text-xs truncate mt-1 ${isUnread ? 'font-medium text-gray-900' : 'text-gray-400'}`}>
+                                {chat.lastMessage.content}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-400 truncate mt-1 italic">
+                                No messages yet
+                              </p>
+                            )}
                           </div>
-                          <p className="text-sm text-gray-600 truncate">
-                            {chat.lastMessage ? chat.lastMessage.content : 'No messages yet'}
-                          </p>
                         </div>
-                        {chat.unreadCount > 0 && (
-                          <Badge variant="destructive" className="ml-auto">
-                            {chat.unreadCount}
-                          </Badge>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
