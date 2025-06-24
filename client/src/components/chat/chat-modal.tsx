@@ -121,10 +121,14 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       
       console.log(`Fetching messages from: ${url}`);
       const response = await apiRequest('GET', url);
-      return Array.isArray(response) ? response : [];
+      const messages = Array.isArray(response) ? response : [];
+      console.log(`Received ${messages.length} messages:`, messages);
+      return messages;
     },
     enabled: !!activeEventId && isAuthenticated,
     retry: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 
   // Ensure messages is always an array
@@ -132,10 +136,11 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
 
   // Debug logging
   React.useEffect(() => {
-    if (activeEventId && messages) {
+    if (activeEventId) {
       console.log(`Messages for event ${activeEventId}:`, messages);
+      console.log(`Active event ID: ${activeEventId}, Other participant: ${otherParticipantId}`);
     }
-  }, [activeEventId, messages]);
+  }, [activeEventId, messages, otherParticipantId]);
 
   // Delete chatroom mutation
   const deleteChatroomMutation = useMutation({
