@@ -501,7 +501,11 @@ export class DatabaseStorage implements IStorage {
 
   // Chat operations
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const [newMessage] = await db.insert(chatMessages).values(message).returning();
+    const messageData = {
+      ...message,
+      readBy: message.readBy || [message.senderId], // Sender automatically reads their own message
+    };
+    const [newMessage] = await db.insert(chatMessages).values(messageData).returning();
     return newMessage;
   }
 
@@ -721,6 +725,9 @@ export class DatabaseStorage implements IStorage {
               );
 
             const unreadCount = unreadQuery[0]?.count || 0;
+
+            // Only return chats where there are other participants
+            if (otherParticipants.length === 0) return null;
 
             // Return separate chat entries for each participant
             return otherParticipants.map(participant => ({
