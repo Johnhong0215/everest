@@ -81,6 +81,13 @@ export default function Home() {
     setPendingFilters(defaultPending);
   }, []);
 
+  // Handle opening chat with specific receiver
+  const handleOpenChat = (eventId: number, receiverId?: string) => {
+    setActiveEventId(eventId);
+    setSelectedReceiverId(receiverId || null);
+    setIsChatOpen(true);
+  };
+
   // Check if there are pending filter changes
   const hasPendingChanges = useMemo(() => (
     pendingFilters.location !== appliedFilters.location ||
