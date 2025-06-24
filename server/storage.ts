@@ -64,6 +64,9 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(eventId: number, limit?: number, offset?: number): Promise<ChatMessageWithSender[]>;
   getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: any; unreadCount: number; otherParticipant: any }[]>;
+  markMessageAsRead(messageId: number, userId: string): Promise<boolean>;
+  markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean>;
+  deleteChatroom(eventId: number, userId: string): Promise<boolean>;
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -511,6 +514,7 @@ export class DatabaseStorage implements IStorage {
         content: chatMessages.content,
         messageType: chatMessages.messageType,
         metadata: chatMessages.metadata,
+        readBy: chatMessages.readBy,
         createdAt: chatMessages.createdAt,
         senderFirstName: users.firstName,
         senderLastName: users.lastName,
@@ -531,6 +535,7 @@ export class DatabaseStorage implements IStorage {
       content: row.content,
       messageType: row.messageType,
       metadata: row.metadata,
+      readBy: row.readBy || [],
       createdAt: row.createdAt,
       sender: {
         id: row.senderId,
@@ -752,6 +757,88 @@ export class DatabaseStorage implements IStorage {
 
     const average = userReviews.reduce((sum, r) => sum + r.rating, 0) / userReviews.length;
     return Math.round(average * 10) / 10; // Round to 1 decimal place
+  }
+
+  async markMessageAsRead(messageId: number, userId: string): Promise<boolean> {
+    try {
+      const message = await db
+        .select({ readBy: chatMessages.readBy })
+        .from(chatMessages)
+        .where(eq(chatMessages.id, messageId))
+        .limit(1);
+
+      if (message.length === 0) return false;
+
+      const currentReadBy = message[0].readBy || [];
+      if (!currentReadBy.includes(userId)) {
+        await db
+          .update(chatMessages)
+          .set({ readBy: [...currentReadBy, userId] })
+          .where(eq(chatMessages.id, messageId));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error marking message as read:", error);
+      return false;
+    }
+  }
+
+  async markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean> {
+    try {
+      const messages = await db
+        .select({ id: chatMessages.id, readBy: chatMessages.readBy })
+        .from(chatMessages)
+        .where(eq(chatMessages.eventId, eventId));
+
+      for (const message of messages) {
+        const currentReadBy = message.readBy || [];
+        if (!currentReadBy.includes(userId)) {
+          await db
+            .update(chatMessages)
+            .set({ readBy: [...currentReadBy, userId] })
+            .where(eq(chatMessages.id, message.id));
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error marking all messages as read:", error);
+      return false;
+    }
+  }
+
+  async deleteChatroom(eventId: number, userId: string): Promise<boolean> {
+    try {
+      // Verify user has access to this event (either host or participant)
+      const event = await db
+        .select({ hostId: events.hostId })
+        .from(events)
+        .where(eq(events.id, eventId))
+        .limit(1);
+
+      if (event.length === 0) return false;
+
+      const booking = await db
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(and(eq(bookings.eventId, eventId), eq(bookings.userId, userId)))
+        .limit(1);
+
+      if (event[0].hostId !== userId && booking.length === 0) {
+        return false; // User has no access to this event
+      }
+
+      // Delete all messages for this event
+      await db
+        .delete(chatMessages)
+        .where(eq(chatMessages.eventId, eventId));
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting chatroom:", error);
+      return false;
+    }
   }
 }
 

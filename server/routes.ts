@@ -346,10 +346,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Chat routes
-  app.get('/api/events/:id/messages', isAuthenticated, async (req, res) => {
+  app.get('/api/events/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
       const eventId = parseInt(req.params.id);
       const { limit = '50', offset = '0' } = req.query;
+      const userId = req.user.claims.sub;
       
       const messages = await storage.getChatMessages(
         eventId,
@@ -357,11 +358,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(offset as string)
       );
       
+      // Mark all messages as read when fetching
+      await storage.markAllMessagesAsRead(eventId, userId);
+      
       console.log(`Fetched ${messages.length} messages for event ${eventId}`);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
       res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.post('/api/events/:id/messages/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      const success = await storage.markAllMessagesAsRead(eventId, userId);
+      
+      if (success) {
+        res.json({ message: "Messages marked as read" });
+      } else {
+        res.status(500).json({ message: "Failed to mark messages as read" });
+      }
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ message: "Failed to mark messages as read" });
+    }
+  });
+
+  app.delete('/api/events/:id/chatroom', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      const success = await storage.deleteChatroom(eventId, userId);
+      
+      if (success) {
+        res.json({ message: "Chatroom deleted successfully" });
+      } else {
+        res.status(403).json({ message: "Not authorized to delete this chatroom" });
+      }
+    } catch (error) {
+      console.error("Error deleting chatroom:", error);
+      res.status(500).json({ message: "Failed to delete chatroom" });
     }
   });
 

@@ -133,6 +133,7 @@ export const chatMessages = pgTable("chat_messages", {
   content: text("content").notNull(),
   messageType: varchar("message_type", { length: 50 }).default("text"), // text, image, location
   metadata: jsonb("metadata"), // For attachments, location data, etc.
+  readBy: jsonb("read_by").$type<string[]>().default([]), // Array of user IDs who have read this message
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -288,6 +289,11 @@ export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+export type ChatMessageWithSender = ChatMessage & {
+  sender: User;
+  isRead?: boolean;
+};
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
@@ -307,6 +313,4 @@ export type BookingWithEventAndUser = Booking & {
   user: User;
 };
 
-export type ChatMessageWithSender = ChatMessage & {
-  sender: User;
-};
+

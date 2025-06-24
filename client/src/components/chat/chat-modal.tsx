@@ -7,7 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Send, MapPin, Calendar, Paperclip, CheckCircle, X, Search } from "lucide-react";
+import { Send, MapPin, Calendar, Paperclip, CheckCircle, X, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useSocket } from "@/hooks/useSocket";
@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { EventWithHost, ChatMessageWithSender } from "@shared/schema";
 import { SPORTS } from "@/lib/constants";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, isSameDay } from "date-fns";
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -98,18 +98,19 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     }
   }, [activeEventId, messages]);
 
-  // Mark event as played mutation (for hosts)
-  const markPlayedMutation = useMutation({
+  // Delete chatroom mutation
+  const deleteChatroomMutation = useMutation({
     mutationFn: async (eventId: number) => {
-      return await apiRequest('PUT', `/api/events/${eventId}`, { status: 'completed' });
+      return await apiRequest('DELETE', `/api/events/${eventId}/chatroom`);
     },
     onSuccess: () => {
       toast({
-        title: "Event Marked as Played",
-        description: "The event has been marked as completed.",
+        title: "Chatroom Deleted",
+        description: "The chatroom has been deleted successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/my-events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      setActiveEventId(null);
+      onClose();
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -125,7 +126,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
       }
       toast({
         title: "Error",
-        description: "Failed to mark event as played. Please try again.",
+        description: "Failed to delete chatroom. Please try again.",
         variant: "destructive",
       });
     },
@@ -176,6 +177,48 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
 
     sendMessage(activeEventId, messageInput.trim());
     setMessageInput("");
+    
+    // Invalidate queries to refresh message list
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+    }, 100);
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = (messages: ChatMessageWithSender[]) => {
+    const groups: { date: string; messages: ChatMessageWithSender[] }[] = [];
+    let currentDate = '';
+    let currentGroup: ChatMessageWithSender[] = [];
+
+    messages.forEach((message) => {
+      const messageDate = new Date(message.createdAt!);
+      let dateLabel = '';
+      
+      if (isToday(messageDate)) {
+        dateLabel = 'Today';
+      } else if (isYesterday(messageDate)) {
+        dateLabel = 'Yesterday';
+      } else {
+        dateLabel = format(messageDate, 'M/d/yyyy');
+      }
+
+      if (dateLabel !== currentDate) {
+        if (currentGroup.length > 0) {
+          groups.push({ date: currentDate, messages: currentGroup });
+        }
+        currentDate = dateLabel;
+        currentGroup = [message];
+      } else {
+        currentGroup.push(message);
+      }
+    });
+
+    if (currentGroup.length > 0) {
+      groups.push({ date: currentDate, messages: currentGroup });
+    }
+
+    return groups;
   };
 
   const getSportIcon = (sportId: string) => {
@@ -321,12 +364,14 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         variant="ghost" 
                         size="sm"
                         onClick={() => {
-                          setActiveEventId(null);
-                          // TODO: Implement leave chat functionality
+                          if (confirm("Are you sure you want to delete this chatroom? This will remove all messages for both participants.")) {
+                            deleteChatroomMutation.mutate(activeEventId);
+                          }
                         }}
                         className="text-gray-500 hover:text-red-500"
+                        disabled={deleteChatroomMutation.isPending}
                       >
-                        <X className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -354,55 +399,82 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <p className="text-gray-500">No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      messages.map((message): React.ReactNode => {
-                        const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex items-start space-x-3 ${
-                              isOwnMessage ? 'justify-end' : ''
-                            }`}
-                          >
-                            {!isOwnMessage && (
-                              <Avatar className="w-8 h-8">
-                                <AvatarImage src={message.sender?.profileImageUrl || undefined} />
-                                <AvatarFallback className="text-xs">
-                                  {message.sender?.firstName?.[0] || message.sender?.email?.[0] || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
-                            <div className={`flex-1 ${isOwnMessage ? 'max-w-xs ml-auto' : 'max-w-xs'}`}>
-                              {!isOwnMessage && (
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className="text-sm font-medium text-gray-900">
-                                    {message.sender?.firstName && message.sender?.lastName 
-                                      ? `${message.sender.firstName} ${message.sender.lastName.charAt(0)}.`
-                                      : message.sender?.email?.split('@')[0] || 'User'
-                                    }
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
-                                  </span>
-                                </div>
-                              )}
+                      groupMessagesByDate(messages).map((group) => (
+                        <div key={group.date}>
+                          {/* Date Separator */}
+                          <div className="flex items-center my-4">
+                            <div className="flex-1 border-t border-gray-200"></div>
+                            <span className="px-3 text-xs text-gray-500 bg-white">{group.date}</span>
+                            <div className="flex-1 border-t border-gray-200"></div>
+                          </div>
+                          
+                          {/* Messages for this date */}
+                          {group.messages.map((message) => {
+                            const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
+                            const isRead = message.readBy && message.readBy.length > 1; // More than just sender
+                            
+                            return (
                               <div
-                                className={`rounded-lg p-3 ${
-                                  isOwnMessage
-                                    ? 'bg-everest-blue text-white'
-                                    : 'bg-gray-100 text-gray-900'
+                                key={message.id}
+                                className={`flex items-start space-x-3 mb-4 ${
+                                  isOwnMessage ? 'justify-end' : ''
                                 }`}
                               >
-                                <p className="text-sm">{message.content}</p>
-                              </div>
-                              {isOwnMessage ? (
-                                <div className="text-xs text-gray-500 mt-1 text-right">
-                                  {message.createdAt ? format(new Date(message.createdAt), 'h:mm a') : ''}
+                                {!isOwnMessage && (
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={message.sender?.profileImageUrl || undefined} />
+                                    <AvatarFallback className="text-xs">
+                                      {message.sender?.firstName?.[0] || message.sender?.email?.[0] || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
+                                <div className={`flex-1 ${isOwnMessage ? 'max-w-xs ml-auto' : 'max-w-xs'}`}>
+                                  {!isOwnMessage && (
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {message.sender?.firstName && message.sender?.lastName 
+                                          ? `${message.sender.firstName} ${message.sender.lastName.charAt(0)}.`
+                                          : message.sender?.email?.split('@')[0] || 'User'
+                                        }
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div
+                                    className={`rounded-lg p-3 ${
+                                      isOwnMessage
+                                        ? 'bg-everest-blue text-white'
+                                        : 'bg-gray-100 text-gray-900'
+                                    }`}
+                                  >
+                                    <p className="text-sm">{message.content}</p>
+                                  </div>
+                                  {isOwnMessage && (
+                                    <div className="flex items-center justify-end space-x-2 mt-1">
+                                      <span className="text-xs text-gray-500">
+                                        {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {isRead ? 'Read' : 'Sent'}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        );
-                      })
+                                {isOwnMessage && (
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
+                                    <AvatarFallback className="text-xs">
+                                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))
                     )}
                     <div ref={messagesEndRef} />
                   </div>
