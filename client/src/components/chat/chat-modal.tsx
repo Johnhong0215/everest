@@ -176,6 +176,8 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     if (activeEventId && socketMessages.length > 0) {
       const newMessage = socketMessages[socketMessages.length - 1];
       if (newMessage.eventId === activeEventId) {
+        // Clear any pending optimistic messages first
+        setOptimisticMessages([]);
         // Refresh messages immediately when new message arrives
         queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
         queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
@@ -193,11 +195,14 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     e.preventDefault();
     if (!messageInput.trim() || !activeEventId || !isConnected || !user) return;
 
+    const messageContent = messageInput.trim();
+    const tempId = `temp-${Date.now()}`;
+    
     const tempMessage: ChatMessageWithSender = {
-      id: Date.now(), // Temporary ID
+      id: tempId as any,
       eventId: activeEventId,
       senderId: (user as any).id,
-      content: messageInput.trim(),
+      content: messageContent,
       messageType: "text",
       metadata: null,
       readBy: [(user as any).id],
@@ -209,33 +214,36 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
         email: (user as any).email || null,
         profileImageUrl: (user as any).profileImageUrl || null,
       },
-      isPending: true // Mark as pending
+      isPending: true
     };
 
-    // Add optimistic message
+    // Add optimistic message at the end
     setOptimisticMessages(prev => [...prev, tempMessage]);
-    
-    const messageContent = messageInput.trim();
     setMessageInput("");
 
     // Send actual message
     sendMessage(activeEventId, messageContent);
     
-    // Clear optimistic message after a delay and refresh
+    // Remove optimistic message when real message is confirmed
     setTimeout(() => {
-      setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
       queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
-    }, 500);
+    }, 1500);
   };
 
-  // Group messages by date
+  // Group messages by date, ensuring proper ordering
   const groupMessagesByDate = (messages: ChatMessageWithSender[]) => {
+    // Sort all messages by creation time first
+    const sortedMessages = [...messages].sort((a, b) => 
+      new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+    );
+
     const groups: { date: string; messages: ChatMessageWithSender[] }[] = [];
     let currentDate = '';
     let currentGroup: ChatMessageWithSender[] = [];
 
-    messages.forEach((message) => {
+    sortedMessages.forEach((message) => {
       const messageDate = new Date(message.createdAt!);
       let dateLabel = '';
       
@@ -492,12 +500,12 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                                       isOwnMessage
                                         ? 'bg-everest-blue text-white'
                                         : 'bg-gray-100 text-gray-900'
-                                    } ${isPending ? 'opacity-70' : ''}`}
+                                    }`}
                                   >
                                     <p className="text-sm">{message.content}</p>
                                     {isPending && (
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                      <div className="absolute top-1 right-1">
+                                        <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
                                       </div>
                                     )}
                                   </div>

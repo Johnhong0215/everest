@@ -42,9 +42,11 @@ Everest is a full-stack web application that connects sports enthusiasts for loc
 - **Capacity Management**: Real-time tracking of available spots
 
 ### Real-time Features
-- **WebSocket Server**: Built-in WebSocket support for live chat
-- **Event Chat**: Per-event chat rooms for participants
+- **WebSocket Server**: Built-in WebSocket support for live chat with real-time message delivery
+- **Event Chat**: Per-event chat rooms for participants with optimistic message sending
 - **Connection Management**: User-specific connection tracking
+- **Read Status**: Message read receipts with automatic unread count updates
+- **Chat Controls**: Chatroom deletion, date separators, and dynamic message bubble sizing
 
 ### Payment System
 - **Provider**: Stripe with React Stripe.js
@@ -117,6 +119,7 @@ Everest is a full-stack web application that connects sports enthusiasts for loc
 - June 22, 2025. Implemented distance-based event sorting and date filter checkboxes
 - June 22, 2025. Added comprehensive timezone-aware date handling throughout the application
 - June 22, 2025. Implemented comprehensive booking status system (requested/accepted/rejected/cancelled) with proper player count logic that only increments when bookings are accepted
+- June 24, 2025. Completed advanced chat system with real-time messaging, read status tracking, optimistic sending with loading states, dynamic message sizing, date separators, and chatroom deletion functionality
 
 ## User Preferences
 
