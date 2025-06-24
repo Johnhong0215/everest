@@ -42,6 +42,7 @@ export function useSocket() {
         console.log('WebSocket message received:', data);
         
         if (data.type === 'new_message') {
+          // Store the complete message data correctly
           setMessages(prev => [...prev, data]);
           
           // Show browser notification for new messages

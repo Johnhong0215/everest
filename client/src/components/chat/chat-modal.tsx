@@ -194,13 +194,18 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     if (socketMessages.length > 0) {
       const newMessage = socketMessages[socketMessages.length - 1];
       
-      // Always refresh chat list for unread counts
+      // Always refresh chat list for unread counts and new conversations
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
       
-      // If message is for active chat, refresh messages
+      // If message is for active chat, refresh messages and clear optimistic
       if (activeEventId && newMessage.eventId === activeEventId) {
         setOptimisticMessages([]);
         queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+      }
+      
+      // If no active chat but this is first message from sender, it should appear in preview
+      if (!activeEventId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
       }
     }
   }, [socketMessages, activeEventId, queryClient]);

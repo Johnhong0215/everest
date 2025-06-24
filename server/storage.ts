@@ -746,8 +746,18 @@ export class DatabaseStorage implements IStorage {
       );
 
       // Flatten the array of arrays and filter out nulls
-      const flattenedChats = chats.flat().filter(chat => chat !== null && chat.otherParticipant !== null);
-      return flattenedChats as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
+      const flattenedChats = chats.flat().filter(chat => chat !== null);
+      
+      // Only return chats that have messages or are between actual participants
+      const validChats = flattenedChats.filter(chat => {
+        // Always show if there's a last message
+        if (chat.lastMessage) return true;
+        
+        // For events without messages, only show if user has accepted booking or is host
+        return chat.otherParticipant !== null;
+      });
+      
+      return validChats as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
     } catch (error) {
       console.error("Error in getEventChats:", error);
       return [];
