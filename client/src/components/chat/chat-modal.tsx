@@ -78,12 +78,19 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     retry: false,
   });
 
-  // Fetch active event details directly
-  const { data: activeEvent } = useQuery<EventWithHost>({
+  // Fetch active event details directly with error handling
+  const { data: activeEvent, error: eventError } = useQuery<EventWithHost>({
     queryKey: [`/api/events/${activeEventId}`],
     enabled: !!activeEventId,
     retry: false,
   });
+
+  // Log any errors for debugging
+  React.useEffect(() => {
+    if (eventError) {
+      console.error('Error fetching event:', eventError);
+    }
+  }, [eventError]);
 
   // Fetch messages for active event
   const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({

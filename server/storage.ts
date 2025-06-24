@@ -549,30 +549,16 @@ export class DatabaseStorage implements IStorage {
 
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
     try {
-      // Get all events where user is host or has any booking (not just accepted)
+      // Get all events where user is host
       const hostedEvents = await db
-        .select({ 
-          eventId: events.id,
-          hostId: events.hostId,
-          title: events.title,
-          sport: events.sport,
-          startTime: events.startTime,
-          location: events.location
-        })
+        .select({ eventId: events.id })
         .from(events)
         .where(eq(events.hostId, userId));
 
+      // Get all events where user has accepted bookings
       const bookedEvents = await db
-        .select({ 
-          eventId: bookings.eventId,
-          hostId: events.hostId,
-          title: events.title,
-          sport: events.sport,
-          startTime: events.startTime,
-          location: events.location
-        })
+        .select({ eventId: bookings.eventId })
         .from(bookings)
-        .innerJoin(events, eq(bookings.eventId, events.id))
         .where(and(eq(bookings.userId, userId), eq(bookings.status, 'accepted')));
 
       const allEventIds = [
@@ -695,11 +681,12 @@ export class DatabaseStorage implements IStorage {
               }
             } : null;
 
-            // Get other participant
-            let otherParticipant = null;
+            // Get ALL other participants for this event to create separate chat entries
+            const otherParticipants = [];
+            
             if (eventData.hostId === userId) {
-              // User is host, get first accepted booking user
-              const participantQuery = await db
+              // User is host, get ALL accepted booking users
+              const participantQueries = await db
                 .select({
                   id: users.id,
                   firstName: users.firstName,
@@ -713,15 +700,12 @@ export class DatabaseStorage implements IStorage {
                   eq(bookings.eventId, eventId),
                   eq(bookings.status, 'accepted'),
                   ne(bookings.userId, userId)
-                ))
-                .limit(1);
+                ));
 
-              if (participantQuery.length > 0) {
-                otherParticipant = participantQuery[0];
-              }
+              otherParticipants.push(...participantQueries);
             } else {
               // User is participant, host is other participant
-              otherParticipant = event.host;
+              otherParticipants.push(event.host);
             }
 
             // Count unread messages (readBy is JSONB array)
@@ -738,16 +722,14 @@ export class DatabaseStorage implements IStorage {
 
             const unreadCount = unreadQuery[0]?.count || 0;
 
-            // Only return chats where there's another participant
-            if (!otherParticipant) return null;
-
-            return {
+            // Return separate chat entries for each participant
+            return otherParticipants.map(participant => ({
               eventId,
               event,
               lastMessage,
               unreadCount,
-              otherParticipant
-            };
+              otherParticipant: participant
+            }));
 
           } catch (error) {
             console.error(`Error processing chat for event ${eventId}:`, error);
@@ -756,7 +738,9 @@ export class DatabaseStorage implements IStorage {
         })
       );
 
-      return chats.filter(chat => chat !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
+      // Flatten the array of arrays and filter out nulls
+      const flattenedChats = chats.flat().filter(chat => chat !== null && chat.otherParticipant !== null);
+      return flattenedChats as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
     } catch (error) {
       console.error("Error in getEventChats:", error);
       return [];
