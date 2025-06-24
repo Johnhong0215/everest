@@ -559,6 +559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   wss.on('connection', (ws, req) => {
     let userId: string | null = null;
+    console.log('New WebSocket connection established');
 
     ws.on('message', async (data) => {
       try {
@@ -568,6 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId = message.userId;
           if (userId) {
             connections.set(userId, ws);
+            console.log(`User ${userId} authenticated and connected via WebSocket`);
           }
           return;
         }
@@ -589,10 +591,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Broadcast to all participants of the event
           const event = await storage.getEvent(message.eventId);
           if (event) {
-            // Get all accepted bookings for this event
+            // Get ALL bookings for this event (not just accepted ones for chat)
             const bookings = await storage.getBookingsByEvent(message.eventId);
-            const acceptedBookings = bookings.filter(b => b.status === 'accepted');
-            const participants = [event.hostId, ...acceptedBookings.map(b => b.userId)];
+            const participants = [event.hostId, ...bookings.map(b => b.userId)];
             
             const broadcastMessage = {
               type: 'new_message',
@@ -600,14 +601,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               message: completeMessage,
             };
 
-            console.log(`Broadcasting message to participants:`, participants);
+            console.log(`Broadcasting message to ALL participants:`, participants);
+            console.log(`Current connections:`, Array.from(connections.keys()));
+            
             participants.forEach(participantId => {
               const participantWs = connections.get(participantId);
               if (participantWs && participantWs.readyState === WebSocket.OPEN) {
                 participantWs.send(JSON.stringify(broadcastMessage));
-                console.log(`Sent message to participant ${participantId}`);
+                console.log(`✓ Sent message to participant ${participantId}`);
               } else {
-                console.log(`Participant ${participantId} not connected or WebSocket not open`);
+                console.log(`✗ Participant ${participantId} not connected or WebSocket not open`);
               }
             });
           }
@@ -620,6 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('close', () => {
       if (userId) {
         connections.delete(userId);
+        console.log(`User ${userId} disconnected from WebSocket`);
       }
     });
   });

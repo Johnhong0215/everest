@@ -559,11 +559,11 @@ export class DatabaseStorage implements IStorage {
         .from(events)
         .where(eq(events.hostId, userId));
 
-      // Get all events where user has accepted bookings
+      // Get all events where user has ANY bookings (for chat access)
       const bookedEvents = await db
         .select({ eventId: bookings.eventId })
         .from(bookings)
-        .where(and(eq(bookings.userId, userId), eq(bookings.status, 'accepted')));
+        .where(eq(bookings.userId, userId));
 
       const allEventIds = [
         ...hostedEvents.map(e => e.eventId),
@@ -689,7 +689,7 @@ export class DatabaseStorage implements IStorage {
             const otherParticipants = [];
             
             if (eventData.hostId === userId) {
-              // User is host, get ALL accepted booking users
+              // User is host, get ALL booking users (not just accepted for chat purposes)
               const participantQueries = await db
                 .select({
                   id: users.id,
@@ -702,7 +702,6 @@ export class DatabaseStorage implements IStorage {
                 .innerJoin(users, eq(bookings.userId, users.id))
                 .where(and(
                   eq(bookings.eventId, eventId),
-                  eq(bookings.status, 'accepted'),
                   ne(bookings.userId, userId)
                 ));
 
