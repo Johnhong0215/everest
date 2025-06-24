@@ -501,7 +501,11 @@ export class DatabaseStorage implements IStorage {
 
   // Chat operations
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const [newMessage] = await db.insert(chatMessages).values(message).returning();
+    const messageData = {
+      ...message,
+      readBy: message.readBy || [message.senderId], // Sender automatically reads their own message
+    };
+    const [newMessage] = await db.insert(chatMessages).values(messageData).returning();
     return newMessage;
   }
 
@@ -548,109 +552,215 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
-    // Get events where user is either host or has an accepted booking
-    const userEvents = await db
-      .select({ eventId: events.id })
-      .from(events)
-      .leftJoin(bookings, and(eq(events.id, bookings.eventId), eq(bookings.status, 'accepted')))
-      .where(
-        or(
-          eq(events.hostId, userId),
-          and(eq(bookings.userId, userId), eq(bookings.status, 'accepted'))
-        )
+    try {
+      // Get all events where user is host
+      const hostedEvents = await db
+        .select({ eventId: events.id })
+        .from(events)
+        .where(eq(events.hostId, userId));
+
+      // Get all events where user has ANY bookings (for chat access)
+      const bookedEvents = await db
+        .select({ eventId: bookings.eventId })
+        .from(bookings)
+        .where(eq(bookings.userId, userId));
+
+      const allEventIds = [
+        ...hostedEvents.map(e => e.eventId),
+        ...bookedEvents.map(e => e.eventId)
+      ];
+
+      const uniqueEventIds = [...new Set(allEventIds)];
+
+      if (uniqueEventIds.length === 0) return [];
+
+      const chats = await Promise.all(
+        uniqueEventIds.map(async (eventId) => {
+          try {
+            // Get complete event details with host
+            const eventQuery = await db
+              .select({
+                // Event fields
+                id: events.id,
+                hostId: events.hostId,
+                title: events.title,
+                description: events.description,
+                sport: events.sport,
+                skillLevel: events.skillLevel,
+                genderMix: events.genderMix,
+                startTime: events.startTime,
+                endTime: events.endTime,
+                location: events.location,
+                latitude: events.latitude,
+                longitude: events.longitude,
+                maxPlayers: events.maxPlayers,
+                currentPlayers: events.currentPlayers,
+                pricePerPerson: events.pricePerPerson,
+                status: events.status,
+                notes: events.notes,
+                sportConfig: events.sportConfig,
+                createdAt: events.createdAt,
+                updatedAt: events.updatedAt,
+                // Host fields
+                hostFirstName: users.firstName,
+                hostLastName: users.lastName,
+                hostEmail: users.email,
+                hostProfileImageUrl: users.profileImageUrl
+              })
+              .from(events)
+              .innerJoin(users, eq(events.hostId, users.id))
+              .where(eq(events.id, eventId))
+              .limit(1);
+
+            if (eventQuery.length === 0) return null;
+
+            const eventData = eventQuery[0];
+            const event = {
+              id: eventData.id,
+              hostId: eventData.hostId,
+              title: eventData.title,
+              description: eventData.description,
+              sport: eventData.sport,
+              skillLevel: eventData.skillLevel,
+              genderMix: eventData.genderMix,
+              startTime: eventData.startTime,
+              endTime: eventData.endTime,
+              location: eventData.location,
+              latitude: eventData.latitude,
+              longitude: eventData.longitude,
+              maxPlayers: eventData.maxPlayers,
+              currentPlayers: eventData.currentPlayers,
+              pricePerPerson: eventData.pricePerPerson,
+              status: eventData.status,
+              notes: eventData.notes,
+              sportConfig: eventData.sportConfig,
+              createdAt: eventData.createdAt,
+              updatedAt: eventData.updatedAt,
+              host: {
+                id: eventData.hostId,
+                firstName: eventData.hostFirstName,
+                lastName: eventData.hostLastName,
+                email: eventData.hostEmail,
+                profileImageUrl: eventData.hostProfileImageUrl
+              }
+            };
+
+            // Get last message with sender details
+            const lastMessageQuery = await db
+              .select({
+                id: chatMessages.id,
+                eventId: chatMessages.eventId,
+                senderId: chatMessages.senderId,
+                content: chatMessages.content,
+                messageType: chatMessages.messageType,
+                metadata: chatMessages.metadata,
+                readBy: chatMessages.readBy,
+                createdAt: chatMessages.createdAt,
+                senderFirstName: users.firstName,
+                senderLastName: users.lastName,
+                senderEmail: users.email,
+                senderProfileImageUrl: users.profileImageUrl
+              })
+              .from(chatMessages)
+              .innerJoin(users, eq(chatMessages.senderId, users.id))
+              .where(eq(chatMessages.eventId, eventId))
+              .orderBy(desc(chatMessages.createdAt))
+              .limit(1);
+
+            const lastMessage = lastMessageQuery.length > 0 ? {
+              id: lastMessageQuery[0].id,
+              eventId: lastMessageQuery[0].eventId,
+              senderId: lastMessageQuery[0].senderId,
+              content: lastMessageQuery[0].content,
+              messageType: lastMessageQuery[0].messageType,
+              metadata: lastMessageQuery[0].metadata,
+              readBy: lastMessageQuery[0].readBy || [],
+              createdAt: lastMessageQuery[0].createdAt,
+              sender: {
+                id: lastMessageQuery[0].senderId,
+                firstName: lastMessageQuery[0].senderFirstName,
+                lastName: lastMessageQuery[0].senderLastName,
+                email: lastMessageQuery[0].senderEmail,
+                profileImageUrl: lastMessageQuery[0].senderProfileImageUrl
+              }
+            } : null;
+
+            // Get ALL other participants for this event to create separate chat entries
+            const otherParticipants = [];
+            
+            if (eventData.hostId === userId) {
+              // User is host, get ALL booking users (not just accepted for chat purposes)
+              const participantQueries = await db
+                .select({
+                  id: users.id,
+                  firstName: users.firstName,
+                  lastName: users.lastName,
+                  email: users.email,
+                  profileImageUrl: users.profileImageUrl
+                })
+                .from(bookings)
+                .innerJoin(users, eq(bookings.userId, users.id))
+                .where(and(
+                  eq(bookings.eventId, eventId),
+                  ne(bookings.userId, userId)
+                ));
+
+              otherParticipants.push(...participantQueries);
+            } else {
+              // User is participant, host is other participant
+              otherParticipants.push(event.host);
+            }
+
+            // Count unread messages (readBy is JSONB array)
+            const unreadQuery = await db
+              .select({ count: count() })
+              .from(chatMessages)
+              .where(
+                and(
+                  eq(chatMessages.eventId, eventId),
+                  ne(chatMessages.senderId, userId),
+                  sql`NOT (${chatMessages.readBy}::jsonb ? ${userId})`
+                )
+              );
+
+            const unreadCount = unreadQuery[0]?.count || 0;
+
+            // Only return chats where there are other participants
+            if (otherParticipants.length === 0) return null;
+
+            // Return separate chat entries for each participant
+            return otherParticipants.map(participant => ({
+              eventId,
+              event,
+              lastMessage,
+              unreadCount,
+              otherParticipant: participant
+            }));
+
+          } catch (error) {
+            console.error(`Error processing chat for event ${eventId}:`, error);
+            return null;
+          }
+        })
       );
 
-    const eventIds = Array.from(new Set(userEvents.map(e => e.eventId)));
-
-    if (eventIds.length === 0) return [];
-
-    // Get last message for each event (including events with no messages)
-    const chats = await Promise.all(
-      eventIds.map(async (eventId) => {
-        // Get event with host information
-        const eventResult = await db
-          .select()
-          .from(events)
-          .leftJoin(users, eq(events.hostId, users.id))
-          .where(eq(events.id, eventId));
+      // Flatten the array of arrays and filter out nulls
+      const flattenedChats = chats.flat().filter(chat => chat !== null);
+      
+      // Only return chats that have messages or are between actual participants
+      const validChats = flattenedChats.filter(chat => {
+        // Always show if there's a last message
+        if (chat.lastMessage) return true;
         
-        if (eventResult.length === 0) return null;
-        
-        const event = eventResult[0].events;
-        const host = eventResult[0].users!;
-
-        // Get the last message with sender information
-        const lastMessageResult = await db
-          .select({
-            id: chatMessages.id,
-            eventId: chatMessages.eventId,
-            senderId: chatMessages.senderId,
-            content: chatMessages.content,
-            messageType: chatMessages.messageType,
-            metadata: chatMessages.metadata,
-            createdAt: chatMessages.createdAt,
-            senderFirstName: users.firstName,
-            senderLastName: users.lastName,
-            senderEmail: users.email,
-          })
-          .from(chatMessages)
-          .leftJoin(users, eq(chatMessages.senderId, users.id))
-          .where(eq(chatMessages.eventId, eventId))
-          .orderBy(desc(chatMessages.createdAt))
-          .limit(1);
-
-        const lastMessage = lastMessageResult.length > 0 ? {
-          ...lastMessageResult[0],
-          sender: {
-            id: lastMessageResult[0].senderId,
-            firstName: lastMessageResult[0].senderFirstName,
-            lastName: lastMessageResult[0].senderLastName,
-            email: lastMessageResult[0].senderEmail,
-          }
-        } : null;
-
-        // Determine the other participant (not the current user)
-        let otherParticipant = null;
-        if (event.hostId === userId) {
-          // Current user is host, find a participant
-          const participantResult = await db
-            .select()
-            .from(bookings)
-            .leftJoin(users, eq(bookings.userId, users.id))
-            .where(and(eq(bookings.eventId, eventId), eq(bookings.status, 'accepted')))
-            .limit(1);
-          
-          if (participantResult.length > 0) {
-            otherParticipant = participantResult[0].users;
-          }
-        } else {
-          // Current user is participant, other participant is the host
-          otherParticipant = host;
-        }
-
-        const unreadCount = await db
-          .select({ count: count() })
-          .from(chatMessages)
-          .where(
-            and(
-              eq(chatMessages.eventId, eventId),
-              ne(chatMessages.senderId, userId), // Exclude own messages
-              not(sql`${chatMessages.readBy} @> ${JSON.stringify([userId])}`) // Not read by user
-            )
-          );
-
-        return {
-          eventId,
-          event: { ...event, host },
-          lastMessage,
-          unreadCount: unreadCount[0]?.count || 0,
-          otherParticipant,
-        };
-      })
-    );
-
-    // Return all chats where there's another participant
-    return chats.filter(chat => chat !== null && chat.otherParticipant !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
+        // For events without messages, only show if user has accepted booking or is host
+        return chat.otherParticipant !== null;
+      });
+      
+      return validChats as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
+    } catch (error) {
+      console.error("Error in getEventChats:", error);
+      return [];
+    }
   }
 
   // Payment operations
