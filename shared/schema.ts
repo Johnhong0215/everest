@@ -293,6 +293,7 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type ChatMessageWithSender = ChatMessage & {
   sender: User;
   isRead?: boolean;
+  isPending?: boolean;
 };
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;

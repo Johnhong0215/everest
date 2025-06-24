@@ -34,6 +34,7 @@ interface EventChat {
 export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) {
   const [activeEventId, setActiveEventId] = useState<number | null>(eventId);
   const [messageInput, setMessageInput] = useState("");
+  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessageWithSender[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -170,19 +171,62 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, socketMessages]);
 
-  // Handle sending messages
+  // Listen for real-time messages and refresh immediately
+  useEffect(() => {
+    if (activeEventId && socketMessages.length > 0) {
+      const newMessage = socketMessages[socketMessages.length - 1];
+      if (newMessage.eventId === activeEventId) {
+        // Refresh messages immediately when new message arrives
+        queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+        queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      }
+    }
+  }, [socketMessages, activeEventId, queryClient]);
+
+  // Clear optimistic messages when switching events
+  useEffect(() => {
+    setOptimisticMessages([]);
+  }, [activeEventId]);
+
+  // Handle sending messages with optimistic updates
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !activeEventId || !isConnected) return;
+    if (!messageInput.trim() || !activeEventId || !isConnected || !user) return;
 
-    sendMessage(activeEventId, messageInput.trim());
-    setMessageInput("");
+    const tempMessage: ChatMessageWithSender = {
+      id: Date.now(), // Temporary ID
+      eventId: activeEventId,
+      senderId: (user as any).id,
+      content: messageInput.trim(),
+      messageType: "text",
+      metadata: null,
+      readBy: [(user as any).id],
+      createdAt: new Date().toISOString(),
+      sender: {
+        id: (user as any).id,
+        firstName: (user as any).firstName || null,
+        lastName: (user as any).lastName || null,
+        email: (user as any).email || null,
+        profileImageUrl: (user as any).profileImageUrl || null,
+      },
+      isPending: true // Mark as pending
+    };
+
+    // Add optimistic message
+    setOptimisticMessages(prev => [...prev, tempMessage]);
     
-    // Invalidate queries to refresh message list
+    const messageContent = messageInput.trim();
+    setMessageInput("");
+
+    // Send actual message
+    sendMessage(activeEventId, messageContent);
+    
+    // Clear optimistic message after a delay and refresh
     setTimeout(() => {
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
       queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
-    }, 100);
+    }, 500);
   };
 
   // Group messages by date
@@ -347,11 +391,11 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <div className="flex items-center">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'Date not set'}
+                            {activeEvent.startTime ? format(new Date(activeEvent.startTime), 'MMM d, HH:mm') : 'No date set'}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3 h-3 mr-1" />
-                            {activeEvent.location || 'Location not set'}
+                            {activeEvent.location || 'No location set'}
                           </div>
                         </div>
                       </div>
@@ -399,7 +443,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                         <p className="text-gray-500">No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      groupMessagesByDate(messages).map((group) => (
+                      groupMessagesByDate([...messages, ...optimisticMessages]).map((group) => (
                         <div key={group.date}>
                           {/* Date Separator */}
                           <div className="flex items-center my-4">
@@ -412,6 +456,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                           {group.messages.map((message) => {
                             const isOwnMessage = user && typeof user === 'object' && 'id' in user && message.senderId === (user as any).id;
                             const isRead = message.readBy && message.readBy.length > 1; // More than just sender
+                            const isPending = (message as any).isPending;
                             
                             return (
                               <div
@@ -428,7 +473,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                                     </AvatarFallback>
                                   </Avatar>
                                 )}
-                                <div className={`flex-1 ${isOwnMessage ? 'max-w-xs ml-auto' : 'max-w-xs'}`}>
+                                <div className={`${isOwnMessage ? 'ml-auto' : ''}`} style={{ maxWidth: Math.min(300, Math.max(100, message.content.length * 8 + 40)) }}>
                                   {!isOwnMessage && (
                                     <div className="flex items-center space-x-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">
@@ -443,13 +488,18 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                                     </div>
                                   )}
                                   <div
-                                    className={`rounded-lg p-3 ${
+                                    className={`rounded-lg p-3 relative ${
                                       isOwnMessage
                                         ? 'bg-everest-blue text-white'
                                         : 'bg-gray-100 text-gray-900'
-                                    }`}
+                                    } ${isPending ? 'opacity-70' : ''}`}
                                   >
                                     <p className="text-sm">{message.content}</p>
+                                    {isPending && (
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                      </div>
+                                    )}
                                   </div>
                                   {isOwnMessage && (
                                     <div className="flex items-center justify-end space-x-2 mt-1">
@@ -457,7 +507,7 @@ export default function ChatModal({ isOpen, onClose, eventId }: ChatModalProps) 
                                         {message.createdAt ? format(new Date(message.createdAt), 'HH:mm') : ''}
                                       </span>
                                       <span className="text-xs text-gray-500">
-                                        {isRead ? 'Read' : 'Sent'}
+                                        {isPending ? 'Sending...' : isRead ? 'Read' : 'Sent'}
                                       </span>
                                     </div>
                                   )}

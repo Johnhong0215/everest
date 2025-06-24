@@ -634,8 +634,9 @@ export class DatabaseStorage implements IStorage {
           .where(
             and(
               eq(chatMessages.eventId, eventId),
-              sql`${chatMessages.senderId} != ${userId}`
-            )!
+              ne(chatMessages.senderId, userId), // Exclude own messages
+              not(sql`${chatMessages.readBy} @> ${JSON.stringify([userId])}`) // Not read by user
+            )
           );
 
         return {
