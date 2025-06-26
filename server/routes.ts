@@ -374,6 +374,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new chat message via REST API
+  app.post('/api/events/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const { content, messageType = "text", receiverId } = req.body;
+      const senderId = req.user?.id || req.user?.claims?.sub;
+
+      console.log(`Creating message: eventId=${eventId}, senderId=${senderId}, receiverId=${receiverId}, content="${content}"`);
+
+      if (!content || !receiverId || !senderId) {
+        return res.status(400).json({ message: "Content, receiverId, and authenticated user are required" });
+      }
+
+      const message = await storage.createChatMessage({
+        eventId,
+        senderId,
+        receiverId,
+        content,
+        messageType,
+        readBy: [senderId] // Sender has read their own message
+      });
+
+      console.log(`Message created successfully with ID: ${message.id}`);
+      res.json(message);
+    } catch (error) {
+      console.error("Error creating message:", error);
+      res.status(500).json({ message: "Failed to create message" });
+    }
+  });
+
   app.post('/api/events/:id/messages/read', isAuthenticated, async (req: any, res) => {
     try {
       const eventId = parseInt(req.params.id);

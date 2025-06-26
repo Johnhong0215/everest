@@ -137,6 +137,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   // Debug logging
   React.useEffect(() => {
     if (activeEventId) {
+      console.log(`Active event ID: ${activeEventId}, Other participant: ${otherParticipantId}`);
       console.log(`Messages for event ${activeEventId}:`, messages);
       console.log(`Active event ID: ${activeEventId}, Other participant: ${otherParticipantId}`);
     }
@@ -276,7 +277,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   }, [activeEventId]);
 
   // Handle sending messages with optimistic updates
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() || !activeEventId || !isConnected || !user) return;
 
@@ -287,18 +288,19 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       id: tempId as any,
       eventId: activeEventId,
       senderId: (user as any).id,
+      receiverId: otherParticipantId,
       content: messageContent,
       messageType: "text",
       metadata: null,
       readBy: [(user as any).id],
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString() as any,
       sender: {
         id: (user as any).id,
         firstName: (user as any).firstName || null,
         lastName: (user as any).lastName || null,
         email: (user as any).email || null,
         profileImageUrl: (user as any).profileImageUrl || null,
-      },
+      } as any,
       isPending: true
     };
 
@@ -309,9 +311,24 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     // Send actual message
     sendMessage(activeEventId, messageContent);
     
+    // Also try sending via HTTP API as fallback
+    try {
+      const response = await apiRequest('POST', `/api/events/${activeEventId}/messages`, {
+        content: messageContent,
+        receiverId: otherParticipantId,
+        messageType: 'text'
+      });
+      console.log('Message sent via HTTP API:', response);
+      
+      // Refresh messages after successful HTTP send
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+    } catch (error) {
+      console.error('HTTP API message failed:', error);
+    }
+    
     // Remove optimistic message when real message is confirmed
     setTimeout(() => {
-      setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setOptimisticMessages(prev => prev.filter(msg => String(msg.id) !== String(tempId)));
       queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
     }, 1500);
@@ -525,7 +542,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                         variant="ghost" 
                         size="sm"
                         onClick={() => {
-                          if (confirm("Are you sure you want to delete this chatroom? This will remove all messages for both participants.")) {
+                          if (activeEventId && confirm("Are you sure you want to delete this chatroom? This will remove all messages for both participants.")) {
                             deleteChatroomMutation.mutate(activeEventId);
                           }
                         }}
@@ -555,12 +572,12 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                           </div>
                         ))}
                       </div>
-                    ) : messages.length === 0 ? (
+                    ) : allMessages.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-gray-500">No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      groupMessagesByDate([...messages, ...optimisticMessages]).map((group) => (
+                      groupMessagesByDate(allMessages).map((group) => (
                         <div key={group.date}>
                           {/* Date Separator */}
                           <div className="flex items-center my-4">
@@ -629,7 +646,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
                                     </div>
                                   )}
                                 </div>
-                                {isOwnMessage && (
+                                {isOwnMessage && user && (
                                   <Avatar className="w-8 h-8">
                                     <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
                                     <AvatarFallback className="text-xs">

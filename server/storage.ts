@@ -893,10 +893,19 @@ export class DatabaseStorage implements IStorage {
 
   async markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean> {
     try {
+      console.log(`Marking messages as read for event ${eventId}, user ${userId}`);
+      
       const messages = await db
         .select({ id: chatMessages.id, readBy: chatMessages.readBy })
         .from(chatMessages)
-        .where(eq(chatMessages.eventId, eventId));
+        .where(
+          and(
+            eq(chatMessages.eventId, eventId),
+            ne(chatMessages.senderId, userId) // Only mark messages from others as read
+          )
+        );
+
+      console.log(`Found ${messages.length} messages to mark as read`);
 
       for (const message of messages) {
         const currentReadBy = message.readBy || [];
@@ -905,6 +914,7 @@ export class DatabaseStorage implements IStorage {
             .update(chatMessages)
             .set({ readBy: [...currentReadBy, userId] })
             .where(eq(chatMessages.id, message.id));
+          console.log(`Marked message ${message.id} as read by ${userId}`);
         }
       }
       
