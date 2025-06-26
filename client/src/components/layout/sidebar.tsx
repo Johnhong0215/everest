@@ -339,15 +339,18 @@ export default function Sidebar({
         </div>
 
         {/* Apply Button */}
-        {hasPendingChanges && (
-          <Button
-            onClick={onApplyFilters}
-            className="w-full"
-            size="lg"
-          >
-            Apply Filters
-          </Button>
-        )}
+        <Button
+          onClick={onApplyFilters}
+          className={`w-full transition-colors ${
+            hasPendingChanges 
+              ? 'bg-everest-blue hover:bg-blue-700 text-white' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
+          }`}
+          size="lg"
+          disabled={!hasPendingChanges}
+        >
+          Apply Filters
+        </Button>
 
         {/* Remove Filters Button */}
         {hasActiveFilters && (
