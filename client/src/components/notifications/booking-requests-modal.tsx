@@ -29,10 +29,10 @@ export default function BookingRequestsModal({ isOpen, onClose, eventId }: Booki
   // Approve booking mutation
   const approveBookingMutation = useMutation({
     mutationFn: async (bookingId: number) => {
-      const response = await apiRequest('PUT', `/api/bookings/${bookingId}/status`, {
-        status: 'confirmed'
+      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, {
+        status: 'accepted'
       });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       toast({
@@ -54,10 +54,10 @@ export default function BookingRequestsModal({ isOpen, onClose, eventId }: Booki
   // Reject booking mutation
   const rejectBookingMutation = useMutation({
     mutationFn: async (bookingId: number) => {
-      const response = await apiRequest('PUT', `/api/bookings/${bookingId}/status`, {
-        status: 'cancelled'
+      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, {
+        status: 'rejected'
       });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       toast({
