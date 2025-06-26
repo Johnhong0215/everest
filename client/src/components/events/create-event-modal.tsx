@@ -91,7 +91,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     mutationFn: async (data: any) => {
       console.log('Sending data to API:', data);
       const response = await apiRequest('POST', '/api/events', data);
-      return response.json();
+      return response;
     },
     onSuccess: (data) => {
       console.log('Event created successfully:', data);
