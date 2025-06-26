@@ -338,22 +338,16 @@ export default function Sidebar({
           />
         </div>
 
-        {/* Apply Button */}
-        <Button
-          onClick={onApplyFilters}
-          className={`w-full transition-colors ${
-            hasPendingChanges 
-              ? 'bg-everest-blue hover:bg-blue-700 text-white' 
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
-          }`}
-          size="lg"
-          disabled={!hasPendingChanges}
-        >
-          Apply Filters
-        </Button>
-
-        {/* Remove Filters Button */}
-        {hasActiveFilters && (
+        {/* Dynamic Filter Button */}
+        {hasPendingChanges ? (
+          <Button
+            onClick={onApplyFilters}
+            className="w-full bg-everest-blue hover:bg-blue-700 text-white transition-colors"
+            size="lg"
+          >
+            Apply Filters
+          </Button>
+        ) : hasActiveFilters ? (
           <Button
             onClick={onRemoveFilters}
             variant="destructive"
@@ -361,6 +355,14 @@ export default function Sidebar({
             size="lg"
           >
             Remove Filters
+          </Button>
+        ) : (
+          <Button
+            className="w-full bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300 transition-colors"
+            size="lg"
+            disabled
+          >
+            Apply Filters
           </Button>
         )}
       </div>
