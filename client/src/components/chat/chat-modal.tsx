@@ -143,6 +143,15 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     }
   }, [activeEventId, messages, otherParticipantId]);
 
+  // Combined messages (real + optimistic) - moved here before any usage
+  const allMessages = React.useMemo(() => {
+    const combined = [...messages, ...optimisticMessages].sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    console.log(`Total combined messages: ${combined.length} (real: ${messages.length}, optimistic: ${optimisticMessages.length})`);
+    return combined;
+  }, [messages, optimisticMessages]);
+
   // Delete chatroom mutation
   const deleteChatroomMutation = useMutation({
     mutationFn: async (eventId: number) => {
