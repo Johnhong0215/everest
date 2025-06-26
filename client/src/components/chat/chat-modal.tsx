@@ -247,6 +247,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       if (activeEventId && newMessage.eventId === activeEventId) {
         setOptimisticMessages([]);
         queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+        refetchMessages();
       }
     }
   }, [socketMessages, activeEventId, queryClient]);
@@ -331,6 +332,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       
       // Refresh messages after successful HTTP send
       queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
+      refetchMessages();
     } catch (error) {
       console.error('HTTP API message failed:', error);
     }
@@ -340,6 +342,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       setOptimisticMessages(prev => prev.filter(msg => String(msg.id) !== String(tempId)));
       queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
+      refetchMessages();
     }, 1500);
   };
 
