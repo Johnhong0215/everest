@@ -105,12 +105,8 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
   // Cancel booking mutation
   const cancelBookingMutation = useMutation({
     mutationFn: async (bookingId: number) => {
-      const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) throw new Error('Failed to cancel booking');
-      return response.json();
+      const response = await apiRequest('DELETE', `/api/bookings/${bookingId}`, {});
+      return response;
     },
     onSuccess: () => {
       toast({

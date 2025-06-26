@@ -90,7 +90,7 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
   const editEventMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest('PUT', `/api/events/${event?.id}`, data);
-      return response.json();
+      return response;
     },
     onSuccess: (data) => {
       toast({

@@ -33,13 +33,8 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
   // Accept booking mutation
   const acceptBookingMutation = useMutation({
     mutationFn: async (bookingId: number) => {
-      const response = await fetch(`/api/bookings/${bookingId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'accepted' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) throw new Error('Failed to accept booking');
-      return response.json();
+      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, { status: 'accepted' });
+      return response;
     },
     onSuccess: () => {
       toast({
@@ -62,13 +57,8 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
   // Reject booking mutation
   const rejectBookingMutation = useMutation({
     mutationFn: async (bookingId: number) => {
-      const response = await fetch(`/api/bookings/${bookingId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'rejected' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) throw new Error('Failed to reject booking');
-      return response.json();
+      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, { status: 'rejected' });
+      return response;
     },
     onSuccess: () => {
       toast({

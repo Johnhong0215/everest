@@ -187,7 +187,7 @@ export default function EventGrid({
         eventId
         // Status will be set to 'requested' automatically by the server
       });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       toast({
@@ -222,7 +222,7 @@ export default function EventGrid({
   const deleteEventMutation = useMutation({
     mutationFn: async (eventId: number) => {
       const response = await apiRequest('DELETE', `/api/events/${eventId}`, {});
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       toast({
