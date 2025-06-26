@@ -108,7 +108,7 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   const otherParticipantId = activeChat?.otherParticipant?.id || receiverId;
 
   // Fetch messages for active event with specific participant
-  const { data: messagesData = [], isLoading: messagesLoading } = useQuery<ChatMessageWithSender[]>({
+  const { data: messagesData = [], isLoading: messagesLoading, refetch: refetchMessages } = useQuery<ChatMessageWithSender[]>({
     queryKey: [`/api/events/${activeEventId}/messages`, otherParticipantId],
     queryFn: async () => {
       if (!activeEventId) return [];
@@ -129,6 +129,8 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
     retry: false,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+    staleTime: 0, // Always consider data stale to force refetch
+    gcTime: 0, // Don't cache results (updated from cacheTime in v5)
   });
 
   // Ensure messages is always an array
