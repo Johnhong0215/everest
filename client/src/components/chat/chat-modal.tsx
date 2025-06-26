@@ -291,10 +291,13 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
   // Handle sending messages with optimistic updates
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !activeEventId || !isConnected || !user) return;
+    if (!messageInput.trim() || !activeEventId || !user || !otherParticipantId) return;
 
     const messageContent = messageInput.trim();
     const tempId = `temp-${Date.now()}`;
+    
+    // Clear input immediately to prevent double sends
+    setMessageInput("");
     
     const tempMessage: ChatMessageWithSender = {
       id: tempId as any,
@@ -316,15 +319,11 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       isPending: true
     };
 
-    // Add optimistic message at the end
+    // Add optimistic message
     setOptimisticMessages(prev => [...prev, tempMessage]);
-    setMessageInput("");
 
-    // Send actual message
-    sendMessage(activeEventId, messageContent);
-    
-    // Also try sending via HTTP API as fallback
     try {
+      // Send ONLY via HTTP API (remove WebSocket to prevent duplicates)
       const response = await apiRequest('POST', `/api/events/${activeEventId}/messages`, {
         content: messageContent,
         receiverId: otherParticipantId,
@@ -332,20 +331,17 @@ export default function ChatModal({ isOpen, onClose, eventId, receiverId }: Chat
       });
       console.log('Message sent via HTTP API:', response);
       
-      // Refresh messages after successful HTTP send
+      // Remove optimistic message immediately after successful send
+      setOptimisticMessages(prev => prev.filter(msg => String(msg.id) !== String(tempId)));
+      
+      // Refresh messages to show real message
       queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
       refetchMessages();
     } catch (error) {
       console.error('HTTP API message failed:', error);
-    }
-    
-    // Remove optimistic message when real message is confirmed
-    setTimeout(() => {
+      // Remove optimistic message on error
       setOptimisticMessages(prev => prev.filter(msg => String(msg.id) !== String(tempId)));
-      queryClient.invalidateQueries({ queryKey: [`/api/events/${activeEventId}/messages`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/my-chats'] });
-      refetchMessages();
-    }, 1500);
+    }
   };
 
   // Group messages by date, ensuring proper ordering
