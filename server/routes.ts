@@ -284,7 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/bookings/:id/status', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/bookings/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const bookingId = parseInt(req.params.id);
@@ -307,13 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Failed to update booking" });
       }
 
-      // If approved, increment event currentPlayers
-      if (status === 'confirmed') {
-        const event = booking.event;
-        // Manually update currentPlayers using direct database access
-        const newPlayerCount = (event.currentPlayers || 0) + 1;
-        await storage.updateEventPlayerCount(event.id, newPlayerCount);
-      }
+      // Player count is now calculated dynamically based on accepted bookings
 
       res.json(updatedBooking);
     } catch (error) {
@@ -496,39 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update booking status (accept/reject by host)
-  app.put('/api/bookings/:id/status', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const bookingId = parseInt(req.params.id);
-      const { status } = req.body;
-      
-      // Validate status
-      if (!['accepted', 'rejected'].includes(status)) {
-        return res.status(400).json({ message: "Invalid status. Must be 'accepted' or 'rejected'" });
-      }
-      
-      // Get the booking and verify the user is the host
-      const booking = await storage.getBooking(bookingId);
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-      
-      if (booking.event.hostId !== userId) {
-        return res.status(403).json({ message: "Not authorized to update this booking" });
-      }
-      
-      // Update booking status
-      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
-      
-      // Player count is now calculated dynamically, no manual manipulation needed
-      
-      res.json(updatedBooking);
-    } catch (error) {
-      console.error("Error updating booking status:", error);
-      res.status(500).json({ message: "Failed to update booking status" });
-    }
-  });
+
 
   // Cancel booking (by participant)
   app.put('/api/bookings/:id/cancel', isAuthenticated, async (req: any, res) => {
