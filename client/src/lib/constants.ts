@@ -3,37 +3,37 @@ export const SPORTS = [
     id: 'badminton',
     name: 'Badminton',
     color: 'sport-badminton',
-    icon: 'racket'
+    icon: '🏸'
   },
   {
     id: 'basketball',
     name: 'Basketball',
     color: 'sport-basketball',
-    icon: 'basketball'
+    icon: '🏀'
   },
   {
     id: 'soccer',
     name: 'Soccer',
     color: 'sport-soccer',
-    icon: 'soccer'
+    icon: '⚽'
   },
   {
     id: 'tennis',
     name: 'Tennis',
     color: 'sport-tennis',
-    icon: 'tennis'
+    icon: '🎾'
   },
   {
     id: 'volleyball',
     name: 'Volleyball',
     color: 'sport-volleyball',
-    icon: 'volleyball'
+    icon: '🏐'
   },
   {
     id: 'tabletennis',
     name: 'Table Tennis',
     color: 'sport-tabletennis',
-    icon: 'ping-pong'
+    icon: '🏓'
   }
 ];
 
