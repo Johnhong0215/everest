@@ -76,9 +76,11 @@ export default function LocationSearch({
     }
 
     setLoading(true);
+    let url = '';
+    
     try {
       // Search with proximity bias if user location is available
-      let url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
+      url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
       
       if (currentUserLocation) {
         // Use viewbox for proximity but don't make it bounded to allow wider results
@@ -90,17 +92,24 @@ export default function LocationSearch({
         console.log('No user location available for proximity search');
       }
 
+      console.log('Making request to:', url);
+      
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Everest Sports Platform (contact@example.com)'
+          'User-Agent': 'Everest Sports Platform'
         }
       });
       
+      console.log('Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Response error text:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
       
       const data = await response.json();
+      console.log('Raw API response:', data);
       
       // Sort by distance if user location is available
       let sortedData = data;
@@ -118,7 +127,8 @@ export default function LocationSearch({
       
       setSuggestions(sortedData.slice(0, 8));
     } catch (error) {
-      console.error('Error searching locations:', error);
+      console.error('Main search failed:', error);
+      console.error('Error details:', error.message || 'Unknown error');
       console.error('Search URL was:', url);
       
       // Try a simpler fallback search without viewbox restrictions
