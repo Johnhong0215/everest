@@ -555,6 +555,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Location search proxy endpoint
+  app.get('/api/search-locations', async (req, res) => {
+    try {
+      const { q, lat, lng, limit = '10' } = req.query;
+      
+      if (!q || typeof q !== 'string' || q.trim().length < 2) {
+        return res.status(400).json({ message: "Query parameter 'q' is required and must be at least 2 characters" });
+      }
+
+      // Build Nominatim URL
+      let url = `https://nominatim.openstreetmap.org/search?format=json&limit=${limit}&q=${encodeURIComponent(q)}&countrycodes=us&addressdetails=1`;
+      
+      // Add proximity search if lat/lng provided
+      if (lat && lng) {
+        const viewboxSize = 1.0;
+        const latNum = parseFloat(lat as string);
+        const lngNum = parseFloat(lng as string);
+        url += `&viewbox=${lngNum-viewboxSize},${latNum-viewboxSize},${lngNum+viewboxSize},${latNum+viewboxSize}`;
+      }
+
+      console.log('Server: Making location search request to:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Everest Sports Platform'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Nominatim API error:', response.status, response.statusText);
+        return res.status(response.status).json({ message: `Location search failed: ${response.statusText}` });
+      }
+
+      const data = await response.json();
+      console.log('Server: Location search returned', data.length, 'results');
+
+      // Transform data to match expected format
+      const transformedData = data.map((item: any) => {
+        const displayName = item.display_name || '';
+        const parts = displayName.split(',').slice(0, 3);
+        const cleanDisplayName = parts.join(', ').trim();
+        
+        return {
+          place_id: item.place_id,
+          display_name: cleanDisplayName,
+          lat: parseFloat(item.lat),
+          lon: parseFloat(item.lon),
+          address: item.address,
+        };
+      });
+
+      res.json(transformedData);
+    } catch (error) {
+      console.error("Error in location search proxy:", error);
+      res.status(500).json({ message: "Failed to search locations" });
+    }
+  });
+
   // Create HTTP server
   const httpServer = createServer(app);
 
