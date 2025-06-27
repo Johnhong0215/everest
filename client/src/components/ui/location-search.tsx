@@ -68,7 +68,7 @@ export default function LocationSearch({
     }
   };
 
-  // Search for locations using Nominatim API
+  // Search for locations using server-side proxy
   const searchLocations = async (query: string) => {
     if (!query.trim() || query.length < 3) {
       setSuggestions([]);
@@ -76,40 +76,31 @@ export default function LocationSearch({
     }
 
     setLoading(true);
-    let url = '';
     
     try {
-      // Search with proximity bias if user location is available
-      url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
+      // Use server-side proxy to avoid CORS issues
+      let url = `/api/search-locations?q=${encodeURIComponent(query)}&limit=10`;
       
       if (currentUserLocation) {
-        // Use viewbox for proximity but don't make it bounded to allow wider results
-        const viewboxSize = 1.0; // Increase search area
-        url += `&viewbox=${currentUserLocation.lng-viewboxSize},${currentUserLocation.lat-viewboxSize},${currentUserLocation.lng+viewboxSize},${currentUserLocation.lat+viewboxSize}`;
-        console.log('Searching with user location:', currentUserLocation);
-        console.log('Search URL:', url);
+        url += `&lat=${currentUserLocation.lat}&lng=${currentUserLocation.lng}`;
+        console.log('Searching with user location via server proxy:', currentUserLocation);
       } else {
         console.log('No user location available for proximity search');
       }
 
-      console.log('Making request to:', url);
+      console.log('Making request to server proxy:', url);
       
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Everest Sports Platform'
-        }
-      });
+      const response = await fetch(url);
       
       console.log('Response status:', response.status, response.statusText);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Response error text:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log('Raw API response:', data);
+      console.log('Server proxy response:', data);
       
       // Sort by distance if user location is available
       let sortedData = data;
@@ -119,55 +110,17 @@ export default function LocationSearch({
           distance: calculateDistance(
             currentUserLocation.lat,
             currentUserLocation.lng,
-            parseFloat(item.lat),
-            parseFloat(item.lon)
+            item.lat,
+            item.lon
           )
         })).sort((a: any, b: any) => a.distance - b.distance);
       }
       
       setSuggestions(sortedData.slice(0, 8));
+      console.log('Search completed, found', sortedData.length, 'suggestions');
     } catch (error) {
-      console.error('Main search failed:', error);
-      console.error('Error details:', error.message || 'Unknown error');
-      console.error('Search URL was:', url);
-      
-      // Try a simpler fallback search without viewbox restrictions
-      try {
-        console.log('Attempting fallback search without geographical restrictions...');
-        const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
-        
-        const fallbackResponse = await fetch(fallbackUrl, {
-          headers: {
-            'User-Agent': 'Everest Sports Platform (contact@example.com)'
-          }
-        });
-        
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          console.log('Fallback search found', fallbackData.length, 'results');
-          
-          // Sort by distance if user location is available
-          let sortedData = fallbackData;
-          if (currentUserLocation) {
-            sortedData = fallbackData.map((item: any) => ({
-              ...item,
-              distance: calculateDistance(
-                currentUserLocation.lat,
-                currentUserLocation.lng,
-                parseFloat(item.lat),
-                parseFloat(item.lon)
-              )
-            })).sort((a: any, b: any) => a.distance - b.distance);
-          }
-          
-          setSuggestions(sortedData.slice(0, 8));
-        } else {
-          setSuggestions([]);
-        }
-      } catch (fallbackError) {
-        console.error('Fallback search also failed:', fallbackError);
-        setSuggestions([]);
-      }
+      console.error('Location search failed:', error);
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }
