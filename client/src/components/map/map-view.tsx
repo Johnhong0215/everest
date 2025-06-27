@@ -308,10 +308,10 @@ export default function MapView({ events, userLocation, onEventClick }: MapViewP
                           {(cluster.events[0].bookings?.filter(b => b.status === 'accepted').length || 0) + 1} / {cluster.events[0].maxPlayers} players
                         </div>
                         
-                        {(cluster.events[0].cost || 0) > 0 && (
+                        {(cluster.events[0].pricePerPerson || 0) > 0 && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <DollarSign className="w-4 h-4" />
-                            ${cluster.events[0].cost} per person
+                            ${cluster.events[0].pricePerPerson} per person
                           </div>
                         )}
                       </div>

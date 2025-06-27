@@ -380,8 +380,24 @@ export default function EventGrid({
       {/* Content */}
       <div className="p-6">
         {viewMode === 'map' ? (
-          <div className="bg-gray-200 rounded-lg h-96 flex items-center justify-center">
-            <p className="text-gray-500">Map view coming soon!</p>
+          <div className="h-[600px] bg-gray-50 rounded-lg border border-gray-200">
+            {events.length > 0 ? (
+              <MapView 
+                events={events}
+                userLocation={userLocation}
+                onEventClick={(event) => {
+                  console.log('Event clicked:', event);
+                }}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center p-8">
+                  <Map className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Events to Show</h3>
+                  <p className="text-gray-500">Create an event or adjust your filters to see events on the map.</p>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <>
