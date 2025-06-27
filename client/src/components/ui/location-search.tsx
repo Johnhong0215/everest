@@ -81,13 +81,25 @@ export default function LocationSearch({
       let url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
       
       if (currentUserLocation) {
-        url += `&viewbox=${currentUserLocation.lng-0.5},${currentUserLocation.lat-0.5},${currentUserLocation.lng+0.5},${currentUserLocation.lat+0.5}&bounded=1`;
+        // Use viewbox for proximity but don't make it bounded to allow wider results
+        const viewboxSize = 1.0; // Increase search area
+        url += `&viewbox=${currentUserLocation.lng-viewboxSize},${currentUserLocation.lat-viewboxSize},${currentUserLocation.lng+viewboxSize},${currentUserLocation.lat+viewboxSize}`;
         console.log('Searching with user location:', currentUserLocation);
+        console.log('Search URL:', url);
       } else {
         console.log('No user location available for proximity search');
       }
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Everest Sports Platform (contact@example.com)'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
       // Sort by distance if user location is available
@@ -107,7 +119,45 @@ export default function LocationSearch({
       setSuggestions(sortedData.slice(0, 8));
     } catch (error) {
       console.error('Error searching locations:', error);
-      setSuggestions([]);
+      console.error('Search URL was:', url);
+      
+      // Try a simpler fallback search without viewbox restrictions
+      try {
+        console.log('Attempting fallback search without geographical restrictions...');
+        const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${encodeURIComponent(query)}&countrycodes=us&addressdetails=1`;
+        
+        const fallbackResponse = await fetch(fallbackUrl, {
+          headers: {
+            'User-Agent': 'Everest Sports Platform (contact@example.com)'
+          }
+        });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          console.log('Fallback search found', fallbackData.length, 'results');
+          
+          // Sort by distance if user location is available
+          let sortedData = fallbackData;
+          if (currentUserLocation) {
+            sortedData = fallbackData.map((item: any) => ({
+              ...item,
+              distance: calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lng,
+                parseFloat(item.lat),
+                parseFloat(item.lon)
+              )
+            })).sort((a: any, b: any) => a.distance - b.distance);
+          }
+          
+          setSuggestions(sortedData.slice(0, 8));
+        } else {
+          setSuggestions([]);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback search also failed:', fallbackError);
+        setSuggestions([]);
+      }
     } finally {
       setLoading(false);
     }
