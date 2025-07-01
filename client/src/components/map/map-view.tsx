@@ -22,6 +22,11 @@ interface MapViewProps {
   events: EventWithHost[];
   userLocation?: { lat: number; lng: number } | null;
   onEventClick?: (event: EventWithHost) => void;
+  onJoin: (eventId: number) => void;
+  onOpenChat: (eventId: number) => void;
+  onCancel: (eventId: number) => void;
+  onModify: (eventId: number) => void;
+  currentUserId: string;
 }
 
 interface EventCluster {
@@ -90,7 +95,8 @@ function createEventIcon(sport: string) {
   });
 }
 
-export default function MapView({ events, userLocation, onEventClick }: MapViewProps) {
+export default function MapView({ events, userLocation, onEventClick, onJoin, onOpenChat, onCancel, onModify, currentUserId }: MapViewProps) {
+  const [selectedEvent, setSelectedEvent] = React.useState<EventWithHost | null>(null);
   // Group events by location (within ~100m radius)
   const eventClusters = useMemo(() => {
     const clusters: EventCluster[] = [];
