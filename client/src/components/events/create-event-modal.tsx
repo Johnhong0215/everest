@@ -98,13 +98,19 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const handleStartTimeChange = (newStartTime: string) => {
     if (!newStartTime) return;
     
+    // Parse the datetime-local input value
+    const inputDate = new Date(newStartTime);
+    
     // Round to nearest 5 minutes
-    const roundedStartTime = roundDateTimeStringTo5Minutes(newStartTime);
+    const minutes = inputDate.getMinutes();
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    inputDate.setMinutes(roundedMinutes, 0, 0);
+    
+    const roundedStartTime = toLocalDateTimeString(inputDate);
     form.setValue('startTime', roundedStartTime);
     
     // Automatically set end time to 1 hour after start time
-    const startDate = new Date(roundedStartTime);
-    const endDate = addOneHour(startDate);
+    const endDate = addOneHour(inputDate);
     form.setValue('endTime', toLocalDateTimeString(endDate));
   };
 
@@ -112,16 +118,20 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const handleEndTimeChange = (newEndTime: string) => {
     if (!newEndTime) return;
     
-    // Round to nearest 5 minutes
-    const roundedEndTime = roundDateTimeStringTo5Minutes(newEndTime);
+    // Parse the datetime-local input value and round to 5 minutes
+    const inputDate = new Date(newEndTime);
+    const minutes = inputDate.getMinutes();
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    inputDate.setMinutes(roundedMinutes, 0, 0);
+    
+    const roundedEndTime = toLocalDateTimeString(inputDate);
     const startTime = form.getValues('startTime');
     
     if (startTime) {
       const startDate = new Date(startTime);
-      const endDate = new Date(roundedEndTime);
       
       // Ensure end time is after start time
-      if (endDate <= startDate) {
+      if (inputDate <= startDate) {
         const newEndDate = addOneHour(startDate);
         form.setValue('endTime', toLocalDateTimeString(newEndDate));
         setTimeValidationError("End time must be after start time. Set to 1 hour after start time.");
@@ -131,7 +141,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       
       // Ensure end time is within 4 hours of start time
       const maxEndDate = new Date(startDate.getTime() + 4 * 60 * 60 * 1000); // 4 hours
-      if (endDate > maxEndDate) {
+      if (inputDate > maxEndDate) {
         form.setValue('endTime', toLocalDateTimeString(maxEndDate));
         setTimeValidationError("End time cannot be more than 4 hours after start time. Set to maximum 4 hours.");
         setTimeout(() => setTimeValidationError(''), 3000);
@@ -319,9 +329,9 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
 
             {/* Sport-Specific Configuration */}
-            {selectedSport && sportConfig && (
-              <div className={`bg-gray-50 p-4 rounded-lg border border-gray-200`}>
-                <h3 className={`text-lg font-semibold text-gray-800 mb-4`}>
+            {selectedSport && sportConfig && Object.keys(sportConfig).length > 0 && (
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
                   {selectedSportData?.name} Settings
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -330,23 +340,24 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     const currentValue = currentConfig[key] || '';
                     
                     return (
-                      <div key={key}>
+                      <div key={`${selectedSport}-${key}`}>
                         <Label className="text-sm font-medium mb-2 block capitalize">
                           {key.replace(/([A-Z])/g, ' $1').trim()}
                         </Label>
                         <Select
                           value={currentValue}
                           onValueChange={(value) => {
+                            console.log(`Setting ${key} to ${value}`);
                             const updatedConfig = { ...currentConfig, [key]: value };
                             form.setValue('sportConfig', updatedConfig);
                           }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder={`Select ${key}`} />
+                            <SelectValue placeholder={`Choose ${key.replace(/([A-Z])/g, ' $1').trim()}`} />
                           </SelectTrigger>
                           <SelectContent>
-                            {(options as string[]).map((option) => (
-                              <SelectItem key={option} value={option}>
+                            {Array.isArray(options) && options.map((option) => (
+                              <SelectItem key={`${key}-${option}`} value={option}>
                                 {option}
                               </SelectItem>
                             ))}
