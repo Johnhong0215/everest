@@ -711,5 +711,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Location search endpoint (proxy to avoid CORS issues)
+  app.get('/api/search-locations', async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: 'Query parameter q is required' });
+      }
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch from Nominatim');
+      }
+
+      const data = await response.json();
+      const locations = data.map((item: any) => ({
+        display_name: item.display_name,
+        lat: parseFloat(item.lat),
+        lon: parseFloat(item.lon)
+      }));
+
+      res.json(locations);
+    } catch (error) {
+      console.error('Location search error:', error);
+      res.status(500).json({ error: 'Failed to search locations' });
+    }
+  });
+
+  // Reverse geocoding endpoint
+  app.get('/api/reverse-geocode', async (req, res) => {
+    try {
+      const { lat, lng } = req.query;
+      if (!lat || !lng || typeof lat !== 'string' || typeof lng !== 'string') {
+        return res.status(400).json({ error: 'Query parameters lat and lng are required' });
+      }
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch from Nominatim');
+      }
+
+      const data = await response.json();
+      
+      // Extract a readable address from the response
+      let address = data.display_name;
+      if (data.address) {
+        const { house_number, road, suburb, city, state, postcode } = data.address;
+        const parts = [];
+        if (house_number && road) parts.push(`${house_number} ${road}`);
+        else if (road) parts.push(road);
+        if (suburb) parts.push(suburb);
+        if (city) parts.push(city);
+        if (state) parts.push(state);
+        if (postcode) parts.push(postcode);
+        
+        if (parts.length > 0) {
+          address = parts.join(', ');
+        }
+      }
+
+      res.json({ address });
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      res.status(500).json({ error: 'Failed to reverse geocode location' });
+    }
+  });
+
   return httpServer;
 }

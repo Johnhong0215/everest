@@ -119,7 +119,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const selectedSportData = SPORTS.find(s => s.id === selectedSport);
   const sportConfig = selectedSport ? SPORT_CONFIGS[selectedSport as keyof typeof SPORT_CONFIGS] : null;
 
-  const onSubmit = (data: CreateEventFormData) => {
+  const onSubmit = async (data: CreateEventFormData) => {
     console.log('Form data submitted:', data);
     
     if (!isAuthenticated || !user || typeof user !== 'object' || !('id' in user)) {
@@ -130,10 +130,30 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       });
       return;
     }
+
+    // Handle "Current Location" by reverse geocoding
+    let finalLocation = data.location;
+    if (data.location === 'Current Location' && locationCoords) {
+      try {
+        const response = await fetch(`/api/reverse-geocode?lat=${locationCoords.lat}&lng=${locationCoords.lng}`);
+        if (response.ok) {
+          const { address } = await response.json();
+          finalLocation = address;
+        } else {
+          // Fallback to coordinates if reverse geocoding fails
+          finalLocation = `${parseFloat(locationCoords.lat).toFixed(6)}, ${parseFloat(locationCoords.lng).toFixed(6)}`;
+        }
+      } catch (error) {
+        console.error('Error getting address:', error);
+        // Fallback to coordinates if reverse geocoding fails
+        finalLocation = `${parseFloat(locationCoords.lat).toFixed(6)}, ${parseFloat(locationCoords.lng).toFixed(6)}`;
+      }
+    }
     
     // Ensure proper data types and format
     const eventData = {
       ...data,
+      location: finalLocation,
       hostId: String((user as any).id), // Add the required hostId field
       maxPlayers: Number(data.maxPlayers),
       startTime: fromLocalDateTimeString(data.startTime),
