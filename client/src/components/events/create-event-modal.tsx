@@ -71,6 +71,22 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     }
   };
 
+  // Calculate default start time (tomorrow, rounded to nearest 5 minutes)
+  const getDefaultStartTime = () => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const minutes = tomorrow.getMinutes();
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    tomorrow.setMinutes(roundedMinutes);
+    tomorrow.setSeconds(0);
+    tomorrow.setMilliseconds(0);
+    return toLocalDateTimeString(tomorrow);
+  };
+
+  const getDefaultEndTime = () => {
+    const startTime = getDefaultStartTime();
+    return addOneHour(startTime);
+  };
+
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventFormSchema),
     defaultValues: {
@@ -78,8 +94,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sport: 'badminton',
       skillLevel: 'intermediate',
       genderMix: 'mixed',
-      startTime: toLocalDateTimeString(new Date(Date.now() + 24 * 60 * 60 * 1000)),
-      endTime: toLocalDateTimeString(new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000)),
+      startTime: getDefaultStartTime(),
+      endTime: getDefaultEndTime(),
       location: '',
       maxPlayers: 4,
       pricePerPerson: '12.00',
@@ -176,6 +192,33 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     form.setValue('sportConfig', {});
   };
 
+  // Function to round time to nearest 5-minute interval
+  const roundToNearestFiveMinutes = (dateString: string) => {
+    const date = new Date(dateString);
+    const minutes = date.getMinutes();
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    date.setMinutes(roundedMinutes);
+    date.setSeconds(0);
+    date.setMilliseconds(0);
+    return toLocalDateTimeString(date);
+  };
+
+  // Function to add one hour to a datetime string
+  const addOneHour = (dateString: string) => {
+    const date = new Date(fromLocalDateTimeString(dateString));
+    date.setHours(date.getHours() + 1);
+    return toLocalDateTimeString(date);
+  };
+
+  // Handle start time change
+  const handleStartTimeChange = (value: string) => {
+    const roundedStartTime = roundToNearestFiveMinutes(value);
+    const endTime = addOneHour(roundedStartTime);
+    
+    form.setValue('startTime', roundedStartTime);
+    form.setValue('endTime', endTime);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="create-event-description">
@@ -247,8 +290,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
             {/* Sport-Specific Configuration */}
             {selectedSport && sportConfig && (
-              <div className={`bg-${selectedSportData?.color} bg-opacity-5 p-4 rounded-lg border border-${selectedSportData?.color} border-opacity-20`}>
-                <h3 className={`text-lg font-semibold text-${selectedSportData?.color} mb-4`}>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h3 className="text-lg font-semibold text-blue-700 mb-4">
                   {selectedSportData?.name} Settings
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
