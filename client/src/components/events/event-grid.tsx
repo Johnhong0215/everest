@@ -50,30 +50,22 @@ export default function EventGrid({
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  // Get user location on component mount
+  // Check if geolocation is available on component mount
   useEffect(() => {
-    if ('geolocation' in navigator && locationPermission === 'prompt') {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setLocationPermission('granted');
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          setLocationPermission('denied');
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      );
+    if (!('geolocation' in navigator)) {
+      console.log('Geolocation not available:', navigator);
+      setLocationPermission('denied');
     }
-  }, [locationPermission]);
+  }, []);
 
   const requestLocation = () => {
+    console.log('Requesting location permission...');
+    setLocationPermission('prompt'); // Reset to prompt state
+    
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log('Location permission granted:', position);
           setUserLocation({
             lat: position.coords.latitude,
             lng: position.coords.longitude
@@ -82,10 +74,18 @@ export default function EventGrid({
         },
         (error) => {
           console.error('Geolocation error:', error);
-          setLocationPermission('denied');
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationPermission('denied');
+          } else {
+            // For timeout or position unavailable, keep as denied but allow retry
+            setLocationPermission('denied');
+          }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // Increased timeout, no cache
       );
+    } else {
+      console.error('Geolocation not available');
+      setLocationPermission('denied');
     }
   };
 
@@ -287,7 +287,7 @@ export default function EventGrid({
   return (
     <>
       {/* Location Permission Banner */}
-      {locationPermission === 'denied' && (
+      {(locationPermission === 'denied' || locationPermission === 'prompt') && !userLocation && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mx-4 mt-4">
           <div className="flex items-center space-x-3">
             <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
