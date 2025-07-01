@@ -249,6 +249,17 @@ export default function Sidebar({
               onChange={(e) => handleDateChange(e.target.value)}
               className="mt-1"
             />
+            {/* Show selected custom date */}
+            {isCustomDate(appliedFilters.date) && (
+              <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                Selected: {new Date(appliedFilters.date + 'T00:00:00').toLocaleDateString('en-US', { 
+                  weekday: 'short', 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                })}
+              </div>
+            )}
           </div>
         </div>
 

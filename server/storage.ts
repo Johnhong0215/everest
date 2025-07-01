@@ -241,10 +241,10 @@ export class DatabaseStorage implements IStorage {
       console.log(`Filtering events where DATE(start_time AT TIME ZONE '${userTimezone}') between '${startDateStr}' and '${endDateStr}'`);
       
       conditions.push(
-        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${startDateStr}`
+        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${startDateStr}::date`
       );
       conditions.push(
-        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endDateStr}`
+        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endDateStr}::date`
       );
     }
 
