@@ -355,6 +355,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     const currentConfig = form.watch('sportConfig') || {};
                     const currentValue = currentConfig[key] || '';
                     
+                    console.log(`Rendering ${key} with options:`, options, 'isArray:', Array.isArray(options));
+                    
                     return (
                       <div key={`${selectedSport}-${key}`}>
                         <Label className="text-sm font-medium mb-2 block capitalize">
@@ -372,11 +374,16 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                             <SelectValue placeholder={`Choose ${key.replace(/([A-Z])/g, ' $1').trim()}`} />
                           </SelectTrigger>
                           <SelectContent>
-                            {Array.isArray(options) && options.map((option) => (
-                              <SelectItem key={`${key}-${option}`} value={option}>
-                                {option}
-                              </SelectItem>
-                            ))}
+                            {Array.isArray(options) ? options.map((option, index) => {
+                              console.log(`Rendering option ${index}:`, option);
+                              return (
+                                <SelectItem key={`${key}-${option}-${index}`} value={option}>
+                                  {option}
+                                </SelectItem>
+                              );
+                            }) : (
+                              <SelectItem value="" disabled>No options available (not array: {typeof options})</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
