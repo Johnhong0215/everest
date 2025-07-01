@@ -143,6 +143,13 @@ export default function EventGrid({
     staleTime: 30000, // 30 seconds
   });
 
+  // Filter out outdated events (events past today's date and time)
+  const filteredEvents = rawEvents.filter(event => {
+    const eventDate = new Date(event.startTime);
+    const now = new Date();
+    return eventDate >= now; // Only show future events
+  });
+
   // Sort events by distance (closest first, then events without location data)
   const events = filteredEvents.sort((a, b) => {
     if (!userLocation) return 0; // No sorting if user location is not available
