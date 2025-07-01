@@ -180,7 +180,15 @@ export const calculateDuration = (startDate: Date, endDate: Date): string => {
 export const roundDateTimeStringTo5Minutes = (dateTimeString: string): string => {
   if (!dateTimeString) return dateTimeString;
   
+  // For datetime-local, the string is already in local timezone format
+  // We need to parse it properly and then round
   const date = new Date(dateTimeString);
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    return dateTimeString;
+  }
+  
   const roundedDate = roundToNearest5Minutes(date);
   return toLocalDateTimeString(roundedDate);
 };

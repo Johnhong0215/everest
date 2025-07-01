@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import LocationSearch from "@/components/ui/location-search";
 import { Button } from "@/components/ui/button";
@@ -42,9 +42,16 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const [selectedSport, setSelectedSport] = useState<string>('badminton');
   const [locationCoords, setLocationCoords] = useState<{lat: string, lng: string} | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [timeValidationError, setTimeValidationError] = useState<string>('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
+
+  // Fetch sports settings from database
+  const { data: sportsSettings = {} } = useQuery({
+    queryKey: ['/api/sports-settings'],
+    enabled: isOpen, // Only fetch when modal is open
+  });
 
   // Get user location for proximity-based search
   useEffect(() => {
@@ -117,11 +124,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       if (endDate <= startDate) {
         const newEndDate = addOneHour(startDate);
         form.setValue('endTime', toLocalDateTimeString(newEndDate));
-        toast({
-          title: "Invalid End Time",
-          description: "End time must be after start time. Set to 1 hour after start time.",
-          variant: "destructive",
-        });
+        setTimeValidationError("End time must be after start time. Set to 1 hour after start time.");
+        setTimeout(() => setTimeValidationError(''), 3000);
         return;
       }
       
@@ -129,15 +133,13 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       const maxEndDate = new Date(startDate.getTime() + 4 * 60 * 60 * 1000); // 4 hours
       if (endDate > maxEndDate) {
         form.setValue('endTime', toLocalDateTimeString(maxEndDate));
-        toast({
-          title: "Invalid End Time",
-          description: "End time cannot be more than 4 hours after start time. Set to maximum 4 hours.",
-          variant: "destructive",
-        });
+        setTimeValidationError("End time cannot be more than 4 hours after start time. Set to maximum 4 hours.");
+        setTimeout(() => setTimeValidationError(''), 3000);
         return;
       }
     }
     
+    setTimeValidationError('');
     form.setValue('endTime', roundedEndTime);
   };
 
@@ -188,7 +190,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   });
 
   const selectedSportData = SPORTS.find(s => s.id === selectedSport);
-  const sportConfig = selectedSport ? SPORT_CONFIGS[selectedSport as keyof typeof SPORT_CONFIGS] : null;
+  const sportConfig = selectedSport && sportsSettings ? (sportsSettings as any)[selectedSport] : null;
 
   const onSubmit = async (data: CreateEventFormData) => {
     console.log('Form data submitted:', data);
@@ -369,7 +371,6 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                       <FormControl>
                         <Input
                           type="datetime-local"
-                          step="300" // 5 minute intervals
                           value={field.value || ''}
                           onChange={(e) => {
                             handleStartTimeChange(e.target.value);
@@ -390,7 +391,6 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                       <FormControl>
                         <Input
                           type="datetime-local"
-                          step="300" // 5 minute intervals
                           value={field.value || ''}
                           onChange={(e) => {
                             handleEndTimeChange(e.target.value);
@@ -413,6 +413,20 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     </div>
                     <span className="text-sm font-medium text-blue-800">
                       Event Duration: {getDuration()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Time Validation Error */}
+              {timeValidationError && (
+                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-1 bg-white rounded-full" />
+                    </div>
+                    <span className="text-sm font-medium text-red-800">
+                      {timeValidationError}
                     </span>
                   </div>
                 </div>

@@ -6,6 +6,7 @@ import {
   payments,
   reviews,
   userSportPreferences,
+  sportsSettings,
   type User,
   type UpsertUser,
   type Event,
@@ -21,6 +22,7 @@ import {
   type InsertPayment,
   type Review,
   type InsertReview,
+  type SportsSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, count, like, gte, lte, inArray, sql, ne, not } from "drizzle-orm";
@@ -84,6 +86,9 @@ export interface IStorage {
   createReview(review: InsertReview): Promise<Review>;
   getReviewsForUser(userId: string): Promise<Review[]>;
   getUserRating(userId: string): Promise<number>;
+
+  // Sports settings operations
+  getSportsSettings(): Promise<Record<string, Record<string, string[]>>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -956,6 +961,29 @@ export class DatabaseStorage implements IStorage {
       console.error("Error deleting chatroom:", error);
       return false;
     }
+  }
+
+  async getSportsSettings(): Promise<Record<string, Record<string, string[]>>> {
+    const settings = await db
+      .select()
+      .from(sportsSettings)
+      .orderBy(asc(sportsSettings.sport), asc(sportsSettings.settingKey), asc(sportsSettings.displayOrder));
+
+    const groupedSettings: Record<string, Record<string, string[]>> = {};
+
+    for (const setting of settings) {
+      if (!groupedSettings[setting.sport]) {
+        groupedSettings[setting.sport] = {};
+      }
+      
+      if (!groupedSettings[setting.sport][setting.settingKey]) {
+        groupedSettings[setting.sport][setting.settingKey] = [];
+      }
+      
+      groupedSettings[setting.sport][setting.settingKey].push(setting.settingValue);
+    }
+
+    return groupedSettings;
   }
 }
 

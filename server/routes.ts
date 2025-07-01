@@ -807,5 +807,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get sports settings from database
+  app.get('/api/sports-settings', async (req, res) => {
+    try {
+      const settings = await storage.getSportsSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching sports settings:', error);
+      res.status(500).json({ message: 'Failed to fetch sports settings' });
+    }
+  });
+
   return httpServer;
 }

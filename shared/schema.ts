@@ -172,6 +172,16 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Sports settings table
+export const sportsSettings = pgTable("sports_settings", {
+  id: serial("id").primaryKey(),
+  sport: sportEnum("sport").notNull(),
+  settingKey: varchar("setting_key").notNull(),
+  settingValue: varchar("setting_value").notNull(),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   hostedEvents: many(events),
@@ -281,6 +291,11 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({
   createdAt: true,
 });
 
+export const insertSportsSettingsSchema = createInsertSchema(sportsSettings).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -300,6 +315,8 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type Review = typeof reviews.$inferSelect;
+export type InsertSportsSettings = z.infer<typeof insertSportsSettingsSchema>;
+export type SportsSettings = typeof sportsSettings.$inferSelect;
 
 // Extended types with relations
 export type EventWithHost = Event & {
