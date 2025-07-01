@@ -400,16 +400,26 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                             }}
                             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {Array.from({ length: 288 }, (_, i) => {
-                              const hours = Math.floor(i / 12);
-                              const minutes = (i % 12) * 5;
-                              const time = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                            {Array.from({ length: 144 }, (_, i) => {
+                              // 6 AM to 11:55 PM (18 hours * 12 intervals = 216, but let's do 6 AM to 11:55 PM)
+                              const totalMinutes = 360 + (i * 5); // Start at 6:00 AM (360 minutes)
+                              const hours24 = Math.floor(totalMinutes / 60);
+                              const minutes = totalMinutes % 60;
+                              
+                              if (hours24 >= 24) return null; // Don't go past midnight
+                              
+                              // Convert to 12-hour format
+                              const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+                              const ampm = hours24 < 12 ? 'AM' : 'PM';
+                              const time24 = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              const displayTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                              
                               return (
-                                <option key={time} value={time}>
-                                  {time}
+                                <option key={time24} value={time24}>
+                                  {displayTime}
                                 </option>
                               );
-                            })}
+                            }).filter(Boolean)}
                           </select>
                         </div>
                       </FormControl>
@@ -444,16 +454,26 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                             }}
                             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {Array.from({ length: 288 }, (_, i) => {
-                              const hours = Math.floor(i / 12);
-                              const minutes = (i % 12) * 5;
-                              const time = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                            {Array.from({ length: 144 }, (_, i) => {
+                              // 6 AM to 11:55 PM
+                              const totalMinutes = 360 + (i * 5); // Start at 6:00 AM (360 minutes)
+                              const hours24 = Math.floor(totalMinutes / 60);
+                              const minutes = totalMinutes % 60;
+                              
+                              if (hours24 >= 24) return null; // Don't go past midnight
+                              
+                              // Convert to 12-hour format
+                              const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+                              const ampm = hours24 < 12 ? 'AM' : 'PM';
+                              const time24 = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              const displayTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                              
                               return (
-                                <option key={time} value={time}>
-                                  {time}
+                                <option key={time24} value={time24}>
+                                  {displayTime}
                                 </option>
                               );
-                            })}
+                            }).filter(Boolean)}
                           </select>
                         </div>
                       </FormControl>
