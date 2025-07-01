@@ -199,8 +199,24 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     },
   });
 
+  // Watch for form sport changes to keep selectedSport in sync
+  const formSport = form.watch('sport');
+  
+  // Keep selectedSport in sync with form
+  useEffect(() => {
+    if (formSport && formSport !== selectedSport) {
+      setSelectedSport(formSport);
+    }
+  }, [formSport, selectedSport]);
+
   const selectedSportData = SPORTS.find(s => s.id === selectedSport);
   const sportConfig = selectedSport && sportsSettings ? (sportsSettings as any)[selectedSport] : null;
+  
+  // Debug logging
+  console.log('selectedSport:', selectedSport);
+  console.log('formSport:', formSport);
+  console.log('sportsSettings:', sportsSettings);
+  console.log('sportConfig:', sportConfig);
 
   const onSubmit = async (data: CreateEventFormData) => {
     console.log('Form data submitted:', data);
