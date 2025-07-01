@@ -720,7 +720,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`,
+        {
+          headers: {
+            'User-Agent': 'Everest Sports App (https://everest.replit.app)',
+          },
+        }
       );
 
       if (!response.ok) {
@@ -749,18 +754,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Query parameters lat and lng are required' });
       }
 
+      console.log(`Reverse geocoding for: ${lat}, ${lng}`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Everest Sports App (https://everest.replit.app)',
+          },
+          signal: controller.signal,
+        }
       );
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch from Nominatim');
+        console.error(`Nominatim response not OK: ${response.status} ${response.statusText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('Nominatim response data:', JSON.stringify(data, null, 2));
       
       // Extract a readable address from the response
-      let address = data.display_name;
+      let address = data.display_name || `${lat}, ${lng}`;
+      
       if (data.address) {
         const { house_number, road, suburb, city, state, postcode } = data.address;
         const parts = [];
@@ -776,10 +797,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log('Final address:', address);
       res.json({ address });
     } catch (error) {
       console.error('Reverse geocoding error:', error);
-      res.status(500).json({ error: 'Failed to reverse geocode location' });
+      // Return coordinates as fallback
+      const { lat, lng } = req.query;
+      res.json({ address: `${lat}, ${lng}` });
     }
   });
 
