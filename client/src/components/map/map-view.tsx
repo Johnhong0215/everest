@@ -78,10 +78,22 @@ function createClusterIcon(count: number) {
 function createEventIcon(sport: string) {
   const sportData = SPORTS.find(s => s.id === sport);
   const color = sportData?.color || 'blue';
-  const initial = sportData?.name?.charAt(0) || sport.charAt(0).toUpperCase();
+  
+  // Use sport-specific icons
+  const getSportIcon = (sport: string) => {
+    switch (sport) {
+      case 'badminton': return '🏸';
+      case 'basketball': return '🏀';
+      case 'soccer': return '⚽';
+      case 'tennis': return '🎾';
+      case 'volleyball': return '🏐';
+      case 'tabletennis': return '🏓';
+      default: return '⚽';
+    }
+  };
   
   return divIcon({
-    html: `<div class="custom-event-icon" style="background: var(--sport-${sport})"><span class="event-inner">${initial}</span></div>`,
+    html: `<div class="custom-event-icon" style="background: var(--sport-${sport})"><span class="event-inner">${getSportIcon(sport)}</span></div>`,
     className: 'custom-div-icon',
     iconSize: [35, 35],
     iconAnchor: [17.5, 35],
@@ -233,14 +245,15 @@ export default function MapView({ events, userLocation, onEventClick, onJoin, on
         <div className="flex gap-2">
           <Button 
             onClick={() => onJoin(event.id)}
-            className="flex-1"
+            className="flex-1 bg-everest-blue hover:bg-blue-700"
           >
             Join & Pay ${event.pricePerPerson}
           </Button>
           <Button 
             onClick={() => onOpenChat(event.id)}
             variant="outline"
-            className="flex-1"
+            size="sm"
+            className="px-3"
           >
             Chat
           </Button>
@@ -348,7 +361,7 @@ export default function MapView({ events, userLocation, onEventClick, onJoin, on
           }
           
           .event-inner {
-            font-size: 16px;
+            font-size: 18px;
             line-height: 1;
           }
           
@@ -477,29 +490,40 @@ export default function MapView({ events, userLocation, onEventClick, onJoin, on
                         </h3>
                         
                         <div className="space-y-3 max-h-60 overflow-y-auto">
-                          {cluster.events.map((event) => (
-                            <Card key={event.id} className="border border-gray-200">
-                              <CardContent className="p-3">
-                                <div className="flex items-start justify-between mb-2">
-                                  <h4 className="font-medium text-sm text-gray-900 leading-tight">
-                                    {event.title}
-                                  </h4>
-                                  <Badge className={`${getStatusColor(getEventStatus(event))} text-xs`}>
-                                    {getStatusText(getEventStatus(event))}
-                                  </Badge>
-                                </div>
-                                
-                                <div className="space-y-1 mb-3">
-                                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                                    <Calendar className="w-3 h-3" />
-                                    {formatDateForDisplay(event.startTime)}
+                          {cluster.events.map((event) => {
+                            const sportData = SPORTS.find(s => s.id === event.sport);
+                            return (
+                              <Card key={event.id} className="border border-gray-200">
+                                <CardContent className="p-3">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-3 h-3 rounded-full bg-${sportData?.color || 'gray'}-500`}></div>
+                                      <h4 className="font-medium text-sm text-gray-900 leading-tight">
+                                        {event.title}
+                                      </h4>
+                                    </div>
+                                    <Badge className={`${getStatusColor(getEventStatus(event))} text-xs`}>
+                                      {getStatusText(getEventStatus(event))}
+                                    </Badge>
                                   </div>
                                   
-                                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                                    <Users className="w-3 h-3" />
-                                    {event.currentPlayers || 0} / {event.maxPlayers}
+                                  <div className="mb-2">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {sportData?.name || event.sport}
+                                    </Badge>
                                   </div>
-                                </div>
+                                  
+                                  <div className="space-y-1 mb-3">
+                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                      <Calendar className="w-3 h-3" />
+                                      {formatDateForDisplay(event.startTime)}
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                      <Users className="w-3 h-3" />
+                                      {event.currentPlayers || 0} / {event.maxPlayers}
+                                    </div>
+                                  </div>
                                 
                                 <Button 
                                   className="w-full" 
@@ -511,7 +535,8 @@ export default function MapView({ events, userLocation, onEventClick, onJoin, on
                                 </Button>
                               </CardContent>
                             </Card>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -525,7 +550,7 @@ export default function MapView({ events, userLocation, onEventClick, onJoin, on
 
       {/* Event Details Panel */}
       {selectedEvent && (
-        <div className="lg:w-1/3 lg:block w-full absolute lg:relative bottom-0 lg:bottom-auto left-0 right-0 lg:left-auto lg:right-0 bg-white lg:bg-transparent p-4 lg:p-6 shadow-lg lg:shadow-none border-t lg:border-t-0 lg:border-l border-gray-200 max-h-80 lg:max-h-full overflow-y-auto z-[1000]">
+        <div className="lg:w-1/3 w-full lg:relative absolute bottom-0 lg:bottom-auto left-0 right-0 lg:left-auto lg:right-0 bg-white lg:bg-transparent p-4 lg:p-6 shadow-lg lg:shadow-none border-t lg:border-t-0 lg:border-l border-gray-200 max-h-[40vh] lg:max-h-full overflow-y-auto z-[1000]">
           <EventDetails event={selectedEvent} />
         </div>
       )}
