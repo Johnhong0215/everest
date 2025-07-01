@@ -71,6 +71,13 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     }
   };
 
+  // Function to add one hour to a datetime string
+  const addOneHour = (dateString: string) => {
+    const date = new Date(fromLocalDateTimeString(dateString));
+    date.setHours(date.getHours() + 1);
+    return toLocalDateTimeString(date);
+  };
+
   // Calculate default start time (tomorrow, rounded to nearest 5 minutes)
   const getDefaultStartTime = () => {
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -200,13 +207,6 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     date.setMinutes(roundedMinutes);
     date.setSeconds(0);
     date.setMilliseconds(0);
-    return toLocalDateTimeString(date);
-  };
-
-  // Function to add one hour to a datetime string
-  const addOneHour = (dateString: string) => {
-    const date = new Date(fromLocalDateTimeString(dateString));
-    date.setHours(date.getHours() + 1);
     return toLocalDateTimeString(date);
   };
 
