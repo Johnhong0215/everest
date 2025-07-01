@@ -234,11 +234,17 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Date filter: ${filters.date}, Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
       
+      // Use PostgreSQL's timezone conversion to compare the event's start_time in the user's timezone
+      const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      console.log(`Filtering events where DATE(start_time AT TIME ZONE '${userTimezone}') between '${startDateStr}' and '${endDateStr}'`);
+      
       conditions.push(
-        and(
-          gte(events.startTime, startDate),
-          lte(events.startTime, endDate)
-        )!
+        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${startDateStr}`
+      );
+      conditions.push(
+        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endDateStr}`
       );
     }
 
