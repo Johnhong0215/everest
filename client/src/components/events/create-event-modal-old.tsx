@@ -1,82 +1,77 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-
-import LocationSearch from '@/components/ui/location-search';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { insertEventSchema } from '@shared/schema';
-import { SPORTS, SPORT_CONFIGS } from '@/lib/constants';
-import { toLocalDateTimeString, fromLocalDateTimeString } from '@/lib/dateUtils';
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import LocationSearch from "@/components/ui/location-search";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { insertEventSchema } from "@shared/schema";
+import { SPORTS, SPORT_CONFIGS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
+import { toLocalDateTimeString, fromLocalDateTimeString } from "@/lib/dateUtils";
+import { z } from "zod";
 
 interface CreateEventModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const createEventFormSchema = insertEventSchema.extend({
-  startTime: z.string().min(1, 'Start time is required'),
-  endTime: z.string().min(1, 'End time is required'),
-  maxPlayers: z.number().min(2, 'At least 2 players required').max(22, 'Maximum 22 players'),
-  pricePerPerson: z.string().regex(/^\d+(\.\d{2})?$/, 'Price must be a valid amount'),
-  location: z.string().min(1, 'Location is required'),
-  sportConfig: z.record(z.any()).optional(),
+const createEventFormSchema = insertEventSchema.omit({
+  hostId: true, // We'll add this in the submit handler
+  description: true, // Remove description requirement
+}).extend({
+  sportConfig: z.record(z.string(), z.any()),
+  startTime: z.string(),
+  endTime: z.string(),
+  maxPlayers: z.coerce.number().min(2).max(22),
+  pricePerPerson: z.string().min(1),
+  title: z.string().min(1, "Title is required"),
+  location: z.string().min(1, "Location is required"),
 });
 
 type CreateEventFormData = z.infer<typeof createEventFormSchema>;
 
 export default function CreateEventModal({ isOpen, onClose }: CreateEventModalProps) {
-  const { user, isAuthenticated } = useAuth();
+  const [selectedSport, setSelectedSport] = useState<string>('badminton');
+  const [locationCoords, setLocationCoords] = useState<{lat: string, lng: string} | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedSport, setSelectedSport] = useState<string>('badminton');
-  const [locationCoords, setLocationCoords] = useState<{ lat: string; lng: string } | null>(null);
+  const { user, isAuthenticated } = useAuth();
 
-  // Function to add one hour to a datetime string
-  const addOneHour = (dateString: string) => {
-    const date = new Date(fromLocalDateTimeString(dateString));
-    date.setHours(date.getHours() + 1);
-    return toLocalDateTimeString(date);
+  // Get user location for proximity-based search
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Geolocation not available:', error);
+        },
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+      );
+    }
+  }, []);
+
+  const handleLocationChange = (location: string, coordinates?: { lat: number; lng: number }) => {
+    form.setValue('location', location);
+    if (coordinates) {
+      setLocationCoords({ lat: coordinates.lat.toString(), lng: coordinates.lng.toString() });
+    }
   };
 
-  // Function to round time to nearest 5-minute interval
-  const roundToNearestFiveMinutes = (dateString: string) => {
-    const date = new Date(dateString);
-    const minutes = date.getMinutes();
-    const roundedMinutes = Math.round(minutes / 5) * 5;
-    date.setMinutes(roundedMinutes);
-    date.setSeconds(0);
-    date.setMilliseconds(0);
-    return toLocalDateTimeString(date);
-  };
+
 
   // Calculate default start time (tomorrow, rounded to nearest 5 minutes)
   const getDefaultStartTime = () => {
@@ -110,26 +105,23 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     },
   });
 
-  // Watch the selected sport to update config
-  const watchedSport = form.watch('sport');
-  const selectedSportData = SPORTS.find(s => s.id === (watchedSport || selectedSport));
-  const sportConfig = selectedSportData ? SPORT_CONFIGS[selectedSportData.id] : null;
-
   const createEventMutation = useMutation({
-    mutationFn: async (eventData: any) => {
-      const response = await apiRequest('POST', '/api/events', eventData);
+    mutationFn: async (data: any) => {
+      console.log('Sending data to API:', data);
+      const response = await apiRequest('POST', '/api/events', data);
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Event created successfully:', data);
       toast({
-        title: "Event Created!",
-        description: "Your event has been created successfully.",
+        title: "Event Created",
+        description: "Your event has been created successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
       queryClient.invalidateQueries({ queryKey: ['/api/my-events'] });
+      onClose();
       form.reset();
       setSelectedSport('badminton');
-      onClose();
     },
     onError: (error: any) => {
       console.error('Create event error:', error);
@@ -142,17 +134,75 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     },
   });
 
-  const handleLocationChange = async (location: string, coordinates?: { lat: number; lng: number }) => {
-    form.setValue('location', location);
-    if (coordinates) {
-      setLocationCoords({ lat: coordinates.lat.toString(), lng: coordinates.lng.toString() });
+  const selectedSportData = SPORTS.find(s => s.id === selectedSport);
+  const sportConfig = selectedSport ? SPORT_CONFIGS[selectedSport as keyof typeof SPORT_CONFIGS] : null;
+
+  const onSubmit = async (data: CreateEventFormData) => {
+    console.log('Form data submitted:', data);
+    
+    if (!isAuthenticated || !user || typeof user !== 'object' || !('id' in user)) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create an event",
+        variant: "destructive",
+      });
+      return;
     }
+
+    // Handle "Current Location" by reverse geocoding
+    let finalLocation = data.location;
+    if (data.location === 'Current Location' && locationCoords) {
+      try {
+        const response = await fetch(`/api/reverse-geocode?lat=${locationCoords.lat}&lng=${locationCoords.lng}`);
+        if (response.ok) {
+          const { address } = await response.json();
+          finalLocation = address;
+        } else {
+          // Fallback to coordinates if reverse geocoding fails
+          finalLocation = `${parseFloat(locationCoords.lat).toFixed(6)}, ${parseFloat(locationCoords.lng).toFixed(6)}`;
+        }
+      } catch (error) {
+        console.error('Error getting address:', error);
+        // Fallback to coordinates if reverse geocoding fails
+        finalLocation = `${parseFloat(locationCoords.lat).toFixed(6)}, ${parseFloat(locationCoords.lng).toFixed(6)}`;
+      }
+    }
+    
+    // Ensure proper data types and format
+    const eventData = {
+      ...data,
+      location: finalLocation,
+      hostId: String((user as any).id), // Add the required hostId field
+      maxPlayers: Number(data.maxPlayers),
+      startTime: fromLocalDateTimeString(data.startTime),
+      endTime: fromLocalDateTimeString(data.endTime),
+      sportConfig: data.sportConfig || {},
+      currentPlayers: 1, // Host counts as first player
+      description: '', // No description field
+      latitude: locationCoords?.lat || null,
+      longitude: locationCoords?.lng || null,
+    };
+    
+    console.log('Sending to API:', eventData);
+    createEventMutation.mutate(eventData as any);
   };
 
   const handleSportSelect = (sportId: string) => {
     setSelectedSport(sportId);
     form.setValue('sport', sportId as any);
+    // Reset sport config when changing sports
     form.setValue('sportConfig', {});
+  };
+
+  // Function to round time to nearest 5-minute interval
+  const roundToNearestFiveMinutes = (dateString: string) => {
+    const date = new Date(dateString);
+    const minutes = date.getMinutes();
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    date.setMinutes(roundedMinutes);
+    date.setSeconds(0);
+    date.setMilliseconds(0);
+    return toLocalDateTimeString(date);
   };
 
   // Handle start time change
@@ -162,51 +212,6 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     
     form.setValue('startTime', roundedStartTime);
     form.setValue('endTime', endTime);
-  };
-
-  const onSubmit = async (data: CreateEventFormData) => {
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to create an event.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    let finalLocation = data.location;
-    
-    // Use location coordinates for geocoding if available
-    if (locationCoords && locationCoords.lat && locationCoords.lng) {
-      try {
-        const response = await fetch(`/api/reverse-geocode?lat=${locationCoords.lat}&lng=${locationCoords.lng}`);
-        if (response.ok) {
-          const geocodeData = await response.json();
-          if (geocodeData.display_name) {
-            finalLocation = geocodeData.display_name;
-          }
-        }
-      } catch (error) {
-        console.error('Reverse geocoding failed:', error);
-      }
-    }
-    
-    const eventData = {
-      ...data,
-      location: finalLocation,
-      hostId: String((user as any).id),
-      maxPlayers: Number(data.maxPlayers),
-      startTime: fromLocalDateTimeString(data.startTime),
-      endTime: fromLocalDateTimeString(data.endTime),
-      sportConfig: data.sportConfig || {},
-      currentPlayers: 1,
-      description: '',
-      latitude: locationCoords?.lat || null,
-      longitude: locationCoords?.lng || null,
-    };
-    
-    console.log('Sending to API:', eventData);
-    createEventMutation.mutate(eventData as any);
   };
 
   return (
@@ -233,29 +238,29 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
           >
             {/* Sport Selection */}
             <div>
-              <Label className="text-sm font-medium mb-3 block">Choose Sport</Label>
+              <Label className="text-sm font-medium mb-3 block">Select Sport</Label>
               <div className="grid grid-cols-3 gap-3">
                 {SPORTS.map((sport) => (
                   <button
                     key={sport.id}
                     type="button"
                     onClick={() => handleSportSelect(sport.id)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      (watchedSport || selectedSport) === sport.id
-                        ? `border-${sport.color}-500 bg-${sport.color}-50`
+                    className={`flex flex-col items-center p-4 border-2 rounded-lg transition-colors ${
+                      selectedSport === sport.id
+                        ? `border-${sport.color} bg-${sport.color} bg-opacity-10`
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="text-center">
-                      <div className={`w-8 h-8 mx-auto mb-2 rounded-full bg-${sport.color}-500 flex items-center justify-center text-white font-bold`}>
-                        {sport.name.charAt(0)}
+                    <div className={`w-8 h-8 bg-${sport.color} rounded-full flex items-center justify-center mb-2`}>
+                      <div className="w-5 h-5 text-white">
+                        <div className="w-full h-full bg-current rounded-sm" />
                       </div>
-                      <span className={`text-sm font-medium ${
-                        (watchedSport || selectedSport) === sport.id ? `text-${sport.color}-700` : 'text-gray-600'
-                      }`}>
-                        {sport.name}
-                      </span>
                     </div>
+                    <span className={`text-sm font-medium ${
+                      selectedSport === sport.id ? `text-${sport.color}` : 'text-gray-600'
+                    }`}>
+                      {sport.name}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -275,6 +280,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 </FormItem>
               )}
             />
+
+
 
             {/* Sport-Specific Configuration */}
             {(watchedSport || selectedSport) && sportConfig && (
@@ -323,8 +330,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                       <Input
                         type="datetime-local"
                         value={field.value || ''}
-                        onChange={(e) => handleStartTimeChange(e.target.value)}
-                        step="300"
+                        onChange={(e) => field.onChange(e.target.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -373,6 +379,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 })()}
               </div>
             )}
+            </div>
 
             {/* Location */}
             <FormField
@@ -386,6 +393,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                       value={field.value}
                       onChange={handleLocationChange}
                       placeholder="Search for venue or address..."
+                      userLocation={userLocation}
                     />
                   </FormControl>
                   <FormMessage />
@@ -423,14 +431,15 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select skill level" />
+                          <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="beginner">Beginner</SelectItem>
-                        <SelectItem value="intermediate">Intermediate</SelectItem>
-                        <SelectItem value="advanced">Advanced</SelectItem>
-                        <SelectItem value="mixed">Mixed</SelectItem>
+                        {SKILL_LEVELS.map((level) => (
+                          <SelectItem key={level.value} value={level.value}>
+                            {level.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -446,13 +455,15 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select gender mix" />
+                          <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="mixed">Mixed</SelectItem>
-                        <SelectItem value="male-only">Male Only</SelectItem>
-                        <SelectItem value="female-only">Female Only</SelectItem>
+                        {GENDER_MIX.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -461,41 +472,52 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
               />
             </div>
 
-            {/* Price */}
+            {/* Cost */}
             <FormField
               control={form.control}
               name="pricePerPerson"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price per Person ($)</FormLabel>
+                  <FormLabel>Cost per Person</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="12.00"
-                      {...field}
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <Input
+                        placeholder="12.00"
+                        className="pl-8"
+                        {...field}
+                      />
+                    </div>
                   </FormControl>
+                  <p className="text-sm text-gray-500">
+                    This covers court rental split among players + 5% platform fee
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+
+
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex space-x-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
+                className="flex-1"
                 onClick={onClose}
-                disabled={createEventMutation.isPending}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                className="flex-1 bg-everest-blue hover:bg-blue-700"
                 disabled={createEventMutation.isPending}
-                className="bg-everest-blue hover:bg-blue-700"
+                onClick={(e) => {
+                  console.log('Submit button clicked');
+                  console.log('Form state:', form.formState);
+                  console.log('Form values:', form.getValues());
+                }}
               >
                 {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
               </Button>
