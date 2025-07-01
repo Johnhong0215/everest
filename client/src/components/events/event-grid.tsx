@@ -144,7 +144,7 @@ export default function EventGrid({
   });
 
   // Sort events by distance (closest first, then events without location data)
-  const events = rawEvents.sort((a, b) => {
+  const events = filteredEvents.sort((a, b) => {
     if (!userLocation) return 0; // No sorting if user location is not available
     
     const aHasLocation = a.latitude && a.longitude;
@@ -457,6 +457,7 @@ export default function EventGrid({
                     currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
                     userLocation={userLocation}
                     userBookingStatus={userBookingStatusMap[event.id] as 'requested' | 'accepted' | 'rejected' | 'cancelled' | null}
+                    isUserCreated={event.hostId === (user && typeof user === 'object' && 'id' in user ? (user as any).id : '')}
                   />
                 ))}
               </div>

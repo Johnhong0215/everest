@@ -16,9 +16,10 @@ interface EventCardProps {
   currentUserId?: string;
   userLocation?: { lat: number; lng: number } | null;
   userBookingStatus?: 'requested' | 'accepted' | 'rejected' | 'cancelled' | null;
+  isUserCreated?: boolean;
 }
 
-export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId, userLocation, userBookingStatus }: EventCardProps) {
+export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModify, currentUserId, userLocation, userBookingStatus, isUserCreated = false }: EventCardProps) {
   const sport = SPORTS.find(s => s.id === event.sport);
   const sportColor = sport?.color || 'sport-badminton';
   
@@ -49,7 +50,11 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
     : null;
 
   return (
-    <Card className="card-hover bg-white border border-gray-200">
+    <Card className={`card-hover border ${
+      isUserCreated 
+        ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100' 
+        : 'bg-white border-gray-200'
+    }`}>
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">

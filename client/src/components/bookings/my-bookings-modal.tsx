@@ -30,6 +30,7 @@ interface Earnings {
 
 export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBookingsModalProps) {
   const [activeTab, setActiveTab] = useState("hosting");
+  const [showActiveOnly, setShowActiveOnly] = useState(true);
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -57,10 +58,19 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
   });
 
   // Fetch joined bookings
-  const { data: joinedBookings = [], isLoading: bookingsLoading } = useQuery<BookingWithEventAndUser[]>({
+  const { data: allJoinedBookings = [], isLoading: bookingsLoading } = useQuery<BookingWithEventAndUser[]>({
     queryKey: ['/api/my-bookings'],
     enabled: isAuthenticated,
     retry: false,
+  });
+
+  // Filter bookings based on active/past toggle
+  const joinedBookings = allJoinedBookings.filter(booking => {
+    const eventDate = new Date(booking.event.startTime);
+    const now = new Date();
+    const isActive = eventDate >= now;
+    
+    return showActiveOnly ? isActive : !isActive;
   });
 
   // Fetch earnings
@@ -351,7 +361,31 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
             <Card>
               <CardContent className="p-0">
                 <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Your Bookings</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Your Bookings</h3>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setShowActiveOnly(true)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                          showActiveOnly
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Active ({allJoinedBookings.filter(b => new Date(b.event.startTime) >= new Date()).length})
+                      </button>
+                      <button
+                        onClick={() => setShowActiveOnly(false)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                          !showActiveOnly
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Past ({allJoinedBookings.filter(b => new Date(b.event.startTime) < new Date()).length})
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 {bookingsLoading ? (
                   <div className="p-6">
@@ -364,7 +398,15 @@ export default function MyBookingsModal({ isOpen, onClose, onOpenChat }: MyBooki
                 ) : joinedBookings.length === 0 ? (
                   <div className="p-6 text-center">
                     <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">You haven't joined any events yet.</p>
+                    <p className="text-gray-500">
+                      {showActiveOnly ? 'No active bookings found.' : 'No past bookings found.'}
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {showActiveOnly 
+                        ? 'Join some events to see your bookings here.' 
+                        : 'Your completed bookings will appear here.'
+                      }
+                    </p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
