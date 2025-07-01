@@ -42,7 +42,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit = '50',
         offset = '0',
         userLat,
-        userLng
+        userLng,
+        userTimezone
       } = req.query;
 
       const filters = {
@@ -58,6 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         offset: parseInt(offset as string),
         userLat: userLat ? parseFloat(userLat as string) : undefined,
         userLng: userLng ? parseFloat(userLng as string) : undefined,
+        userTimezone: userTimezone as string,
       };
 
       const events = await storage.getEvents(filters);

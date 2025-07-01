@@ -171,6 +171,7 @@ export class DatabaseStorage implements IStorage {
     offset?: number;
     userLat?: number;
     userLng?: number;
+    userTimezone?: string;
   }): Promise<EventWithHost[]> {
     // Build conditions
     const conditions = [eq(events.status, "published")];
@@ -180,40 +181,52 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.date) {
-      // Handle different date filter types
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Handle different date filter types with timezone awareness
+      const userTimezone = filters.userTimezone || 'UTC';
+      
+      // Get today in user's timezone
+      const getUserTimezoneDate = (offsetDays: number = 0) => {
+        const now = new Date();
+        // Create a date in the user's timezone
+        const userDate = new Date(now.toLocaleString("en-US", {timeZone: userTimezone}));
+        userDate.setDate(userDate.getDate() + offsetDays);
+        userDate.setHours(0, 0, 0, 0);
+        return userDate;
+      };
       
       let startDate: Date;
       let endDate: Date;
       
       if (filters.date === 'today') {
-        startDate = new Date(today);
-        endDate = new Date(today);
+        startDate = getUserTimezoneDate(0);
+        endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 1);
       } else if (filters.date === 'tomorrow') {
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() + 1);
+        startDate = getUserTimezoneDate(1);
         endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 1);
       } else if (filters.date === 'week') {
         // This week: from today to end of week (Sunday)
+        const today = getUserTimezoneDate(0);
         startDate = new Date(today);
         endDate = new Date(today);
         endDate.setDate(today.getDate() + (6 - today.getDay())); // End of week
         endDate.setHours(23, 59, 59, 999);
       } else if (filters.date === 'month') {
         // This month: from today to end of month
+        const today = getUserTimezoneDate(0);
         startDate = new Date(today);
         endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
         endDate.setHours(23, 59, 59, 999);
       } else {
         // Custom date format (YYYY-MM-DD)
-        const filterDate = new Date(filters.date + 'T00:00:00.000Z');
-        startDate = new Date(filterDate);
-        startDate.setUTCHours(0, 0, 0, 0);
-        endDate = new Date(filterDate);
-        endDate.setUTCHours(23, 59, 59, 999);
+        const filterDate = new Date(filters.date + 'T00:00:00.000');
+        // Interpret the custom date in user's timezone
+        const userTzDate = new Date(filterDate.toLocaleString("en-US", {timeZone: userTimezone}));
+        startDate = new Date(userTzDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(userTzDate);
+        endDate.setHours(23, 59, 59, 999);
       }
       
       conditions.push(

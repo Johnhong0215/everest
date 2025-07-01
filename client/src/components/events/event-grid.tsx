@@ -134,6 +134,9 @@ export default function EventGrid({
         params.append('userLng', userLocation.lng.toString());
       }
       
+      // Add user timezone for accurate date filtering
+      params.append('userTimezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+      
       const url = `/api/events${params.toString() ? `?${params.toString()}` : ''}`;
       return fetch(url).then(res => {
         if (!res.ok) throw new Error('Failed to fetch events');
