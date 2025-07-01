@@ -135,3 +135,52 @@ export const isDateInRange = (date: Date | string, startDate: Date, endDate: Dat
   
   return dateObj >= startOfDay && dateObj <= endOfDay;
 };
+
+/**
+ * Round minutes to nearest 5 minute interval
+ */
+export const roundToNearest5Minutes = (date: Date): Date => {
+  const roundedDate = new Date(date);
+  const minutes = roundedDate.getMinutes();
+  const roundedMinutes = Math.round(minutes / 5) * 5;
+  roundedDate.setMinutes(roundedMinutes, 0, 0); // Also clear seconds and milliseconds
+  return roundedDate;
+};
+
+/**
+ * Add one hour to a date
+ */
+export const addOneHour = (date: Date): Date => {
+  const newDate = new Date(date);
+  newDate.setHours(newDate.getHours() + 1);
+  return newDate;
+};
+
+/**
+ * Calculate duration between two dates in hours and minutes
+ */
+export const calculateDuration = (startDate: Date, endDate: Date): string => {
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+  
+  if (hours === 0) {
+    return `${minutes} min`;
+  } else if (minutes === 0) {
+    return `${hours}h`;
+  } else {
+    return `${hours}h ${minutes}m`;
+  }
+};
+
+/**
+ * Convert datetime-local string to rounded 5-minute intervals
+ */
+export const roundDateTimeStringTo5Minutes = (dateTimeString: string): string => {
+  if (!dateTimeString) return dateTimeString;
+  
+  const date = new Date(dateTimeString);
+  const roundedDate = roundToNearest5Minutes(date);
+  return toLocalDateTimeString(roundedDate);
+};

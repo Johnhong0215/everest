@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { insertEventSchema } from "@shared/schema";
 import { SPORTS, SPORT_CONFIGS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
-import { toLocalDateTimeString, fromLocalDateTimeString } from "@/lib/dateUtils";
+import { toLocalDateTimeString, fromLocalDateTimeString, roundToNearest5Minutes, addOneHour, calculateDuration, roundDateTimeStringTo5Minutes } from "@/lib/dateUtils";
 import { z } from "zod";
 
 interface CreateEventModalProps {
@@ -78,14 +78,76 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sport: 'badminton',
       skillLevel: 'intermediate',
       genderMix: 'mixed',
-      startTime: toLocalDateTimeString(new Date(Date.now() + 24 * 60 * 60 * 1000)),
-      endTime: toLocalDateTimeString(new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000)),
+      startTime: toLocalDateTimeString(roundToNearest5Minutes(new Date(Date.now() + 24 * 60 * 60 * 1000))),
+      endTime: toLocalDateTimeString(addOneHour(roundToNearest5Minutes(new Date(Date.now() + 24 * 60 * 60 * 1000)))),
       location: '',
       maxPlayers: 4,
       pricePerPerson: '12.00',
       sportConfig: {},
     },
   });
+
+  // Helper function to handle start time changes
+  const handleStartTimeChange = (newStartTime: string) => {
+    if (!newStartTime) return;
+    
+    // Round to nearest 5 minutes
+    const roundedStartTime = roundDateTimeStringTo5Minutes(newStartTime);
+    form.setValue('startTime', roundedStartTime);
+    
+    // Automatically set end time to 1 hour after start time
+    const startDate = new Date(roundedStartTime);
+    const endDate = addOneHour(startDate);
+    form.setValue('endTime', toLocalDateTimeString(endDate));
+  };
+
+  // Helper function to handle end time changes
+  const handleEndTimeChange = (newEndTime: string) => {
+    if (!newEndTime) return;
+    
+    // Round to nearest 5 minutes
+    const roundedEndTime = roundDateTimeStringTo5Minutes(newEndTime);
+    const startTime = form.getValues('startTime');
+    
+    if (startTime) {
+      const startDate = new Date(startTime);
+      const endDate = new Date(roundedEndTime);
+      
+      // Ensure end time is after start time
+      if (endDate <= startDate) {
+        // Set to 1 hour after start time if invalid
+        const newEndDate = addOneHour(startDate);
+        form.setValue('endTime', toLocalDateTimeString(newEndDate));
+        return;
+      }
+      
+      // Ensure end time is within 4 hours of start time
+      const maxEndDate = new Date(startDate.getTime() + 4 * 60 * 60 * 1000); // 4 hours
+      if (endDate > maxEndDate) {
+        form.setValue('endTime', toLocalDateTimeString(maxEndDate));
+        return;
+      }
+    }
+    
+    form.setValue('endTime', roundedEndTime);
+  };
+
+  // Calculate duration for display
+  const getDuration = () => {
+    const startTime = form.watch('startTime');
+    const endTime = form.watch('endTime');
+    
+    if (startTime && endTime) {
+      const startDate = new Date(startTime);
+      const endDate = new Date(endTime);
+      
+      if (endDate > startDate) {
+        return calculateDuration(startDate, endDate);
+      }
+    }
+    
+    return '';
+  };
 
   const createEventMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -247,75 +309,111 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
             {/* Sport-Specific Configuration */}
             {selectedSport && sportConfig && (
-              <div className={`bg-${selectedSportData?.color} bg-opacity-5 p-4 rounded-lg border border-${selectedSportData?.color} border-opacity-20`}>
-                <h3 className={`text-lg font-semibold text-${selectedSportData?.color} mb-4`}>
+              <div className={`bg-gray-50 p-4 rounded-lg border border-gray-200`}>
+                <h3 className={`text-lg font-semibold text-gray-800 mb-4`}>
                   {selectedSportData?.name} Settings
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   {Object.entries(sportConfig).map(([key, options]) => (
-                    <div key={key}>
-                      <Label className="text-sm font-medium mb-2 block capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </Label>
-                      <Select
-                        onValueChange={(value) => {
-                          const currentConfig = form.getValues('sportConfig') || {};
-                          form.setValue('sportConfig', { ...currentConfig, [key]: value });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={`Select ${key}`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(options as string[]).map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <FormField
+                      key={key}
+                      control={form.control}
+                      name={`sportConfig.${key}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium capitalize">
+                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                          </FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              const currentConfig = form.getValues('sportConfig') || {};
+                              form.setValue('sportConfig', { ...currentConfig, [key]: value });
+                              field.onChange(value);
+                            }}
+                            value={field.value || ''}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={`Select ${key}`} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {(options as string[]).map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   ))}
                 </div>
               </div>
             )}
 
             {/* Date & Time */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="startTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Start Date & Time</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="datetime-local"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Date & Time</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="datetime-local"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date & Time</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="datetime-local"
+                          step="300" // 5 minute intervals
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            handleStartTimeChange(e.target.value);
+                          }}
+                          min={toLocalDateTimeString(new Date())} // Prevent past dates
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date & Time</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="datetime-local"
+                          step="300" // 5 minute intervals
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            handleEndTimeChange(e.target.value);
+                          }}
+                          min={form.watch('startTime') || toLocalDateTimeString(new Date())} // Must be after start time
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              {/* Duration Display */}
+              {getDuration() && (
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    </div>
+                    <span className="text-sm font-medium text-blue-800">
+                      Event Duration: {getDuration()}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Location */}
