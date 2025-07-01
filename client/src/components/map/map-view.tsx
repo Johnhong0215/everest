@@ -230,8 +230,10 @@ export default function MapView({ events, userLocation, onEventClick }: MapViewP
       <MapContainer
         center={mapCenter}
         zoom={userLocation ? 12 : 6}
-        className="h-full w-full"
+        className="h-full w-full z-0"
         scrollWheelZoom={true}
+        zoomControl={true}
+        style={{ zIndex: 0 }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
