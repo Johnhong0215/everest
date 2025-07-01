@@ -445,7 +445,6 @@ export default function EventGrid({
             ) : (viewMode as string) === 'map' ? (
               <MapView
                 events={events}
-                userLocation={userLocation}
                 onJoin={handleJoinEvent}
                 onOpenChat={onOpenChat}
                 onCancel={handleCancelEvent}
