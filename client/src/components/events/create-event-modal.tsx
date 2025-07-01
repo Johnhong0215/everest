@@ -115,9 +115,13 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       
       // Ensure end time is after start time
       if (endDate <= startDate) {
-        // Set to 1 hour after start time if invalid
         const newEndDate = addOneHour(startDate);
         form.setValue('endTime', toLocalDateTimeString(newEndDate));
+        toast({
+          title: "Invalid End Time",
+          description: "End time must be after start time. Set to 1 hour after start time.",
+          variant: "destructive",
+        });
         return;
       }
       
@@ -125,6 +129,11 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       const maxEndDate = new Date(startDate.getTime() + 4 * 60 * 60 * 1000); // 4 hours
       if (endDate > maxEndDate) {
         form.setValue('endTime', toLocalDateTimeString(maxEndDate));
+        toast({
+          title: "Invalid End Time",
+          description: "End time cannot be more than 4 hours after start time. Set to maximum 4 hours.",
+          variant: "destructive",
+        });
         return;
       }
     }
@@ -314,42 +323,36 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                   {selectedSportData?.name} Settings
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(sportConfig).map(([key, options]) => (
-                    <FormField
-                      key={key}
-                      control={form.control}
-                      name={`sportConfig.${key}` as any}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium capitalize">
-                            {key.replace(/([A-Z])/g, ' $1').trim()}
-                          </FormLabel>
-                          <Select 
-                            onValueChange={(value) => {
-                              const currentConfig = form.getValues('sportConfig') || {};
-                              form.setValue('sportConfig', { ...currentConfig, [key]: value });
-                              field.onChange(value);
-                            }}
-                            value={field.value || ''}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={`Select ${key}`} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {(options as string[]).map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ))}
+                  {Object.entries(sportConfig).map(([key, options]) => {
+                    const currentConfig = form.watch('sportConfig') || {};
+                    const currentValue = currentConfig[key] || '';
+                    
+                    return (
+                      <div key={key}>
+                        <Label className="text-sm font-medium mb-2 block capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </Label>
+                        <Select
+                          value={currentValue}
+                          onValueChange={(value) => {
+                            const updatedConfig = { ...currentConfig, [key]: value };
+                            form.setValue('sportConfig', updatedConfig);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={`Select ${key}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(options as string[]).map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
