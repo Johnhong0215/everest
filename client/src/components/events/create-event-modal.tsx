@@ -362,30 +362,28 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                         <Label className="text-sm font-medium mb-2 block capitalize">
                           {key.replace(/([A-Z])/g, ' $1').trim()}
                         </Label>
-                        <Select
+                        <select
                           value={currentValue}
-                          onValueChange={(value) => {
+                          onChange={(e) => {
+                            const value = e.target.value;
                             console.log(`Setting ${key} to ${value}`);
                             const updatedConfig = { ...currentConfig, [key]: value };
                             form.setValue('sportConfig', updatedConfig);
                           }}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder={`Choose ${key.replace(/([A-Z])/g, ' $1').trim()}`} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.isArray(options) ? options.map((option, index) => {
-                              console.log(`Rendering option ${index}:`, option);
-                              return (
-                                <SelectItem key={`${key}-${option}-${index}`} value={option}>
-                                  {option}
-                                </SelectItem>
-                              );
-                            }) : (
-                              <SelectItem value="" disabled>No options available (not array: {typeof options})</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                          <option value="">Choose {key.replace(/([A-Z])/g, ' $1').trim()}</option>
+                          {Array.isArray(options) ? options.map((option, index) => {
+                            console.log(`Rendering option ${index}:`, option);
+                            return (
+                              <option key={`${key}-${option}-${index}`} value={option}>
+                                {option}
+                              </option>
+                            );
+                          }) : (
+                            <option value="" disabled>No options available (not array: {typeof options})</option>
+                          )}
+                        </select>
                       </div>
                     );
                   })}
