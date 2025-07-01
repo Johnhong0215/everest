@@ -380,14 +380,38 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <FormItem>
                       <FormLabel>Start Date & Time</FormLabel>
                       <FormControl>
-                        <Input
-                          type="datetime-local"
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            handleStartTimeChange(e.target.value);
-                          }}
-                          min={toLocalDateTimeString(new Date())} // Prevent past dates
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="date"
+                            value={field.value ? field.value.split('T')[0] : ''}
+                            onChange={(e) => {
+                              const date = e.target.value;
+                              const time = field.value ? field.value.split('T')[1] : '14:00';
+                              handleStartTimeChange(`${date}T${time}`);
+                            }}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="flex-1"
+                          />
+                          <select
+                            value={field.value ? field.value.split('T')[1] : '14:00'}
+                            onChange={(e) => {
+                              const date = field.value ? field.value.split('T')[0] : new Date().toISOString().split('T')[0];
+                              handleStartTimeChange(`${date}T${e.target.value}`);
+                            }}
+                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {Array.from({ length: 288 }, (_, i) => {
+                              const hours = Math.floor(i / 12);
+                              const minutes = (i % 12) * 5;
+                              const time = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              return (
+                                <option key={time} value={time}>
+                                  {time}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -400,14 +424,38 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                     <FormItem>
                       <FormLabel>End Date & Time</FormLabel>
                       <FormControl>
-                        <Input
-                          type="datetime-local"
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            handleEndTimeChange(e.target.value);
-                          }}
-                          min={form.watch('startTime') || toLocalDateTimeString(new Date())} // Must be after start time
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="date"
+                            value={field.value ? field.value.split('T')[0] : ''}
+                            onChange={(e) => {
+                              const date = e.target.value;
+                              const time = field.value ? field.value.split('T')[1] : '15:00';
+                              handleEndTimeChange(`${date}T${time}`);
+                            }}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="flex-1"
+                          />
+                          <select
+                            value={field.value ? field.value.split('T')[1] : '15:00'}
+                            onChange={(e) => {
+                              const date = field.value ? field.value.split('T')[0] : new Date().toISOString().split('T')[0];
+                              handleEndTimeChange(`${date}T${e.target.value}`);
+                            }}
+                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {Array.from({ length: 288 }, (_, i) => {
+                              const hours = Math.floor(i / 12);
+                              const minutes = (i % 12) * 5;
+                              const time = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              return (
+                                <option key={time} value={time}>
+                                  {time}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
