@@ -507,9 +507,16 @@ export default function EventGrid({
                       <h2 className="text-lg font-semibold">Filter Events</h2>
                       <p className="text-sm text-gray-600">Find the perfect game for you</p>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      Mobile filtering coming soon
-                    </div>
+                    <Sidebar
+                      appliedFilters={appliedFilters}
+                      pendingFilters={pendingFilters}
+                      onImmediateFilterChange={onImmediateFilterChange}
+                      onPendingFilterChange={onPendingFilterChange}
+                      onApplyFilters={onApplyFilters}
+                      onRemoveFilters={onRemoveFilters}
+                      hasPendingChanges={hasPendingChanges}
+                      className="border-0 shadow-none"
+                    />
                   </div>
                 </SheetContent>
               </Sheet>

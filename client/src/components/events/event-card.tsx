@@ -76,9 +76,14 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
           </div>
         </div>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-          {event.title}
-        </h3>
+        <div className="mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+            {event.title}
+          </h3>
+          {isUserCreated && (
+            <span className="text-xs text-blue-600 font-medium">Created by me</span>
+          )}
+        </div>
 
         <div className="space-y-2 mb-4">
           <div className="flex items-center space-x-2 text-sm text-gray-600">
