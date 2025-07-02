@@ -398,6 +398,12 @@ export default function EventGrid({
                 onEventClick={(event) => {
                   console.log('Event clicked:', event);
                 }}
+                onJoin={handleJoinEvent}
+                onOpenChat={onOpenChat}
+                onCancel={handleCancelEvent}
+                onModify={handleModifyEvent}
+                currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
+                userBookingStatusMap={userBookingStatusMap}
               />
             ) : (
               <div className="h-full flex items-center justify-center">

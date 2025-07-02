@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon, LatLngBounds, divIcon } from 'leaflet';
 import { EventWithHost } from '@shared/schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, MapPin, Users, DollarSign } from 'lucide-react';
-import { formatDateForDisplay } from '@/lib/dateUtils';
+import { Calendar, MapPin, Users, DollarSign, Clock, Trophy } from 'lucide-react';
+import { formatDateForDisplay, calculateDuration } from '@/lib/dateUtils';
 import { SPORTS } from '@/lib/constants';
 import 'leaflet/dist/leaflet.css';
 
@@ -22,6 +22,12 @@ interface MapViewProps {
   events: EventWithHost[];
   userLocation?: { lat: number; lng: number } | null;
   onEventClick?: (event: EventWithHost) => void;
+  onJoin?: (eventId: number) => void;
+  onOpenChat?: (eventId: number, receiverId?: string) => void;
+  onCancel?: (eventId: number) => void;
+  onModify?: (eventId: number) => void;
+  currentUserId?: string;
+  userBookingStatusMap?: Record<number, string>;
 }
 
 interface EventCluster {
@@ -73,6 +79,36 @@ function createClusterIcon(count: number) {
   });
 }
 
+// Helper functions for event status and actions
+function getEventStatus(event: EventWithHost) {
+  const now = new Date();
+  const eventStart = new Date(event.startTime);
+  const eventEnd = new Date(event.endTime);
+
+  if (event.status === 'cancelled') return 'cancelled';
+  if (now > eventEnd) return 'completed';
+  if (now >= eventStart && now <= eventEnd) return 'active';
+  return 'upcoming';
+}
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case 'completed': return 'bg-gray-500 text-white';
+    case 'active': return 'bg-green-500 text-white';
+    case 'cancelled': return 'bg-red-500 text-white';
+    default: return 'bg-blue-500 text-white';
+  }
+}
+
+function getStatusText(status: string) {
+  switch (status) {
+    case 'completed': return 'Completed';
+    case 'active': return 'Live';
+    case 'cancelled': return 'Cancelled';
+    default: return 'Upcoming';
+  }
+}
+
 // Create single event icon based on sport
 function createEventIcon(sport: string) {
   const sportConfig = SPORTS.find(s => s.id === sport);
@@ -90,7 +126,205 @@ function createEventIcon(sport: string) {
   });
 }
 
-export default function MapView({ events, userLocation, onEventClick }: MapViewProps) {
+export default function MapView({ 
+  events, 
+  userLocation, 
+  onEventClick, 
+  onJoin, 
+  onOpenChat, 
+  onCancel, 
+  onModify, 
+  currentUserId,
+  userBookingStatusMap = {}
+}: MapViewProps) {
+  const [detailViewEvent, setDetailViewEvent] = useState<EventWithHost | null>(null);
+
+  // Event action handlers
+  const handleViewDetails = (event: EventWithHost) => {
+    setDetailViewEvent(event);
+  };
+
+  const handleBackToSummary = () => {
+    setDetailViewEvent(null);
+  };
+
+  // Render detailed event view
+  const renderDetailedEventView = (event: EventWithHost) => {
+    const sport = SPORTS.find(s => s.id === event.sport);
+    const sportColor = sport?.color || 'sport-badminton';
+    const currentPlayers = event.currentPlayers || 0;
+    const isEventFull = currentPlayers >= event.maxPlayers;
+    const spotsRemaining = event.maxPlayers - currentPlayers;
+    const isHost = currentUserId === event.hostId;
+    const userBookingStatus = userBookingStatusMap[event.id];
+
+    return (
+      <div className="w-full max-w-md">
+        <div className="p-4">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <h3 className="font-bold text-lg text-gray-900 leading-tight mb-1">
+                {event.title}
+              </h3>
+              <p className="text-sm text-gray-600">
+                by {event.host.firstName || event.host.email}
+              </p>
+            </div>
+            <Badge className={getStatusColor(getEventStatus(event))}>
+              {getStatusText(getEventStatus(event))}
+            </Badge>
+          </div>
+
+          {/* Event Details */}
+          <div className="space-y-3 mb-4">
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <span>{formatDateForDisplay(event.startTime)}</span>
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-gray-500" />
+              <span>{calculateDuration(new Date(event.startTime), new Date(event.endTime))}</span>
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-gray-500" />
+              <span className="line-clamp-2">{event.location}</span>
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm">
+              <Users className="w-4 h-4 text-gray-500" />
+              <span>{currentPlayers} / {event.maxPlayers} players</span>
+              {spotsRemaining > 0 && (
+                <span className="text-green-600 font-medium">
+                  ({spotsRemaining} spots left)
+                </span>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm">
+              <Trophy className="w-4 h-4 text-gray-500" />
+              <span className="capitalize">{event.skillLevel}</span>
+            </div>
+            
+            {parseFloat(event.pricePerPerson) > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <DollarSign className="w-4 h-4 text-gray-500" />
+                <span>${event.pricePerPerson} per person</span>
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          {event.description && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {event.description}
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            {isHost ? (
+              <>
+                <Button 
+                  onClick={() => onModify?.(event.id)}
+                  variant="outline"
+                  className="flex-1"
+                  size="sm"
+                >
+                  Modify
+                </Button>
+                <Button 
+                  onClick={() => onCancel?.(event.id)}
+                  variant="destructive"
+                  className="flex-1"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                {(() => {
+                  // Event is full
+                  if (isEventFull) {
+                    return (
+                      <Button disabled className="flex-1" size="sm">
+                        Event Full
+                      </Button>
+                    );
+                  }
+                  
+                  // User has different booking statuses
+                  switch (userBookingStatus) {
+                    case 'requested':
+                      return (
+                        <Button disabled className="flex-1 bg-yellow-500" size="sm">
+                          Request Sent
+                        </Button>
+                      );
+                    case 'accepted':
+                      return (
+                        <Button disabled className="flex-1 bg-green-600" size="sm">
+                          Accepted
+                        </Button>
+                      );
+                    case 'rejected':
+                      return (
+                        <Button disabled className="flex-1 bg-red-600" size="sm">
+                          Rejected
+                        </Button>
+                      );
+                    case 'cancelled':
+                      return (
+                        <Button disabled className="flex-1 bg-gray-500" size="sm">
+                          Cancelled
+                        </Button>
+                      );
+                    default:
+                      // User can join
+                      return (
+                        <Button 
+                          onClick={() => onJoin?.(event.id)}
+                          className="flex-1 bg-everest-blue hover:bg-blue-700"
+                          size="sm"
+                        >
+                          Join & Pay
+                        </Button>
+                      );
+                  }
+                })()}
+                
+                {onOpenChat && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => onOpenChat(event.id, event.hostId)}
+                    className="px-3"
+                  >
+                    Chat
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Back Button */}
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={handleBackToSummary}
+            className="w-full mt-3 text-gray-600"
+          >
+            ← Back to summary
+          </Button>
+        </div>
+      </div>
+    );
+  };
   // Group events by location (within ~100m radius)
   const eventClusters = useMemo(() => {
     const clusters: EventCluster[] = [];
@@ -218,7 +452,7 @@ export default function MapView({ events, userLocation, onEventClick }: MapViewP
         
         .leaflet-popup-content {
           margin: 0;
-          width: 280px !important;
+          width: 320px !important;
         }
         
         .custom-div-icon {
@@ -277,103 +511,111 @@ export default function MapView({ events, userLocation, onEventClick }: MapViewP
             <Popup>
               <div className="p-0">
                 {cluster.count === 1 ? (
-                  // Single event popup
-                  <div className="w-full">
-                    <div className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-lg text-gray-900 leading-tight">
-                            {cluster.events[0].title}
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            by {cluster.events[0].host.firstName || cluster.events[0].host.email}
-                          </p>
-                        </div>
-                        <Badge className={getStatusColor(getEventStatus(cluster.events[0]))}>
-                          {getStatusText(getEventStatus(cluster.events[0]))}
-                        </Badge>
-                      </div>
-                      
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          {formatDateForDisplay(cluster.events[0].startTime)}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <MapPin className="w-4 h-4" />
-                          {cluster.events[0].location}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Users className="w-4 h-4" />
-                          {(cluster.events[0].bookings?.filter(b => b.status === 'accepted').length || 0) + 1} / {cluster.events[0].maxPlayers} players
-                        </div>
-                        
-                        {(cluster.events[0].pricePerPerson || 0) > 0 && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <DollarSign className="w-4 h-4" />
-                            ${cluster.events[0].pricePerPerson} per person
+                  // Single event popup with conditional detailed view
+                  detailViewEvent && detailViewEvent.id === cluster.events[0].id ? (
+                    renderDetailedEventView(detailViewEvent)
+                  ) : (
+                    <div className="w-full">
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="font-semibold text-lg text-gray-900 leading-tight">
+                              {cluster.events[0].title}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              by {cluster.events[0].host.firstName || cluster.events[0].host.email}
+                            </p>
                           </div>
-                        )}
+                          <Badge className={getStatusColor(getEventStatus(cluster.events[0]))}>
+                            {getStatusText(getEventStatus(cluster.events[0]))}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="w-4 h-4" />
+                            {formatDateForDisplay(cluster.events[0].startTime)}
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <MapPin className="w-4 h-4" />
+                            {cluster.events[0].location}
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Users className="w-4 h-4" />
+                            {(cluster.events[0].bookings?.filter(b => b.status === 'accepted').length || 0) + 1} / {cluster.events[0].maxPlayers} players
+                          </div>
+                          
+                          {parseFloat(cluster.events[0].pricePerPerson || '0') > 0 && (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <DollarSign className="w-4 h-4" />
+                              ${cluster.events[0].pricePerPerson} per person
+                            </div>
+                          )}
+                        </div>
+                        
+                        <Button 
+                          className="w-full" 
+                          size="sm"
+                          onClick={() => handleViewDetails(cluster.events[0])}
+                        >
+                          View Details
+                        </Button>
                       </div>
-                      
-                      <Button 
-                        className="w-full" 
-                        size="sm"
-                        onClick={() => onEventClick?.(cluster.events[0])}
-                      >
-                        View Details
-                      </Button>
                     </div>
-                  </div>
+                  )
                 ) : (
-                  // Multiple events popup
-                  <div className="w-full">
-                    <div className="p-4">
-                      <h3 className="font-semibold text-lg text-gray-900 mb-3">
-                        {cluster.count} Events at this location
-                      </h3>
-                      
-                      <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {cluster.events.map((event) => (
-                          <Card key={event.id} className="border border-gray-200">
-                            <CardContent className="p-3">
-                              <div className="flex items-start justify-between mb-2">
-                                <h4 className="font-medium text-sm text-gray-900 leading-tight">
-                                  {event.title}
-                                </h4>
-                                <Badge className={`${getStatusColor(getEventStatus(event))} text-xs`}>
-                                  {getStatusText(getEventStatus(event))}
-                                </Badge>
-                              </div>
-                              
-                              <div className="space-y-1 mb-3">
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
-                                  <Calendar className="w-3 h-3" />
-                                  {formatDateForDisplay(event.startTime)}
+                  // Multiple events popup with detailed view support
+                  detailViewEvent && cluster.events.some(e => e.id === detailViewEvent.id) ? (
+                    renderDetailedEventView(detailViewEvent)
+                  ) : (
+                    <div className="w-full">
+                      <div className="p-4">
+                        <h3 className="font-semibold text-lg text-gray-900 mb-3">
+                          {cluster.count} Events at this location
+                        </h3>
+                        
+                        <div className="space-y-3 max-h-60 overflow-y-auto">
+                          {cluster.events.map((event) => (
+                            <Card key={event.id} className="border border-gray-200">
+                              <CardContent className="p-3">
+                                <div className="flex items-start justify-between mb-2">
+                                  <h4 className="font-medium text-sm text-gray-900 leading-tight">
+                                    {event.title}
+                                  </h4>
+                                  <Badge className={`${getStatusColor(getEventStatus(event))} text-xs`}>
+                                    {getStatusText(getEventStatus(event))}
+                                  </Badge>
                                 </div>
                                 
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
-                                  <Users className="w-3 h-3" />
-                                  {(event.bookings?.filter(b => b.status === 'accepted').length || 0) + 1} / {event.maxPlayers}
+                                <div className="space-y-1 mb-3">
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <Calendar className="w-3 h-3" />
+                                    {formatDateForDisplay(event.startTime)}
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <Users className="w-3 h-3" />
+                                    {(event.bookings?.filter(b => b.status === 'accepted').length || 0) + 1} / {event.maxPlayers}
+                                  </div>
                                 </div>
-                              </div>
-                              
-                              <Button 
-                                className="w-full" 
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onEventClick?.(event)}
-                              >
-                                View Details
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))}
+                                
+                                <Button 
+                                  className="w-full" 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleViewDetails(event)}
+                                >
+                                  View Details
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )
                 )}
               </div>
             </Popup>
