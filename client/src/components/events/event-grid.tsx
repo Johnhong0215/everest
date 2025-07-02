@@ -45,6 +45,7 @@ export default function EventGrid({
   const [editingEvent, setEditingEvent] = useState<EventWithHost | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
@@ -61,32 +62,74 @@ export default function EventGrid({
   const requestLocation = () => {
     console.log('Requesting location permission...');
     setLocationPermission('prompt'); // Reset to prompt state
+    setLocationLoading(true);
     
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('Location permission granted:', position);
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setLocationPermission('granted');
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          if (error.code === error.PERMISSION_DENIED) {
-            setLocationPermission('denied');
-          } else {
-            // For timeout or position unavailable, keep as denied but allow retry
-            setLocationPermission('denied');
-          }
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // Increased timeout, no cache
-      );
-    } else {
-      console.error('Geolocation not available');
+    if (!('geolocation' in navigator)) {
+      console.error('Geolocation not supported by this browser');
       setLocationPermission('denied');
+      setLocationLoading(false);
+      toast({
+        title: "Location Not Supported",
+        description: "Your browser doesn't support location services.",
+        variant: "destructive",
+      });
+      return;
     }
+
+    // Check if the page is served over HTTPS (required for geolocation in modern browsers)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      console.error('Geolocation requires HTTPS');
+      setLocationPermission('denied');
+      setLocationLoading(false);
+      toast({
+        title: "HTTPS Required",
+        description: "Location services require a secure connection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Requesting geolocation...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('Location permission granted:', position);
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setLocationPermission('granted');
+        setLocationLoading(false);
+        toast({
+          title: "Location Enabled",
+          description: "Your location has been enabled for distance calculations.",
+        });
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let errorMessage = "Unable to get your location.";
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location access denied. Please allow location permissions in your browser.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out. Please try again.";
+            break;
+        }
+        
+        setLocationPermission('denied');
+        setLocationLoading(false);
+        toast({
+          title: "Location Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // Increased timeout, no cache
+    );
   };
 
   // Calculate distance between two coordinates using Haversine formula
@@ -301,10 +344,11 @@ export default function EventGrid({
               onClick={requestLocation}
               variant="outline"
               size="sm"
+              disabled={locationLoading}
               className="flex-shrink-0"
             >
-              <Navigation className="w-4 h-4 mr-2" />
-              Enable Location
+              <Navigation className={`w-4 h-4 mr-2 ${locationLoading ? 'animate-spin' : ''}`} />
+              {locationLoading ? 'Getting Location...' : 'Enable Location'}
             </Button>
           </div>
         </div>

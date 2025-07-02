@@ -49,23 +49,50 @@ export default function LocationSearch({
 
   // Get user's current location
   const getCurrentLocation = () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setCurrentUserLocation(coords);
-          onChange('Current Location', coords);
-          setIsOpen(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      );
+    if (!('geolocation' in navigator)) {
+      console.error('Geolocation not supported by this browser');
+      return;
     }
+
+    // Check if the page is served over HTTPS (required for geolocation in modern browsers)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      console.error('Geolocation requires HTTPS');
+      return;
+    }
+
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setCurrentUserLocation(coords);
+        onChange('Current Location', coords);
+        setIsOpen(false);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        setLoading(false);
+        
+        // Provide feedback to user based on error type
+        let errorMessage = "Unable to get location";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location access denied";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location unavailable";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out";
+            break;
+        }
+        console.warn(errorMessage);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   // Search for locations using server-side proxy
@@ -246,10 +273,11 @@ export default function LocationSearch({
             variant="ghost"
             size="sm"
             onClick={getCurrentLocation}
+            disabled={loading}
             className="h-8 w-8 p-0 hover:bg-gray-100"
             title="Use current location"
           >
-            <Navigation className="w-4 h-4" />
+            <Navigation className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
