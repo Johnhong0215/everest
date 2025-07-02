@@ -183,12 +183,47 @@ export class DatabaseStorage implements IStorage {
     if (filters?.date) {
       const userTimezone = filters.userTimezone || 'UTC';
       
-      // Get user's current date in their timezone
+      // Get user's current date in their timezone (simplest approach)
       const getUserDate = (offsetDays: number = 0) => {
-        const now = new Date();
-        const userDate = new Date(now.toLocaleString("en-CA", {timeZone: userTimezone})); // en-CA gives YYYY-MM-DD format
-        userDate.setDate(userDate.getDate() + offsetDays);
-        return userDate.toISOString().split('T')[0]; // Return YYYY-MM-DD string
+        try {
+          const now = new Date();
+          console.log(`Getting user date with timezone: ${userTimezone}, offset: ${offsetDays}`);
+          
+          // Use Intl API to get the date in user's timezone
+          const options: Intl.DateTimeFormatOptions = {
+            timeZone: userTimezone,
+            year: 'numeric',
+            month: '2-digit', 
+            day: '2-digit'
+          };
+          
+          const formatter = new Intl.DateTimeFormat('en-CA', options);
+          const dateStr = formatter.format(now); // This gives YYYY-MM-DD directly
+          console.log(`Base date in ${userTimezone}: ${dateStr}`);
+          
+          // If we need to add offset days, parse and adjust
+          if (offsetDays === 0) {
+            return dateStr;
+          }
+          
+          const [year, month, day] = dateStr.split('-').map(Number);
+          const date = new Date(year, month - 1, day);
+          date.setDate(date.getDate() + offsetDays);
+          
+          const resultYear = date.getFullYear();
+          const resultMonth = String(date.getMonth() + 1).padStart(2, '0');
+          const resultDay = String(date.getDate()).padStart(2, '0');
+          const result = `${resultYear}-${resultMonth}-${resultDay}`;
+          
+          console.log(`Final date with offset ${offsetDays}: ${result}`);
+          return result;
+        } catch (error) {
+          console.error('Error in getUserDate:', error);
+          // Fallback to simple UTC date
+          const fallbackDate = new Date();
+          fallbackDate.setDate(fallbackDate.getDate() + offsetDays);
+          return fallbackDate.toISOString().split('T')[0];
+        }
       };
       
       let targetDateStr: string;
