@@ -51,11 +51,32 @@ export default function EventGrid({
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  // Check if geolocation is available on component mount
+  // Check for saved location and geolocation availability on component mount
   useEffect(() => {
     if (!('geolocation' in navigator)) {
       console.log('Geolocation not available:', navigator);
       setLocationPermission('denied');
+      return;
+    }
+
+    // Check for saved location data in localStorage
+    try {
+      const savedLocation = localStorage.getItem('userLocation');
+      const savedPermission = localStorage.getItem('locationPermission');
+      
+      if (savedLocation && savedPermission === 'granted') {
+        const location = JSON.parse(savedLocation);
+        if (location.lat && location.lng) {
+          setUserLocation(location);
+          setLocationPermission('granted');
+          console.log('Restored saved location:', location);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to restore saved location:', error);
+      // Clear invalid data
+      localStorage.removeItem('userLocation');
+      localStorage.removeItem('locationPermission');
     }
   }, []);
 
@@ -96,12 +117,23 @@ export default function EventGrid({
       navigator.geolocation.getCurrentPosition(
         (position) => {
           console.log('Quick location success:', position);
-          setUserLocation({
+          const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setUserLocation(location);
           setLocationPermission('granted');
           setLocationLoading(false);
+          
+          // Save to localStorage for persistence
+          try {
+            localStorage.setItem('userLocation', JSON.stringify(location));
+            localStorage.setItem('locationPermission', 'granted');
+            console.log('Saved location to localStorage');
+          } catch (error) {
+            console.warn('Failed to save location to localStorage:', error);
+          }
+          
           toast({
             title: "Location Enabled",
             description: "Your location has been enabled for distance calculations.",
@@ -121,12 +153,23 @@ export default function EventGrid({
       navigator.geolocation.getCurrentPosition(
         (position) => {
           console.log('Backup location success:', position);
-          setUserLocation({
+          const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setUserLocation(location);
           setLocationPermission('granted');
           setLocationLoading(false);
+          
+          // Save to localStorage for persistence
+          try {
+            localStorage.setItem('userLocation', JSON.stringify(location));
+            localStorage.setItem('locationPermission', 'granted');
+            console.log('Saved location to localStorage');
+          } catch (error) {
+            console.warn('Failed to save location to localStorage:', error);
+          }
+          
           toast({
             title: "Location Enabled",
             description: "Your location has been enabled for distance calculations.",
@@ -150,6 +193,15 @@ export default function EventGrid({
           
           setLocationPermission('denied');
           setLocationLoading(false);
+          
+          // Clear saved location data when denied
+          try {
+            localStorage.removeItem('userLocation');
+            localStorage.removeItem('locationPermission');
+          } catch (error) {
+            console.warn('Failed to clear location data:', error);
+          }
+          
           toast({
             title: "Location Error",
             description: errorMessage,

@@ -34,6 +34,23 @@ export default function LocationSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
 
+  // Check for saved location data on component mount
+  useEffect(() => {
+    try {
+      const savedLocation = localStorage.getItem('userLocation');
+      const savedPermission = localStorage.getItem('locationPermission');
+      
+      if (savedLocation && savedPermission === 'granted') {
+        const location = JSON.parse(savedLocation);
+        if (location.lat && location.lng) {
+          setCurrentUserLocation(location);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to restore saved location in search:', error);
+    }
+  }, []);
+
   // Calculate distance between two coordinates
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 3959; // Earth's radius in miles
@@ -74,6 +91,14 @@ export default function LocationSearch({
           onChange('Current Location', coords);
           setIsOpen(false);
           setLoading(false);
+          
+          // Save to localStorage for persistence
+          try {
+            localStorage.setItem('userLocation', JSON.stringify(coords));
+            localStorage.setItem('locationPermission', 'granted');
+          } catch (error) {
+            console.warn('Failed to save location to localStorage:', error);
+          }
         },
         (error) => {
           console.log('Quick location failed, trying backup...', error);
@@ -95,6 +120,14 @@ export default function LocationSearch({
           onChange('Current Location', coords);
           setIsOpen(false);
           setLoading(false);
+          
+          // Save to localStorage for persistence
+          try {
+            localStorage.setItem('userLocation', JSON.stringify(coords));
+            localStorage.setItem('locationPermission', 'granted');
+          } catch (error) {
+            console.warn('Failed to save location to localStorage:', error);
+          }
         },
         (error) => {
           console.error('All location attempts failed:', error);
