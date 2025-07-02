@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon, LatLngBounds, divIcon } from 'leaflet';
 import { EventWithHost } from '@shared/schema';
@@ -138,13 +138,18 @@ export default function MapView({
   userBookingStatusMap = {}
 }: MapViewProps) {
   const [detailViewEvent, setDetailViewEvent] = useState<EventWithHost | null>(null);
+  const popupRefs = useRef<Map<string, any>>(new Map());
 
   // Event action handlers
-  const handleViewDetails = (event: EventWithHost) => {
+  const handleViewDetails = (event: EventWithHost, e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setDetailViewEvent(event);
   };
 
-  const handleBackToSummary = () => {
+  const handleBackToSummary = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setDetailViewEvent(null);
   };
 
@@ -316,7 +321,7 @@ export default function MapView({
           <Button 
             variant="ghost" 
             size="sm"
-            onClick={handleBackToSummary}
+            onClick={(e) => handleBackToSummary(e)}
             className="w-full mt-3 text-gray-600"
           >
             ← Back to summary
@@ -508,7 +513,7 @@ export default function MapView({
               : createEventIcon(cluster.events[0].sport)
             }
           >
-            <Popup>
+            <Popup closeOnClick={false}>
               <div className="p-0">
                 {cluster.count === 1 ? (
                   // Single event popup with conditional detailed view
@@ -558,7 +563,7 @@ export default function MapView({
                         <Button 
                           className="w-full" 
                           size="sm"
-                          onClick={() => handleViewDetails(cluster.events[0])}
+                          onClick={(e) => handleViewDetails(cluster.events[0], e)}
                         >
                           View Details
                         </Button>
@@ -605,7 +610,7 @@ export default function MapView({
                                   className="w-full" 
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleViewDetails(event)}
+                                  onClick={(e) => handleViewDetails(event, e)}
                                 >
                                   View Details
                                 </Button>
