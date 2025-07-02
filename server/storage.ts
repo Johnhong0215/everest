@@ -181,89 +181,72 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.date) {
-      const userTimezone = filters.userTimezone || 'UTC';
-      
-      // Get user's current date in their timezone (simplest approach)
-      const getUserDate = (offsetDays: number = 0) => {
-        try {
-          const now = new Date();
-          console.log(`Getting user date with timezone: ${userTimezone}, offset: ${offsetDays}`);
-          
-          // Use Intl API to get the date in user's timezone
-          const options: Intl.DateTimeFormatOptions = {
-            timeZone: userTimezone,
-            year: 'numeric',
-            month: '2-digit', 
-            day: '2-digit'
-          };
-          
-          const formatter = new Intl.DateTimeFormat('en-CA', options);
-          const dateStr = formatter.format(now); // This gives YYYY-MM-DD directly
-          console.log(`Base date in ${userTimezone}: ${dateStr}`);
-          
-          // If we need to add offset days, parse and adjust
-          if (offsetDays === 0) {
-            return dateStr;
-          }
-          
-          const [year, month, day] = dateStr.split('-').map(Number);
-          const date = new Date(year, month - 1, day);
-          date.setDate(date.getDate() + offsetDays);
-          
-          const resultYear = date.getFullYear();
-          const resultMonth = String(date.getMonth() + 1).padStart(2, '0');
-          const resultDay = String(date.getDate()).padStart(2, '0');
-          const result = `${resultYear}-${resultMonth}-${resultDay}`;
-          
-          console.log(`Final date with offset ${offsetDays}: ${result}`);
-          return result;
-        } catch (error) {
-          console.error('Error in getUserDate:', error);
-          // Fallback to simple UTC date
-          const fallbackDate = new Date();
-          fallbackDate.setDate(fallbackDate.getDate() + offsetDays);
-          return fallbackDate.toISOString().split('T')[0];
-        }
-      };
-      
+      // Use the EXACT same logic as frontend dateUtils - no timezone conversion
+      // Events are stored as local time, filter by local time
       let targetDateStr: string;
       
       if (filters.date === 'today') {
-        targetDateStr = getUserDate(0);
+        // Same as getTodayString() in frontend
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        targetDateStr = `${year}-${month}-${day}`;
       } else if (filters.date === 'tomorrow') {
-        targetDateStr = getUserDate(1);
+        // Same as getTomorrowString() in frontend
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const year = tomorrow.getFullYear();
+        const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const day = String(tomorrow.getDate()).padStart(2, '0');
+        targetDateStr = `${year}-${month}-${day}`;
       } else if (filters.date === 'week') {
-        // This week logic - for now, just show today to end of week
-        const today = getUserDate(0);
-        const todayDate = new Date(today);
-        const daysUntilSunday = 6 - todayDate.getDay();
-        const endOfWeek = getUserDate(daysUntilSunday);
+        // This week logic
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
         
-        console.log(`Week filter: from ${today} to ${endOfWeek}`);
-        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${today}::date`);
-        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endOfWeek}::date`);
-        return; // Early return for week filter
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+        const endYear = endOfWeek.getFullYear();
+        const endMonth = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+        const endDay = String(endOfWeek.getDate()).padStart(2, '0');
+        const endOfWeekStr = `${endYear}-${endMonth}-${endDay}`;
+        
+        console.log(`Week filter: from ${todayStr} to ${endOfWeekStr}`);
+        conditions.push(sql`DATE(${events.startTime}) >= ${todayStr}::date`);
+        conditions.push(sql`DATE(${events.startTime}) <= ${endOfWeekStr}::date`);
+        return;
       } else if (filters.date === 'month') {
         // This month logic
-        const today = getUserDate(0);
-        const todayDate = new Date(today);
-        const endOfMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
-        const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
         
-        console.log(`Month filter: from ${today} to ${endOfMonthStr}`);
-        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${today}::date`);
-        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endOfMonthStr}::date`);
-        return; // Early return for month filter
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const endYear = endOfMonth.getFullYear();
+        const endMonth = String(endOfMonth.getMonth() + 1).padStart(2, '0');
+        const endDay = String(endOfMonth.getDate()).padStart(2, '0');
+        const endOfMonthStr = `${endYear}-${endMonth}-${endDay}`;
+        
+        console.log(`Month filter: from ${todayStr} to ${endOfMonthStr}`);
+        conditions.push(sql`DATE(${events.startTime}) >= ${todayStr}::date`);
+        conditions.push(sql`DATE(${events.startTime}) <= ${endOfMonthStr}::date`);
+        return;
       } else {
         // Custom date format (YYYY-MM-DD)
         targetDateStr = filters.date;
       }
       
-      console.log(`Simple date filter: ${filters.date} -> ${targetDateStr} (user timezone: ${userTimezone})`);
+      console.log(`Date filter: ${filters.date} -> comparing DATE(start_time) = ${targetDateStr}`);
       
-      // Simple comparison: if event's date in user timezone equals target date
+      // Simple date comparison without timezone conversion
       conditions.push(
-        sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`
+        sql`DATE(${events.startTime}) = ${targetDateStr}::date`
       );
     }
 
