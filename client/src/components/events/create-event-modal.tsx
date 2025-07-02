@@ -600,10 +600,10 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Skill Level</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select skill level" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -624,10 +624,10 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gender Mix</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select gender mix" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
