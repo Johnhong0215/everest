@@ -43,6 +43,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const [locationCoords, setLocationCoords] = useState<{lat: string, lng: string} | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [timeValidationError, setTimeValidationError] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
@@ -176,6 +177,10 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       const response = await apiRequest('POST', '/api/events', data);
       return response;
     },
+    onMutate: () => {
+      // Prevent double submissions by setting submitting state immediately
+      setIsSubmitting(true);
+    },
     onSuccess: (data) => {
       console.log('Event created successfully:', data);
       toast({
@@ -187,6 +192,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       onClose();
       form.reset();
       setSelectedSport('badminton');
+      setIsSubmitting(false);
     },
     onError: (error: any) => {
       console.error('Create event error:', error);
@@ -196,6 +202,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
         description: errorMessage,
         variant: "destructive",
       });
+      setIsSubmitting(false);
     },
   });
 
@@ -209,6 +216,13 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     }
   }, [formSport, selectedSport]);
 
+  // Reset submission state when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
   const selectedSportData = SPORTS.find(s => s.id === selectedSport);
   const sportConfig = selectedSport && sportsSettings ? (sportsSettings as any)[selectedSport] : null;
   
@@ -220,6 +234,12 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
   const onSubmit = async (data: CreateEventFormData) => {
     console.log('Form data submitted:', data);
+    
+    // Prevent double submissions
+    if (isSubmitting || createEventMutation.isPending) {
+      console.log('Submission already in progress, ignoring duplicate submission');
+      return;
+    }
     
     if (!isAuthenticated || !user || typeof user !== 'object' || !('id' in user)) {
       toast({
@@ -664,14 +684,16 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
               <Button
                 type="submit"
                 className="flex-1 bg-everest-blue hover:bg-blue-700"
-                disabled={createEventMutation.isPending}
+                disabled={isSubmitting || createEventMutation.isPending}
                 onClick={(e) => {
                   console.log('Submit button clicked');
                   console.log('Form state:', form.formState);
                   console.log('Form values:', form.getValues());
+                  console.log('Is submitting:', isSubmitting);
+                  console.log('Mutation pending:', createEventMutation.isPending);
                 }}
               >
-                {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
+                {(isSubmitting || createEventMutation.isPending) ? 'Creating...' : 'Create Event'}
               </Button>
             </div>
           </form>
