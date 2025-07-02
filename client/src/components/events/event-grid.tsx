@@ -280,9 +280,18 @@ export default function EventGrid({
     return eventDate >= now; // Only show future events
   });
 
-  // Sort events by distance (closest first, then events without location data)
+  // Sort events by date first, then by distance within each date
   const events = filteredEvents.sort((a, b) => {
-    if (!userLocation) return 0; // No sorting if user location is not available
+    const dateA = new Date(a.startTime);
+    const dateB = new Date(b.startTime);
+    
+    // First sort by date
+    if (dateA.toDateString() !== dateB.toDateString()) {
+      return dateA.getTime() - dateB.getTime();
+    }
+    
+    // Same date, sort by distance if user location is available
+    if (!userLocation) return 0;
     
     const aHasLocation = a.latitude && a.longitude;
     const bHasLocation = b.latitude && b.longitude;
@@ -303,6 +312,44 @@ export default function EventGrid({
     
     return distanceA - distanceB;
   });
+
+  // Group events by date
+  const groupEventsByDate = (events: EventWithHost[]) => {
+    const groups: { [key: string]: EventWithHost[] } = {};
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    events.forEach(event => {
+      const eventDate = new Date(event.startTime);
+      const eventDateString = eventDate.toDateString();
+      const todayString = today.toDateString();
+      const tomorrowString = tomorrow.toDateString();
+      
+      let groupKey: string;
+      if (eventDateString === todayString) {
+        groupKey = 'Today';
+      } else if (eventDateString === tomorrowString) {
+        groupKey = 'Tomorrow';
+      } else {
+        // Format as "Monday, Dec 25"
+        groupKey = eventDate.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+      }
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(event);
+    });
+    
+    return groups;
+  };
+
+  const eventGroups = groupEventsByDate(events);
 
   // Fetch user bookings to determine status for each event
   const { data: userBookings = [] } = useQuery({
@@ -589,20 +636,33 @@ export default function EventGrid({
                 currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {events.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    onJoin={handleJoinEvent}
-                    onOpenChat={onOpenChat}
-                    onCancel={handleCancelEvent}
-                    onModify={handleModifyEvent}
-                    currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
-                    userLocation={userLocation}
-                    userBookingStatus={userBookingStatusMap[event.id] as 'requested' | 'accepted' | 'rejected' | 'cancelled' | null}
-                    isUserCreated={event.hostId === (user && typeof user === 'object' && 'id' in user ? (user as any).id : '')}
-                  />
+              <div className="space-y-8">
+                {Object.entries(eventGroups).map(([dateGroup, groupEvents]) => (
+                  <div key={dateGroup} className="space-y-4">
+                    {/* Date Header */}
+                    <div className="border-b border-gray-200 pb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">{dateGroup}</h3>
+                      <p className="text-sm text-gray-500">{groupEvents.length} event{groupEvents.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    
+                    {/* Events Grid for this date */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {groupEvents.map((event) => (
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          onJoin={handleJoinEvent}
+                          onOpenChat={onOpenChat}
+                          onCancel={handleCancelEvent}
+                          onModify={handleModifyEvent}
+                          currentUserId={user && typeof user === 'object' && 'id' in user ? (user as any).id : ''}
+                          userLocation={userLocation}
+                          userBookingStatus={userBookingStatusMap[event.id] as 'requested' | 'accepted' | 'rejected' | 'cancelled' | null}
+                          isUserCreated={event.hostId === (user && typeof user === 'object' && 'id' in user ? (user as any).id : '')}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
