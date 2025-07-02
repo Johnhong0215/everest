@@ -518,12 +518,12 @@ export default function EventGrid({
                     <Filter className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-                  <div className="space-y-4">
-                    <div className="border-b pb-4">
-                      <h2 className="text-lg font-semibold">Filter Events</h2>
-                      <p className="text-sm text-gray-600">Find the perfect game for you</p>
-                    </div>
+                <SheetContent side="left" className="w-[300px] sm:w-[400px] flex flex-col">
+                  <div className="border-b pb-4 flex-shrink-0">
+                    <h2 className="text-lg font-semibold">Filter Events</h2>
+                    <p className="text-sm text-gray-600">Find the perfect game for you</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto pt-4">
                     <Sidebar
                       appliedFilters={filters}
                       pendingFilters={pendingFilters || { location: '', radius: 5, priceMax: 100 }}
