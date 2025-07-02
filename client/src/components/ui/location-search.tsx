@@ -91,7 +91,7 @@ export default function LocationSearch({
         }
         console.warn(errorMessage);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
   };
 

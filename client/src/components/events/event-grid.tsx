@@ -128,7 +128,7 @@ export default function EventGrid({
           variant: "destructive",
         });
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // Increased timeout, no cache
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 } // Faster location with cache
     );
   };
 
