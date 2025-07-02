@@ -47,6 +47,7 @@ export interface IStorage {
     search?: string;
     limit?: number;
     offset?: number;
+    userTimezone?: string;
   }): Promise<EventWithHost[]>;
   updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined>;
   updateEventPlayerCount(id: number, playerCount: number): Promise<boolean>;
@@ -181,73 +182,55 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.date) {
-      // Use the EXACT same logic as frontend dateUtils - no timezone conversion
-      // Events are stored as local time, filter by local time
-      let targetDateStr: string;
+      // Create dates in user's timezone for accurate filtering
+      const userTimezone = filters.userTimezone || 'UTC';
       
       if (filters.date === 'today') {
-        // Same as getTodayString() in frontend
+        // Get today's date in user's timezone
         const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        targetDateStr = `${year}-${month}-${day}`;
+        const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
+        console.log(`Date filter: today -> comparing DATE(start_time) = ${targetDateStr} (user timezone: ${userTimezone})`);
+        conditions.push(sql`DATE(${events.startTime}) = ${targetDateStr}::date`);
       } else if (filters.date === 'tomorrow') {
-        // Same as getTomorrowString() in frontend
+        // Get tomorrow's date in user's timezone
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const year = tomorrow.getFullYear();
-        const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-        const day = String(tomorrow.getDate()).padStart(2, '0');
-        targetDateStr = `${year}-${month}-${day}`;
+        const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(tomorrow);
+        console.log(`Date filter: tomorrow -> comparing DATE(start_time) = ${targetDateStr} (user timezone: ${userTimezone})`);
+        conditions.push(sql`DATE(${events.startTime}) = ${targetDateStr}::date`);
       } else if (filters.date === 'week') {
-        // This week logic
+        // This week logic - use user's timezone
         const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${day}`;
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
         
-        const endOfWeek = new Date(today);
-        endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
-        const endYear = endOfWeek.getFullYear();
-        const endMonth = String(endOfWeek.getMonth() + 1).padStart(2, '0');
-        const endDay = String(endOfWeek.getDate()).padStart(2, '0');
-        const endOfWeekStr = `${endYear}-${endMonth}-${endDay}`;
+        // Calculate end of week in user's timezone
+        const todayInUserTz = new Date(todayStr + 'T00:00:00');
+        const endOfWeek = new Date(todayInUserTz);
+        endOfWeek.setDate(todayInUserTz.getDate() + (6 - todayInUserTz.getDay()));
+        const endOfWeekStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(endOfWeek);
         
-        console.log(`Week filter: from ${todayStr} to ${endOfWeekStr}`);
+        console.log(`Week filter: from ${todayStr} to ${endOfWeekStr} (user timezone: ${userTimezone})`);
         conditions.push(sql`DATE(${events.startTime}) >= ${todayStr}::date`);
         conditions.push(sql`DATE(${events.startTime}) <= ${endOfWeekStr}::date`);
-        return;
       } else if (filters.date === 'month') {
-        // This month logic
+        // This month logic - use user's timezone
         const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${day}`;
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
         
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        const endYear = endOfMonth.getFullYear();
-        const endMonth = String(endOfMonth.getMonth() + 1).padStart(2, '0');
-        const endDay = String(endOfMonth.getDate()).padStart(2, '0');
-        const endOfMonthStr = `${endYear}-${endMonth}-${endDay}`;
+        // Get last day of current month in user's timezone
+        const todayInUserTz = new Date(todayStr + 'T00:00:00');
+        const endOfMonth = new Date(todayInUserTz.getFullYear(), todayInUserTz.getMonth() + 1, 0);
+        const endOfMonthStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(endOfMonth);
         
-        console.log(`Month filter: from ${todayStr} to ${endOfMonthStr}`);
+        console.log(`Month filter: from ${todayStr} to ${endOfMonthStr} (user timezone: ${userTimezone})`);
         conditions.push(sql`DATE(${events.startTime}) >= ${todayStr}::date`);
         conditions.push(sql`DATE(${events.startTime}) <= ${endOfMonthStr}::date`);
-        return;
       } else {
         // Custom date format (YYYY-MM-DD)
-        targetDateStr = filters.date;
+        const targetDateStr = filters.date;
+        console.log(`Date filter: custom date -> comparing DATE(start_time) = ${targetDateStr} (user timezone: ${userTimezone})`);
+        conditions.push(sql`DATE(${events.startTime}) = ${targetDateStr}::date`);
       }
-      
-      console.log(`Date filter: ${filters.date} -> comparing DATE(start_time) = ${targetDateStr}`);
-      
-      // Simple date comparison without timezone conversion
-      conditions.push(
-        sql`DATE(${events.startTime}) = ${targetDateStr}::date`
-      );
     }
 
     if (filters?.skillLevels && filters.skillLevels.length > 0) {
