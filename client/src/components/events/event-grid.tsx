@@ -90,46 +90,78 @@ export default function EventGrid({
     }
 
     console.log('Requesting geolocation...');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log('Location permission granted:', position);
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        setLocationPermission('granted');
-        setLocationLoading(false);
-        toast({
-          title: "Location Enabled",
-          description: "Your location has been enabled for distance calculations.",
-        });
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        let errorMessage = "Unable to get your location.";
-        
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = "Location access denied. Please allow location permissions in your browser.";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = "Location information is unavailable.";
-            break;
-          case error.TIMEOUT:
-            errorMessage = "Location request timed out. Please try again.";
-            break;
-        }
-        
-        setLocationPermission('denied');
-        setLocationLoading(false);
-        toast({
-          title: "Location Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 } // Faster location with cache
-    );
+    
+    // Try with fast, low-accuracy location first
+    const tryQuickLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('Quick location success:', position);
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setLocationPermission('granted');
+          setLocationLoading(false);
+          toast({
+            title: "Location Enabled",
+            description: "Your location has been enabled for distance calculations.",
+          });
+        },
+        (error) => {
+          console.log('Quick location failed, trying with higher timeout...', error);
+          // If quick attempt fails, try with more time but still fast settings
+          tryBackupLocation();
+        },
+        { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 } // Very fast first attempt
+      );
+    };
+
+    // Backup attempt with slightly longer timeout
+    const tryBackupLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('Backup location success:', position);
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setLocationPermission('granted');
+          setLocationLoading(false);
+          toast({
+            title: "Location Enabled",
+            description: "Your location has been enabled for distance calculations.",
+          });
+        },
+        (error) => {
+          console.error('All location attempts failed:', error);
+          let errorMessage = "Unable to get your location.";
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = "Location access denied. Please allow location permissions in your browser.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "Location services are not available on this device.";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "Location request timed out. Your device may not have GPS/location services enabled.";
+              break;
+          }
+          
+          setLocationPermission('denied');
+          setLocationLoading(false);
+          toast({
+            title: "Location Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 } // Longer timeout for backup
+      );
+    };
+
+    // Start with quick attempt
+    tryQuickLocation();
   };
 
   // Calculate distance between two coordinates using Haversine formula

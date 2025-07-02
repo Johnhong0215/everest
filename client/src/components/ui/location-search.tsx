@@ -61,38 +61,64 @@ export default function LocationSearch({
     }
 
     setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        setCurrentUserLocation(coords);
-        onChange('Current Location', coords);
-        setIsOpen(false);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error getting location:', error);
-        setLoading(false);
-        
-        // Provide feedback to user based on error type
-        let errorMessage = "Unable to get location";
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = "Location access denied";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = "Location unavailable";
-            break;
-          case error.TIMEOUT:
-            errorMessage = "Location request timed out";
-            break;
-        }
-        console.warn(errorMessage);
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-    );
+    
+    // Try quick location first
+    const tryQuickLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setCurrentUserLocation(coords);
+          onChange('Current Location', coords);
+          setIsOpen(false);
+          setLoading(false);
+        },
+        (error) => {
+          console.log('Quick location failed, trying backup...', error);
+          tryBackupLocation();
+        },
+        { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
+      );
+    };
+
+    // Backup with longer timeout
+    const tryBackupLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setCurrentUserLocation(coords);
+          onChange('Current Location', coords);
+          setIsOpen(false);
+          setLoading(false);
+        },
+        (error) => {
+          console.error('All location attempts failed:', error);
+          setLoading(false);
+          
+          let errorMessage = "Unable to get location";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = "Location access denied";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "Location services unavailable";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "Location request timed out";
+              break;
+          }
+          console.warn(errorMessage);
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      );
+    };
+
+    tryQuickLocation();
   };
 
   // Search for locations using server-side proxy
