@@ -30,6 +30,17 @@ interface EventGridProps {
   onCreateEvent: () => void;
   onOpenChat: (eventId: number) => void;
   onFiltersChange: (filters: any) => void;
+  // Props for mobile sidebar
+  pendingFilters?: {
+    location: string;
+    radius: number;
+    priceMax: number;
+  };
+  onImmediateFilterChange?: (key: string, value: any) => void;
+  onPendingFilterChange?: (key: string, value: any) => void;
+  onApplyFilters?: () => void;
+  onRemoveFilters?: () => void;
+  hasPendingChanges?: boolean;
 }
 
 export default function EventGrid({ 
@@ -38,7 +49,13 @@ export default function EventGrid({
   onViewModeChange, 
   onCreateEvent, 
   onOpenChat,
-  onFiltersChange
+  onFiltersChange,
+  pendingFilters,
+  onImmediateFilterChange,
+  onPendingFilterChange,
+  onApplyFilters,
+  onRemoveFilters,
+  hasPendingChanges
 }: EventGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEventForPayment, setSelectedEventForPayment] = useState<number | null>(null);
@@ -508,13 +525,13 @@ export default function EventGrid({
                       <p className="text-sm text-gray-600">Find the perfect game for you</p>
                     </div>
                     <Sidebar
-                      appliedFilters={appliedFilters}
-                      pendingFilters={pendingFilters}
-                      onImmediateFilterChange={onImmediateFilterChange}
-                      onPendingFilterChange={onPendingFilterChange}
-                      onApplyFilters={onApplyFilters}
-                      onRemoveFilters={onRemoveFilters}
-                      hasPendingChanges={hasPendingChanges}
+                      appliedFilters={filters}
+                      pendingFilters={pendingFilters || { location: '', radius: 5, priceMax: 100 }}
+                      onImmediateFilterChange={onImmediateFilterChange || (() => {})}
+                      onPendingFilterChange={onPendingFilterChange || (() => {})}
+                      onApplyFilters={onApplyFilters || (() => {})}
+                      onRemoveFilters={onRemoveFilters || (() => {})}
+                      hasPendingChanges={hasPendingChanges || false}
                       className="border-0 shadow-none"
                     />
                   </div>

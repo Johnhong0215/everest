@@ -127,6 +127,12 @@ export default function Home() {
             onCreateEvent={() => setIsCreateEventOpen(true)}
             onFiltersChange={() => {}}
             onOpenChat={handleOpenChat}
+            pendingFilters={pendingFilters}
+            onImmediateFilterChange={handleImmediateFiltersChange}
+            onPendingFilterChange={handlePendingFiltersChange}
+            onApplyFilters={handleApplyFilters}
+            onRemoveFilters={handleRemoveFilters}
+            hasPendingChanges={hasPendingChanges}
           />
         </main>
       </div>
