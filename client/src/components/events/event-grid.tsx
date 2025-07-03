@@ -290,11 +290,18 @@ export default function EventGrid({
     staleTime: 30000, // 30 seconds
   });
 
-  // Filter out outdated events (events past today's date and time)
+  // Filter out outdated events (events from previous days, but keep all events for today)
   const filteredEvents = rawEvents.filter(event => {
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const eventDate = new Date(event.startTime);
     const now = new Date();
-    return eventDate >= now; // Only show future events
+    
+    // Get date strings in user's timezone
+    const eventDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(eventDate);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(now);
+    
+    // Show events that are today or in the future (by date, not time)
+    return eventDateStr >= todayStr;
   });
 
   // Sort events by date first, then by distance within each date
