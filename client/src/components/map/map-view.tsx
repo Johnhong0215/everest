@@ -58,7 +58,19 @@ function MapBounds({ events, userLocation }: { events: EventWithHost[]; userLoca
     }
     
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [20, 20] });
+      // Set zoom constraints to prevent zooming out too far globally
+      // minZoom: 10 shows city-level view, maxZoom: 16 shows detailed street view
+      map.fitBounds(bounds, { 
+        padding: [20, 20],
+        maxZoom: 16,
+        // Set a minimum zoom level to prevent showing global view
+        // Zoom level 10 is appropriate for showing nearby city/regional events
+      });
+      
+      // Ensure minimum zoom level after fitBounds
+      if (map.getZoom() < 8) {
+        map.setZoom(8);
+      }
     }
   }, [events, userLocation, map]);
 
@@ -468,7 +480,9 @@ export default function MapView({
       
       <MapContainer
         center={mapCenter}
-        zoom={userLocation ? 12 : 6}
+        zoom={userLocation ? 12 : 10}
+        minZoom={8}
+        maxZoom={18}
         className="h-full w-full z-0"
         scrollWheelZoom={true}
         zoomControl={true}
