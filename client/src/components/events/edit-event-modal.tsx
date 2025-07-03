@@ -170,13 +170,24 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
     if (event && isOpen) {
       setSelectedSport(event.sport);
       
-      // Convert UTC times to local datetime-local format for the form
+      // Convert event times to local timezone for datetime-local input
       const startDateTime = new Date(event.startTime);
       const endDateTime = new Date(event.endTime);
       
+      // Adjust for timezone offset to get local time
+      const startTimeLocal = new Date(startDateTime.getTime() - startDateTime.getTimezoneOffset() * 60000);
+      const endTimeLocal = new Date(endDateTime.getTime() - endDateTime.getTimezoneOffset() * 60000);
+      
       // Format as YYYY-MM-DDTHH:mm for datetime-local input
-      const startTimeString = startDateTime.toISOString().slice(0, 16);
-      const endTimeString = endDateTime.toISOString().slice(0, 16);
+      const startTimeString = startTimeLocal.toISOString().slice(0, 16);
+      const endTimeString = endTimeLocal.toISOString().slice(0, 16);
+      
+      console.log('Setting form with event times:', {
+        originalStart: event.startTime,
+        originalEnd: event.endTime,
+        formattedStart: startTimeString,
+        formattedEnd: endTimeString
+      });
       
       form.reset({
         title: event.title,
