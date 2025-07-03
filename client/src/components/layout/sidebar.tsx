@@ -115,7 +115,9 @@ export default function Sidebar({
 
   // Check if the current date filter is a custom date (not a quick filter)
   const isCustomDate = (dateValue: string) => {
-    return dateValue && !isQuickFilterDate(dateValue);
+    // Check if it's one of the text-based quick filters
+    const quickFilterTexts = ['today', 'tomorrow', 'week', 'month'];
+    return dateValue && !quickFilterTexts.includes(dateValue);
   };
 
   // Check if any filters are currently active
@@ -252,12 +254,23 @@ export default function Sidebar({
             {/* Show selected custom date */}
             {isCustomDate(appliedFilters.date) && (
               <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                Selected: {new Date(appliedFilters.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                  weekday: 'short', 
-                  month: 'short', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                })}
+                Selected: {(() => {
+                  try {
+                    const dateStr = appliedFilters.date.includes('T') ? appliedFilters.date : appliedFilters.date + 'T00:00:00';
+                    const date = new Date(dateStr);
+                    if (isNaN(date.getTime())) {
+                      return appliedFilters.date; // Fallback to raw value if invalid
+                    }
+                    return date.toLocaleDateString('en-US', { 
+                      weekday: 'short', 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    });
+                  } catch {
+                    return appliedFilters.date; // Fallback to raw value if error
+                  }
+                })()}
               </div>
             )}
           </div>
