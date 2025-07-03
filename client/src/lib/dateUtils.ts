@@ -148,6 +148,47 @@ export const roundToNearest5Minutes = (date: Date): Date => {
 };
 
 /**
+ * Round minutes to nearest 15 minute interval
+ */
+export const roundToNearest15Minutes = (date: Date): Date => {
+  const roundedDate = new Date(date);
+  const minutes = roundedDate.getMinutes();
+  const roundedMinutes = Math.round(minutes / 15) * 15;
+  roundedDate.setMinutes(roundedMinutes, 0, 0); // Also clear seconds and milliseconds
+  return roundedDate;
+};
+
+/**
+ * Get minimum allowed start time (current time + 5 minutes, rounded to next 15-minute interval)
+ */
+export const getMinimumStartTime = (): Date => {
+  const now = new Date();
+  const minTime = new Date(now.getTime() + 5 * 60 * 1000); // Add 5 minutes
+  
+  // Round up to next 15-minute interval
+  const minutes = minTime.getMinutes();
+  const nextQuarter = Math.ceil(minutes / 15) * 15;
+  
+  if (nextQuarter === 60) {
+    minTime.setHours(minTime.getHours() + 1);
+    minTime.setMinutes(0, 0, 0);
+  } else {
+    minTime.setMinutes(nextQuarter, 0, 0);
+  }
+  
+  return minTime;
+};
+
+/**
+ * Add one hour to a date, handling day rollover
+ */
+export const addOneHourWithDayRollover = (date: Date): Date => {
+  const newDate = new Date(date);
+  newDate.setHours(newDate.getHours() + 1);
+  return newDate;
+};
+
+/**
  * Add one hour to a date
  */
 export const addOneHour = (date: Date): Date => {

@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { insertEventSchema } from "@shared/schema";
 import { SPORTS, SPORT_CONFIGS, SKILL_LEVELS, GENDER_MIX } from "@/lib/constants";
-import { toLocalDateTimeString, fromLocalDateTimeString, roundToNearest5Minutes, addOneHour, calculateDuration, roundDateTimeStringTo5Minutes } from "@/lib/dateUtils";
+import { toLocalDateTimeString, fromLocalDateTimeString, roundToNearest15Minutes, addOneHourWithDayRollover, calculateDuration, getMinimumStartTime } from "@/lib/dateUtils";
 import { z } from "zod";
 
 interface CreateEventModalProps {
@@ -86,8 +86,8 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       sport: 'badminton',
       skillLevel: 'intermediate',
       genderMix: 'mixed',
-      startTime: toLocalDateTimeString(roundToNearest5Minutes(new Date(Date.now() + 24 * 60 * 60 * 1000))),
-      endTime: toLocalDateTimeString(addOneHour(roundToNearest5Minutes(new Date(Date.now() + 24 * 60 * 60 * 1000)))),
+      startTime: toLocalDateTimeString(getMinimumStartTime()),
+      endTime: toLocalDateTimeString(addOneHourWithDayRollover(getMinimumStartTime())),
       location: '',
       maxPlayers: 4,
       pricePerPerson: '12.00',
@@ -102,16 +102,33 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
     // Parse the datetime-local input value
     const inputDate = new Date(newStartTime);
     
-    // Round to nearest 5 minutes
+    // Validate minimum time requirement (5 minutes from now)
+    const now = new Date();
+    const minTime = new Date(now.getTime() + 5 * 60 * 1000);
+    
+    if (inputDate < minTime) {
+      setTimeValidationError('Start time must be at least 5 minutes from now');
+      return;
+    } else {
+      setTimeValidationError('');
+    }
+    
+    // Round to nearest 15 minutes
     const minutes = inputDate.getMinutes();
-    const roundedMinutes = Math.round(minutes / 5) * 5;
-    inputDate.setMinutes(roundedMinutes, 0, 0);
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    
+    if (roundedMinutes === 60) {
+      inputDate.setHours(inputDate.getHours() + 1);
+      inputDate.setMinutes(0, 0, 0);
+    } else {
+      inputDate.setMinutes(roundedMinutes, 0, 0);
+    }
     
     const roundedStartTime = toLocalDateTimeString(inputDate);
     form.setValue('startTime', roundedStartTime);
     
-    // Automatically set end time to 1 hour after start time
-    const endDate = addOneHour(inputDate);
+    // Automatically set end time to 1 hour after start time (handles day rollover)
+    const endDate = addOneHourWithDayRollover(inputDate);
     form.setValue('endTime', toLocalDateTimeString(endDate));
   };
 
@@ -119,11 +136,17 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
   const handleEndTimeChange = (newEndTime: string) => {
     if (!newEndTime) return;
     
-    // Parse the datetime-local input value and round to 5 minutes
+    // Parse the datetime-local input value and round to 15 minutes
     const inputDate = new Date(newEndTime);
     const minutes = inputDate.getMinutes();
-    const roundedMinutes = Math.round(minutes / 5) * 5;
-    inputDate.setMinutes(roundedMinutes, 0, 0);
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    
+    if (roundedMinutes === 60) {
+      inputDate.setHours(inputDate.getHours() + 1);
+      inputDate.setMinutes(0, 0, 0);
+    } else {
+      inputDate.setMinutes(roundedMinutes, 0, 0);
+    }
     
     const roundedEndTime = toLocalDateTimeString(inputDate);
     const startTime = form.getValues('startTime');
@@ -133,7 +156,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       
       // Ensure end time is after start time
       if (inputDate <= startDate) {
-        const newEndDate = addOneHour(startDate);
+        const newEndDate = addOneHourWithDayRollover(startDate);
         form.setValue('endTime', toLocalDateTimeString(newEndDate));
         setTimeValidationError("End time must be after start time. Set to 1 hour after start time.");
         setTimeout(() => setTimeValidationError(''), 3000);
@@ -441,13 +464,25 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                             }}
                             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {Array.from({ length: 144 }, (_, i) => {
-                              // 6 AM to 11:55 PM (18 hours * 12 intervals = 216, but let's do 6 AM to 11:55 PM)
-                              const totalMinutes = 360 + (i * 5); // Start at 6:00 AM (360 minutes)
+                            {Array.from({ length: 72 }, (_, i) => {
+                              // 6 AM to 11:45 PM in 15-minute intervals
+                              const totalMinutes = 360 + (i * 15); // Start at 6:00 AM (360 minutes)
                               const hours24 = Math.floor(totalMinutes / 60);
                               const minutes = totalMinutes % 60;
                               
                               if (hours24 >= 24) return null; // Don't go past midnight
+                              
+                              // Calculate minimum allowed time for today
+                              const now = new Date();
+                              const minTime = new Date(now.getTime() + 5 * 60 * 1000); // Add 5 minutes
+                              const selectedDate = field.value ? field.value.split('T')[0] : '';
+                              const today = now.toISOString().split('T')[0];
+                              
+                              // If selecting today, filter out times that are too early
+                              if (selectedDate === today) {
+                                const currentTime = new Date(`${today}T${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+                                if (currentTime < minTime) return null;
+                              }
                               
                               // Convert to 12-hour format
                               const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
@@ -495,19 +530,27 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                             }}
                             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {Array.from({ length: 144 }, (_, i) => {
-                              // 6 AM to 11:55 PM
-                              const totalMinutes = 360 + (i * 5); // Start at 6:00 AM (360 minutes)
-                              const hours24 = Math.floor(totalMinutes / 60);
+                            {Array.from({ length: 76 }, (_, i) => {
+                              // 6 AM to 12:45 AM next day in 15-minute intervals  
+                              const totalMinutes = 360 + (i * 15); // Start at 6:00 AM (360 minutes)
+                              let hours24 = Math.floor(totalMinutes / 60);
                               const minutes = totalMinutes % 60;
                               
-                              if (hours24 >= 24) return null; // Don't go past midnight
+                              // Allow going past midnight for next day (up to 1 AM next day)
+                              let nextDay = false;
+                              if (hours24 >= 24) {
+                                hours24 = hours24 - 24;
+                                nextDay = true;
+                                if (hours24 > 1) return null; // Only allow up to 1:45 AM next day
+                              }
                               
                               // Convert to 12-hour format
                               const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
                               const ampm = hours24 < 12 ? 'AM' : 'PM';
                               const time24 = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-                              const displayTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                              const displayTime = nextDay 
+                                ? `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm} (+1 day)`
+                                : `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
                               
                               return (
                                 <option key={time24} value={time24}>
