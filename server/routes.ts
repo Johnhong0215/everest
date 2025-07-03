@@ -129,7 +129,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }
 
-      const updates = insertEventSchema.partial().parse(req.body);
+      // Parse and convert dates
+      const bodyData = req.body;
+      if (bodyData.startTime && typeof bodyData.startTime === 'string') {
+        bodyData.startTime = new Date(bodyData.startTime);
+      }
+      if (bodyData.endTime && typeof bodyData.endTime === 'string') {
+        bodyData.endTime = new Date(bodyData.endTime);
+      }
+      
+      const updates = insertEventSchema.partial().parse(bodyData);
       const event = await storage.updateEvent(eventId, updates);
       
       if (!event) {

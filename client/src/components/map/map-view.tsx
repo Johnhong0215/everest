@@ -178,10 +178,7 @@ export default function MapView({
   const [detailViewEvent, setDetailViewEvent] = useState<EventWithHost | null>(null);
   const popupRefs = useRef<Map<string, any>>(new Map());
 
-  // Debug userLocation
-  useEffect(() => {
-    console.log('MapView received userLocation:', userLocation);
-  }, [userLocation]);
+
 
   // Event action handlers
   const handleViewDetails = (event: EventWithHost, e?: React.MouseEvent) => {
@@ -538,9 +535,7 @@ export default function MapView({
         
         {/* User location marker */}
         {userLocation && (
-          <>
-            {console.log('Rendering user location marker at:', userLocation)}
-            <Marker 
+          <Marker 
               position={[userLocation.lat, userLocation.lng]}
               icon={divIcon({
                 html: '<div style="background: #3b82f6; border: 3px solid white; border-radius: 50%; width: 24px; height: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 1000; position: relative;"><div style="background: white; border-radius: 50%; width: 8px; height: 8px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: pulse 2s infinite;"></div></div>',
@@ -559,7 +554,6 @@ export default function MapView({
                 </div>
               </Popup>
             </Marker>
-          </>
         )}
         
         {/* Event clusters */}
