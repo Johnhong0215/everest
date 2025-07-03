@@ -63,12 +63,15 @@ export default function EventGrid({
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [locationLoading, setLocationLoading] = useState(false);
+  const [watchId, setWatchId] = useState<number | null>(null);
 
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  // Check for saved location and geolocation availability on component mount
+
+
+  // Check for saved location and start continuous tracking
   useEffect(() => {
     if (!('geolocation' in navigator)) {
       console.log('Geolocation not available:', navigator);
@@ -76,17 +79,23 @@ export default function EventGrid({
       return;
     }
 
-    // Check for saved location data in localStorage
+    // Check for saved location data and permission in localStorage
     try {
-      const savedLocation = localStorage.getItem('userLocation');
       const savedPermission = localStorage.getItem('locationPermission');
       
-      if (savedLocation && savedPermission === 'granted') {
-        const location = JSON.parse(savedLocation);
-        if (location.lat && location.lng) {
-          setUserLocation(location);
-          setLocationPermission('granted');
-          console.log('Restored saved location:', location);
+      if (savedPermission === 'granted') {
+        setLocationPermission('granted');
+        // Start continuous location tracking
+        startLocationTracking();
+      } else {
+        // For initial load, still try to restore last known location for display
+        const savedLocation = localStorage.getItem('userLocation');
+        if (savedLocation) {
+          const location = JSON.parse(savedLocation);
+          if (location.lat && location.lng) {
+            setUserLocation(location);
+            console.log('Restored saved location:', location);
+          }
         }
       }
     } catch (error) {
@@ -95,7 +104,78 @@ export default function EventGrid({
       localStorage.removeItem('userLocation');
       localStorage.removeItem('locationPermission');
     }
+
+    // Cleanup function to stop tracking when component unmounts
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        setWatchId(null);
+      }
+    };
   }, []);
+
+  // Stop tracking when permission is revoked
+  useEffect(() => {
+    if (locationPermission !== 'granted' && watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      setWatchId(null);
+    }
+  }, [locationPermission, watchId]);
+
+  // Function to start continuous location tracking
+  const startLocationTracking = () => {
+    if (!('geolocation' in navigator) || watchId !== null) {
+      return; // Already tracking or not available
+    }
+
+    console.log('Starting continuous location tracking...');
+    
+    const id = navigator.geolocation.watchPosition(
+      (position) => {
+        const newLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        
+        // Only update if location has changed significantly (more than ~10 meters)
+        const hasSignificantChange = !userLocation || 
+          calculateDistance(userLocation.lat, userLocation.lng, newLocation.lat, newLocation.lng) > 0.006; // ~10 meters
+        
+        if (hasSignificantChange) {
+          console.log('Location updated:', newLocation);
+          setUserLocation(newLocation);
+          
+          // Save updated location to localStorage
+          try {
+            localStorage.setItem('userLocation', JSON.stringify(newLocation));
+          } catch (error) {
+            console.warn('Failed to save updated location:', error);
+          }
+        }
+      },
+      (error) => {
+        console.error('Location tracking error:', error);
+        
+        // Only show error for significant issues, not temporary GPS problems
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationPermission('denied');
+          localStorage.setItem('locationPermission', 'denied');
+          toast({
+            title: "Location Access Denied",
+            description: "Please allow location access to see distance to events.",
+            variant: "destructive",
+          });
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000 // Cache location for 30 seconds
+      }
+    );
+    
+    setWatchId(id);
+  };
 
   const requestLocation = () => {
     console.log('Requesting location permission...');
@@ -155,6 +235,9 @@ export default function EventGrid({
             title: "Location Enabled",
             description: "Your location has been enabled for distance calculations.",
           });
+
+          // Start continuous location tracking
+          startLocationTracking();
         },
         (error) => {
           console.log('Quick location failed, trying with higher timeout...', error);
@@ -191,6 +274,9 @@ export default function EventGrid({
             title: "Location Enabled",
             description: "Your location has been enabled for distance calculations.",
           });
+
+          // Start continuous location tracking
+          startLocationTracking();
         },
         (error) => {
           console.error('All location attempts failed:', error);
@@ -233,18 +319,7 @@ export default function EventGrid({
     tryQuickLocation();
   };
 
-  // Calculate distance between two coordinates using Haversine formula
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Radius of the Earth in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distance in kilometers
-  };
+
 
   const { data: rawEvents = [], isLoading, error } = useQuery<EventWithHost[]>({
     queryKey: ['/api/events', filters],
