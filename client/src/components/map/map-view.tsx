@@ -58,18 +58,44 @@ function MapBounds({ events, userLocation }: { events: EventWithHost[]; userLoca
     }
     
     if (bounds.isValid()) {
-      // Set zoom constraints to prevent zooming out too far globally
-      // minZoom: 10 shows city-level view, maxZoom: 16 shows detailed street view
-      map.fitBounds(bounds, { 
-        padding: [20, 20],
-        maxZoom: 16,
-        // Set a minimum zoom level to prevent showing global view
-        // Zoom level 10 is appropriate for showing nearby city/regional events
-      });
-      
-      // Ensure minimum zoom level after fitBounds
-      if (map.getZoom() < 8) {
-        map.setZoom(8);
+      if (userLocation && events.length > 0) {
+        // If user location is available, focus on nearby events
+        // Calculate distance from user to each event and set appropriate bounds
+        const nearbyEvents = events.filter(event => {
+          if (!event.latitude || !event.longitude) return false;
+          const eventLat = parseFloat(event.latitude);
+          const eventLng = parseFloat(event.longitude);
+          
+          // Calculate distance in km using Haversine formula
+          const R = 6371; // Earth's radius in km
+          const dLat = (eventLat - userLocation.lat) * Math.PI / 180;
+          const dLng = (eventLng - userLocation.lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                   Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(eventLat * Math.PI / 180) *
+                   Math.sin(dLng/2) * Math.sin(dLng/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const distance = R * c;
+          
+          return distance <= 25; // Show events within 25km radius
+        });
+        
+        if (nearbyEvents.length > 0) {
+          // Create bounds for nearby events and user location
+          const nearbyBounds = new LatLngBounds([]);
+          nearbyBounds.extend([userLocation.lat, userLocation.lng]);
+          nearbyEvents.forEach(event => {
+            if (event.latitude && event.longitude) {
+              nearbyBounds.extend([parseFloat(event.latitude), parseFloat(event.longitude)]);
+            }
+          });
+          map.fitBounds(nearbyBounds, { padding: [50, 50], maxZoom: 14 });
+        } else {
+          // No nearby events, center on user location with reasonable zoom
+          map.setView([userLocation.lat, userLocation.lng], 12);
+        }
+      } else {
+        // No user location, fit all events with reasonable constraints
+        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 12 });
       }
     }
   }, [events, userLocation, map]);
@@ -480,9 +506,7 @@ export default function MapView({
       
       <MapContainer
         center={mapCenter}
-        zoom={userLocation ? 12 : 10}
-        minZoom={8}
-        maxZoom={18}
+        zoom={userLocation ? 12 : 6}
         className="h-full w-full z-0"
         scrollWheelZoom={true}
         zoomControl={true}
