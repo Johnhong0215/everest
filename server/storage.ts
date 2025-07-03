@@ -175,7 +175,11 @@ export class DatabaseStorage implements IStorage {
     userTimezone?: string;
   }): Promise<EventWithHost[]> {
     // Build conditions
-    const conditions = [eq(events.status, "published")];
+    const conditions = [
+      eq(events.status, "published"),
+      // Only show events that haven't started yet
+      gte(events.startTime, new Date())
+    ];
 
     if (filters?.sports && filters.sports.length > 0) {
       conditions.push(inArray(events.sport, filters.sports as any));
