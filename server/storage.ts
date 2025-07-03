@@ -189,15 +189,15 @@ export class DatabaseStorage implements IStorage {
         // Get today's date in user's timezone
         const today = new Date();
         const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
-        console.log(`Date filter: today -> comparing DATE(start_time) = ${targetDateStr} (user timezone: ${userTimezone})`);
-        conditions.push(sql`DATE(${events.startTime}) = ${targetDateStr}::date`);
+        console.log(`Date filter: today -> comparing DATE(start_time AT TIME ZONE '${userTimezone}') = ${targetDateStr}`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`);
       } else if (filters.date === 'tomorrow') {
         // Get tomorrow's date in user's timezone
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(tomorrow);
-        console.log(`Date filter: tomorrow -> comparing DATE(start_time) = ${targetDateStr} (user timezone: ${userTimezone})`);
-        conditions.push(sql`DATE(${events.startTime}) = ${targetDateStr}::date`);
+        console.log(`Date filter: tomorrow -> comparing DATE(start_time AT TIME ZONE '${userTimezone}') = ${targetDateStr}`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`);
       } else if (filters.date === 'week') {
         // This week logic - use user's timezone
         const today = new Date();
@@ -209,9 +209,9 @@ export class DatabaseStorage implements IStorage {
         endOfWeek.setDate(todayInUserTz.getDate() + (6 - todayInUserTz.getDay()));
         const endOfWeekStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(endOfWeek);
         
-        console.log(`Week filter: from ${todayStr} to ${endOfWeekStr} (user timezone: ${userTimezone})`);
-        conditions.push(sql`DATE(${events.startTime}) >= ${todayStr}::date`);
-        conditions.push(sql`DATE(${events.startTime}) <= ${endOfWeekStr}::date`);
+        console.log(`Week filter: from ${todayStr} to ${endOfWeekStr} (timezone: ${userTimezone})`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${todayStr}::date`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endOfWeekStr}::date`);
       } else if (filters.date === 'month') {
         // This month logic - use user's timezone
         const today = new Date();
@@ -222,14 +222,14 @@ export class DatabaseStorage implements IStorage {
         const endOfMonth = new Date(todayInUserTz.getFullYear(), todayInUserTz.getMonth() + 1, 0);
         const endOfMonthStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(endOfMonth);
         
-        console.log(`Month filter: from ${todayStr} to ${endOfMonthStr} (user timezone: ${userTimezone})`);
-        conditions.push(sql`DATE(${events.startTime}) >= ${todayStr}::date`);
-        conditions.push(sql`DATE(${events.startTime}) <= ${endOfMonthStr}::date`);
+        console.log(`Month filter: from ${todayStr} to ${endOfMonthStr} (timezone: ${userTimezone})`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) >= ${todayStr}::date`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) <= ${endOfMonthStr}::date`);
       } else {
         // Custom date format (YYYY-MM-DD)
         const targetDateStr = filters.date;
-        console.log(`Date filter: custom date -> comparing DATE(start_time) = ${targetDateStr} (user timezone: ${userTimezone})`);
-        conditions.push(sql`DATE(${events.startTime}) = ${targetDateStr}::date`);
+        console.log(`Date filter: custom date -> comparing DATE(start_time AT TIME ZONE '${userTimezone}') = ${targetDateStr}`);
+        conditions.push(sql`DATE(${events.startTime} AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`);
       }
     }
 
