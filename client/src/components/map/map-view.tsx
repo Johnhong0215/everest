@@ -507,6 +507,18 @@ export default function MapView({
           background: none;
           border: none;
         }
+        
+        .user-location-marker {
+          background: none !important;
+          border: none !important;
+          z-index: 1000 !important;
+        }
+        
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
       `}</style>
       
       <MapContainer
@@ -526,24 +538,28 @@ export default function MapView({
         
         {/* User location marker */}
         {userLocation && (
-          <Marker 
-            position={[userLocation.lat, userLocation.lng]}
-            icon={divIcon({
-              html: '<div style="background: #ef4444; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
-              className: 'custom-div-icon',
-              iconSize: [20, 20],
-              iconAnchor: [10, 10],
-            })}
-          >
-            <Popup>
-              <div className="p-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="font-medium text-sm">Your Location</span>
+          <>
+            {console.log('Rendering user location marker at:', userLocation)}
+            <Marker 
+              position={[userLocation.lat, userLocation.lng]}
+              icon={divIcon({
+                html: '<div style="background: #3b82f6; border: 3px solid white; border-radius: 50%; width: 24px; height: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 1000; position: relative;"><div style="background: white; border-radius: 50%; width: 8px; height: 8px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: pulse 2s infinite;"></div></div>',
+                className: 'user-location-marker',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+              })}
+              zIndexOffset={1000}
+            >
+              <Popup>
+                <div className="p-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <span className="font-medium text-sm">Your Location</span>
+                  </div>
                 </div>
-              </div>
-            </Popup>
-          </Marker>
+              </Popup>
+            </Marker>
+          </>
         )}
         
         {/* Event clusters */}
