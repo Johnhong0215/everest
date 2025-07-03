@@ -178,6 +178,11 @@ export default function MapView({
   const [detailViewEvent, setDetailViewEvent] = useState<EventWithHost | null>(null);
   const popupRefs = useRef<Map<string, any>>(new Map());
 
+  // Debug userLocation
+  useEffect(() => {
+    console.log('MapView received userLocation:', userLocation);
+  }, [userLocation]);
+
   // Event action handlers
   const handleViewDetails = (event: EventWithHost, e?: React.MouseEvent) => {
     e?.preventDefault();
