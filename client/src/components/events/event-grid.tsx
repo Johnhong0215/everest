@@ -333,27 +333,33 @@ export default function EventGrid({
   // Group events by date
   const groupEventsByDate = (events: EventWithHost[]) => {
     const groups: { [key: string]: EventWithHost[] } = {};
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Get today and tomorrow dates in user's timezone
     const today = new Date();
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
+    
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(tomorrow);
     
     events.forEach(event => {
+      // Convert event UTC timestamp to user's timezone date
       const eventDate = new Date(event.startTime);
-      const eventDateString = eventDate.toDateString();
-      const todayString = today.toDateString();
-      const tomorrowString = tomorrow.toDateString();
+      const eventDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(eventDate);
       
       let groupKey: string;
-      if (eventDateString === todayString) {
+      if (eventDateStr === todayStr) {
         groupKey = 'Today';
-      } else if (eventDateString === tomorrowString) {
+      } else if (eventDateStr === tomorrowStr) {
         groupKey = 'Tomorrow';
       } else {
-        // Format as "Monday, Dec 25"
+        // Format as "Monday, Dec 25" in user's timezone
         groupKey = eventDate.toLocaleDateString('en-US', { 
           weekday: 'long', 
           month: 'short', 
-          day: 'numeric' 
+          day: 'numeric',
+          timeZone: userTimezone
         });
       }
       
