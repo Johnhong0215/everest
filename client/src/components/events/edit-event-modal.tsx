@@ -170,17 +170,13 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
     if (event && isOpen) {
       setSelectedSport(event.sport);
       
-      // Convert event times to local timezone for datetime-local input
+      // Convert event times to local timezone for form input
       const startDateTime = new Date(event.startTime);
       const endDateTime = new Date(event.endTime);
       
-      // Adjust for timezone offset to get local time
-      const startTimeLocal = new Date(startDateTime.getTime() - startDateTime.getTimezoneOffset() * 60000);
-      const endTimeLocal = new Date(endDateTime.getTime() - endDateTime.getTimezoneOffset() * 60000);
-      
-      // Format as YYYY-MM-DDTHH:mm for datetime-local input
-      const startTimeString = startTimeLocal.toISOString().slice(0, 16);
-      const endTimeString = endTimeLocal.toISOString().slice(0, 16);
+      // Use toLocalDateTimeString to format properly for the form
+      const startTimeString = toLocalDateTimeString(startDateTime);
+      const endTimeString = toLocalDateTimeString(endDateTime);
       
       console.log('Setting form with event times:', {
         originalStart: event.startTime,
@@ -357,24 +353,56 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
                     <FormItem>
                       <FormLabel>Start Date & Time</FormLabel>
                       <FormControl>
-                        <Input
-                          type="datetime-local"
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            // Auto-adjust end time if needed
-                            const startTime = new Date(e.target.value);
-                            const endTime = form.getValues('endTime');
-                            if (endTime) {
-                              const endDateTime = new Date(endTime);
-                              if (endDateTime <= startTime) {
-                                const newEndTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Add 1 hour
-                                form.setValue('endTime', newEndTime.toISOString().slice(0, 16));
+                        <div className="flex gap-2">
+                          <Input
+                            type="date"
+                            value={field.value ? field.value.split('T')[0] : ''}
+                            onChange={(e) => {
+                              const date = e.target.value;
+                              const time = field.value ? field.value.split('T')[1] : '14:00';
+                              handleStartTimeChange(`${date}T${time}`);
+                            }}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="flex-1"
+                          />
+                          <select
+                            value={field.value ? field.value.split('T')[1] : '14:00'}
+                            onChange={(e) => {
+                              const date = field.value ? field.value.split('T')[0] : new Date().toISOString().split('T')[0];
+                              handleStartTimeChange(`${date}T${e.target.value}`);
+                            }}
+                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {Array.from({ length: 72 }, (_, i) => {
+                              const totalMinutes = 360 + (i * 15);
+                              const hours24 = Math.floor(totalMinutes / 60);
+                              const minutes = totalMinutes % 60;
+                              
+                              if (hours24 >= 24) return null;
+                              
+                              const now = new Date();
+                              const minTime = new Date(now.getTime() + 5 * 60 * 1000);
+                              const selectedDate = field.value ? field.value.split('T')[0] : '';
+                              const today = now.toISOString().split('T')[0];
+                              
+                              if (selectedDate === today) {
+                                const currentTime = new Date(`${today}T${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+                                if (currentTime < minTime) return null;
                               }
-                            }
-                          }}
-                        />
+                              
+                              const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+                              const ampm = hours24 < 12 ? 'AM' : 'PM';
+                              const time24 = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              const displayTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                              
+                              return (
+                                <option key={time24} value={time24}>
+                                  {displayTime}
+                                </option>
+                              );
+                            }).filter(Boolean)}
+                          </select>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -387,26 +415,46 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
                     <FormItem>
                       <FormLabel>End Date & Time</FormLabel>
                       <FormControl>
-                        <Input
-                          type="datetime-local"
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            // Validate end time is after start time
-                            const endTime = new Date(e.target.value);
-                            const startTime = form.getValues('startTime');
-                            if (startTime) {
-                              const startDateTime = new Date(startTime);
-                              if (endTime <= startDateTime) {
-                                setTimeValidationError("End time must be after start time");
-                                setTimeout(() => setTimeValidationError(''), 3000);
-                              } else {
-                                setTimeValidationError('');
-                              }
-                            }
-                          }}
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="date"
+                            value={field.value ? field.value.split('T')[0] : ''}
+                            onChange={(e) => {
+                              const date = e.target.value;
+                              const time = field.value ? field.value.split('T')[1] : '15:00';
+                              handleEndTimeChange(`${date}T${time}`);
+                            }}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="flex-1"
+                          />
+                          <select
+                            value={field.value ? field.value.split('T')[1] : '15:00'}
+                            onChange={(e) => {
+                              const date = field.value ? field.value.split('T')[0] : new Date().toISOString().split('T')[0];
+                              handleEndTimeChange(`${date}T${e.target.value}`);
+                            }}
+                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {Array.from({ length: 72 }, (_, i) => {
+                              const totalMinutes = 360 + (i * 15);
+                              const hours24 = Math.floor(totalMinutes / 60);
+                              const minutes = totalMinutes % 60;
+                              
+                              if (hours24 >= 24) return null;
+                              
+                              const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+                              const ampm = hours24 < 12 ? 'AM' : 'PM';
+                              const time24 = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              const displayTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                              
+                              return (
+                                <option key={time24} value={time24}>
+                                  {displayTime}
+                                </option>
+                              );
+                            }).filter(Boolean)}
+                          </select>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
