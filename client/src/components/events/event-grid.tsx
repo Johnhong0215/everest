@@ -89,37 +89,27 @@ export default function EventGrid({
       return;
     }
 
-    // Force clear all cached location data to ensure fresh location across devices
-    console.log('Clearing all cached location data for fresh tracking...');
-    localStorage.removeItem('userLocation');
-    
-    // Also clear React Query cache to force fresh data fetch
-    queryClient.clear();
-    
-    // Check for saved permission but always get fresh location
+    // Check location permission status but always get fresh location
     try {
       const savedPermission = localStorage.getItem('locationPermission');
       
       if (savedPermission === 'granted') {
-        console.log('Location permission previously granted, starting fresh real-time tracking...');
+        console.log('Location permission previously granted, getting fresh location...');
         setLocationPermission('granted');
-        // Always start fresh location tracking - no cached data
-        startLocationTracking();
+        // Immediately request fresh location and start tracking
+        requestLocation();
       } else if (savedPermission === 'denied') {
-        console.log('Location permission previously denied, will not track');
+        console.log('Location permission previously denied');
         setLocationPermission('denied');
-      } else {
-        console.log('No location permission saved, will request fresh permission...');
-        // Clear location state to ensure no stale data
+        // Clear any cached location data when permission is denied
+        localStorage.removeItem('userLocation');
         setUserLocation(null);
-        
-        // Automatically request fresh location permission
-        console.log('Attempting automatic fresh location request...');
-        setTimeout(() => {
-          if (locationPermission === 'prompt') {
-            requestLocation();
-          }
-        }, 1000); // Give UI time to load before requesting location
+      } else {
+        console.log('No location permission saved, user needs to grant permission');
+        setLocationPermission('prompt');
+        // Clear any cached location data
+        localStorage.removeItem('userLocation');
+        setUserLocation(null);
       }
     } catch (error) {
       console.warn('Failed to check saved permission:', error);
@@ -127,6 +117,7 @@ export default function EventGrid({
       localStorage.removeItem('userLocation');
       localStorage.removeItem('locationPermission');
       setUserLocation(null);
+      setLocationPermission('prompt');
     }
 
     // Cleanup function to stop tracking when component unmounts
@@ -278,6 +269,8 @@ export default function EventGrid({
         setUserLocation(location);
         setLocationPermission('granted');
         setLocationLoading(false);
+        
+        console.log('User location state updated:', location);
         
         // Save to localStorage for persistence
         try {
