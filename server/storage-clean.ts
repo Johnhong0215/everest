@@ -115,6 +115,7 @@ export class CleanSupabaseStorage implements IStorage {
         email: '',
         firstName: 'Host',
         lastName: 'User',
+        displayName: 'Host User',
         profileImageUrl: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
@@ -130,6 +131,7 @@ export class CleanSupabaseStorage implements IStorage {
       email: booking.users.email,
       firstName: booking.users.first_name,
       lastName: booking.users.last_name,
+      displayName: booking.users.display_name || `${booking.users.first_name} ${booking.users.last_name}`,
       profileImageUrl: booking.users.profile_image_url,
       stripeCustomerId: booking.users.stripe_customer_id,
       stripeSubscriptionId: booking.users.stripe_subscription_id,
@@ -143,6 +145,7 @@ export class CleanSupabaseStorage implements IStorage {
       email: '',
       firstName: 'User',
       lastName: '',
+      displayName: 'Unknown User',
       profileImageUrl: null,
       stripeCustomerId: null,
       stripeSubscriptionId: null,
@@ -213,55 +216,70 @@ export class CleanSupabaseStorage implements IStorage {
   }
 
   async getEvent(id: number): Promise<EventWithHost | undefined> {
-    const { data, error } = await supabaseAdmin
+    const { data: event, error } = await supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        users(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
     
-    if (error || !data) return undefined;
+    if (error || !event) return undefined;
+    
+    // Fetch host details separately
+    const { data: host, error: hostError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', event.host_id)
+      .single();
+
+    const hostData = host || {
+      id: event.host_id,
+      email: '',
+      firstName: 'Host',
+      lastName: 'User',
+      displayName: 'Host User',
+      profileImageUrl: null,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      phoneVerified: false,
+      idVerified: false,
+      bio: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     
     return {
-      ...data,
-      host: data.users || {
-        id: data.host_id,
-        email: '',
-        firstName: 'Host',
-        lastName: 'User',
-        profileImageUrl: null,
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        phoneVerified: false,
-        idVerified: false,
-        bio: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
+      ...event,
+      host: hostData
     } as EventWithHost;
   }
 
   async getEvents(filters?: any): Promise<EventWithHost[]> {
-    let query = supabaseAdmin
+    const { data: events, error } = await supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        users(*)
-      `)
+      .select('*')
       .order('start_time', { ascending: true });
 
-    const { data, error } = await query;
     if (error) throw error;
+    if (!events) return [];
 
-    return (data || []).map(event => ({
-      ...event,
-      host: event.users || {
+    console.log(`Found ${events.length} events from database:`, events.map(e => ({ id: e.id, title: e.title })));
+
+    // Fetch host details for each event
+    const eventsWithHosts: EventWithHost[] = [];
+    
+    for (const event of events) {
+      const { data: host, error: hostError } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', event.host_id)
+        .single();
+
+      const hostData = host || {
         id: event.host_id,
         email: '',
         firstName: 'Host',
         lastName: 'User',
+        displayName: 'Host User',
         profileImageUrl: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
@@ -270,8 +288,15 @@ export class CleanSupabaseStorage implements IStorage {
         bio: null,
         createdAt: new Date(),
         updatedAt: new Date()
-      }
-    })) as EventWithHost[];
+      };
+
+      eventsWithHosts.push({
+        ...event,
+        host: hostData
+      } as EventWithHost);
+    }
+
+    return eventsWithHosts;
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {
