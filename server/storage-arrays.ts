@@ -680,20 +680,34 @@ export class ArraySupabaseStorage implements IStorage {
 
       for (const event of events) {
         if (event.requested_users && event.requested_users.length > 0) {
+          console.log(`Processing event ${event.id} with ${event.requested_users.length} requested users`);
           for (const userId of event.requested_users) {
+            console.log(`Fetching user details for userId: ${userId}`);
+            
             // Fetch user details separately
-            const { data: user } = await supabase
+            const { data: user, error: userError } = await supabase
               .from('users')
               .select('*')
               .eq('id', userId)
               .single();
 
+            if (userError) {
+              console.log(`Error fetching user ${userId}:`, userError);
+              continue;
+            }
+
             // Fetch host details separately  
-            const { data: host } = await supabase
+            const { data: host, error: hostError } = await supabase
               .from('users')
               .select('*')
               .eq('id', hostId)
               .single();
+
+            if (hostError) {
+              console.log(`Error fetching host ${hostId}:`, hostError);
+            }
+
+            console.log(`User found: ${user ? 'YES' : 'NO'}, Host found: ${host ? 'YES' : 'NO'}`);
 
             if (user) {
               pendingBookings.push({

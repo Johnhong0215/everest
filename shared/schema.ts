@@ -128,18 +128,31 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Chat messages table
-export const chatMessages = pgTable("chat_messages", {
+// Chats table - tracks conversations between users for specific events
+export const chats = pgTable("chats", {
   id: serial("id").primaryKey(),
-  eventId: integer("event_id").notNull().references(() => events.id),
   senderId: varchar("sender_id").notNull().references(() => users.id),
   receiverId: varchar("receiver_id").notNull().references(() => users.id),
-  content: text("content").notNull(),
-  messageType: varchar("message_type", { length: 50 }).default("text"), // text, image, location
-  metadata: jsonb("metadata"), // For attachments, location data, etc.
-  readBy: jsonb("read_by").$type<string[]>().default([]), // Array of user IDs who have read this message
+  eventId: integer("event_id").notNull().references(() => events.id),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_chats_participants").on(table.senderId, table.receiverId, table.eventId),
+  index("idx_chats_event").on(table.eventId),
+]);
+
+// Chat messages table - stores individual messages
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  chatId: integer("chat_id").notNull().references(() => chats.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+}, (table) => [
+  index("idx_chat_messages_chat_time").on(table.chatId, table.createdAt),
+  index("idx_chat_messages_sender").on(table.senderId),
+]);
 
 // Payment transactions table
 export const payments = pgTable("payments", {
@@ -189,6 +202,8 @@ export const sportsSettings = pgTable("sports_settings", {
 export const usersRelations = relations(users, ({ many }) => ({
   hostedEvents: many(events),
   bookings: many(bookings),
+  chatsAsSender: many(chats, { relationName: "sender" }),
+  chatsAsReceiver: many(chats, { relationName: "receiver" }),
   chatMessages: many(chatMessages),
   sportPreferences: many(userSportPreferences),
   reviewsGiven: many(reviews, { relationName: "reviewer" }),
@@ -201,8 +216,26 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     references: [users.id],
   }),
   bookings: many(bookings),
-  chatMessages: many(chatMessages),
+  chats: many(chats),
   reviews: many(reviews),
+}));
+
+export const chatsRelations = relations(chats, ({ one, many }) => ({
+  sender: one(users, {
+    fields: [chats.senderId],
+    references: [users.id],
+    relationName: "sender",
+  }),
+  receiver: one(users, {
+    fields: [chats.receiverId],
+    references: [users.id],
+    relationName: "receiver",
+  }),
+  event: one(events, {
+    fields: [chats.eventId],
+    references: [events.id],
+  }),
+  messages: many(chatMessages),
 }));
 
 export const bookingsRelations = relations(bookings, ({ one, many }) => ({
@@ -218,9 +251,9 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
-  event: one(events, {
-    fields: [chatMessages.eventId],
-    references: [events.id],
+  chat: one(chats, {
+    fields: [chatMessages.chatId],
+    references: [chats.id],
   }),
   sender: one(users, {
     fields: [chatMessages.senderId],
@@ -289,6 +322,12 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   updatedAt: true,
 });
 
+export const insertChatSchema = createInsertSchema(chats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   id: true,
   createdAt: true,
@@ -317,6 +356,8 @@ export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
+export type InsertChat = z.infer<typeof insertChatSchema>;
+export type Chat = typeof chats.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 
