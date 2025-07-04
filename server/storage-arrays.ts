@@ -180,34 +180,58 @@ export class ArraySupabaseStorage implements IStorage {
 
   async getEvent(id: number): Promise<EventWithHost | undefined> {
     try {
-      const { data, error } = await supabase
+      const { data: event, error } = await supabase
         .from('events')
-        .select(`
-          *,
-          host:host_id(*)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (error || !data) return undefined;
+      if (error || !event) return undefined;
+
+      // Fetch host separately to avoid foreign key issues
+      const { data: host } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', event.host_id)
+        .single();
 
       return {
-        ...data,
-        hostId: data.host_id,
-        skillLevel: data.skill_level,
-        genderMix: data.gender_mix,
-        startTime: data.start_time,
-        endTime: data.end_time,
-        maxPlayers: data.max_players,
-        currentPlayers: data.current_players,
-        pricePerPerson: data.price_per_person,
-        sportConfig: data.sport_config,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        requestedUsers: data.requested_users || [],
-        acceptedUsers: data.accepted_users || [],
-        rejectedUsers: data.rejected_users || [],
-        host: data.host
+        id: event.id,
+        hostId: event.host_id,
+        title: event.title,
+        description: event.description,
+        sport: event.sport,
+        skillLevel: event.skill_level,
+        genderMix: event.gender_mix,
+        startTime: event.start_time,
+        endTime: event.end_time,
+        location: event.location,
+        latitude: parseFloat(event.latitude) || 0,
+        longitude: parseFloat(event.longitude) || 0,
+        maxPlayers: event.max_players,
+        currentPlayers: event.current_players || 1,
+        pricePerPerson: parseFloat(event.price_per_person) || 0,
+        sportConfig: event.sport_config || {},
+        status: event.status,
+        notes: event.notes,
+        createdAt: new Date(event.created_at),
+        updatedAt: new Date(event.updated_at),
+        requestedUsers: event.requested_users || [],
+        acceptedUsers: event.accepted_users || [],
+        rejectedUsers: event.rejected_users || [],
+        host: host || {
+          id: event.host_id?.toString() || '',
+          email: '',
+          firstName: 'Unknown',
+          lastName: 'Host',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          emailVerified: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
       } as EventWithHost;
     } catch (error) {
       console.error('Error fetching event:', error);
@@ -219,7 +243,9 @@ export class ArraySupabaseStorage implements IStorage {
     try {
       let query = supabase
         .from('events')
-        .select('*');
+        .select('*')
+        .gte('start_time', new Date().toISOString()) // Only show future events
+        .eq('status', 'published');
 
       if (filters?.sports?.length) {
         query = query.in('sport', filters.sports);
@@ -346,34 +372,58 @@ export class ArraySupabaseStorage implements IStorage {
 
   async getEventsByHost(hostId: string): Promise<EventWithHost[]> {
     try {
-      const { data, error } = await supabase
+      const { data: events, error } = await supabase
         .from('events')
-        .select(`
-          *,
-          host:host_id(*)
-        `)
+        .select('*')
         .eq('host_id', hostId);
 
       if (error) throw new Error(`Host events fetch failed: ${error.message}`);
-      if (!data) return [];
+      if (!events) return [];
 
-      return data.map(item => ({
-        ...item,
-        hostId: item.host_id,
-        skillLevel: item.skill_level,
-        genderMix: item.gender_mix,
-        startTime: item.start_time,
-        endTime: item.end_time,
-        maxPlayers: item.max_players,
-        currentPlayers: item.current_players,
-        pricePerPerson: item.price_per_person,
-        sportConfig: item.sport_config,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-        requestedUsers: item.requested_users || [],
-        acceptedUsers: item.accepted_users || [],
-        rejectedUsers: item.rejected_users || [],
-        host: item.host
+      // Fetch host information separately 
+      const { data: host } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', hostId)
+        .single();
+
+      return events.map(event => ({
+        id: event.id,
+        hostId: event.host_id,
+        title: event.title,
+        description: event.description,
+        sport: event.sport,
+        skillLevel: event.skill_level,
+        genderMix: event.gender_mix,
+        startTime: event.start_time,
+        endTime: event.end_time,
+        location: event.location,
+        latitude: parseFloat(event.latitude) || 0,
+        longitude: parseFloat(event.longitude) || 0,
+        maxPlayers: event.max_players,
+        currentPlayers: event.current_players || 1,
+        pricePerPerson: parseFloat(event.price_per_person) || 0,
+        sportConfig: event.sport_config || {},
+        status: event.status,
+        notes: event.notes,
+        createdAt: new Date(event.created_at),
+        updatedAt: new Date(event.updated_at),
+        requestedUsers: event.requested_users || [],
+        acceptedUsers: event.accepted_users || [],
+        rejectedUsers: event.rejected_users || [],
+        host: host || {
+          id: hostId,
+          email: '',
+          firstName: 'Unknown',
+          lastName: 'Host',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          emailVerified: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
       })) as EventWithHost[];
     } catch (error) {
       console.error('Error fetching host events:', error);
@@ -434,24 +484,35 @@ export class ArraySupabaseStorage implements IStorage {
   async getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]> {
     try {
       // Find events where user is in any participant array
-      const { data, error } = await supabase
+      const { data: events, error } = await supabase
         .from('events')
-        .select(`
-          *,
-          host:host_id(*)
-        `)
+        .select('*')
         .or(`requested_users.cs.{${userId}},accepted_users.cs.{${userId}},rejected_users.cs.{${userId}}`);
 
       if (error) throw new Error(`User bookings fetch failed: ${error.message}`);
-      if (!data) return [];
+      if (!events) return [];
 
       // Convert to BookingWithEventAndUser format
       const bookings: BookingWithEventAndUser[] = [];
       
-      for (const event of data) {
+      for (const event of events) {
         let status = 'requested';
         if (event.accepted_users?.includes(userId)) status = 'accepted';
         else if (event.rejected_users?.includes(userId)) status = 'rejected';
+
+        // Fetch host separately
+        const { data: host } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', event.host_id)
+          .single();
+
+        // Fetch user separately  
+        const { data: user } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
         bookings.push({
           id: event.id,
@@ -463,30 +524,53 @@ export class ArraySupabaseStorage implements IStorage {
           createdAt: new Date(event.created_at),
           updatedAt: new Date(event.updated_at),
           event: {
-            ...event,
+            id: event.id,
             hostId: event.host_id,
+            title: event.title,
+            description: event.description,
+            sport: event.sport,
             skillLevel: event.skill_level,
             genderMix: event.gender_mix,
             startTime: event.start_time,
             endTime: event.end_time,
+            location: event.location,
+            latitude: parseFloat(event.latitude) || 0,
+            longitude: parseFloat(event.longitude) || 0,
             maxPlayers: event.max_players,
-            currentPlayers: event.current_players,
-            pricePerPerson: event.price_per_person,
-            sportConfig: event.sport_config,
-            createdAt: event.created_at,
-            updatedAt: event.updated_at,
+            currentPlayers: event.current_players || 1,
+            pricePerPerson: parseFloat(event.price_per_person) || 0,
+            sportConfig: event.sport_config || {},
+            status: event.status,
+            notes: event.notes,
+            createdAt: new Date(event.created_at),
+            updatedAt: new Date(event.updated_at),
             requestedUsers: event.requested_users || [],
             acceptedUsers: event.accepted_users || [],
             rejectedUsers: event.rejected_users || [],
-            host: event.host
+            host: host || {
+              id: event.host_id?.toString() || '',
+              email: '',
+              firstName: 'Unknown',
+              lastName: 'Host',
+              profileImageUrl: null,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              phoneVerified: false,
+              emailVerified: false,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
           } as EventWithHost,
-          user: {
+          user: user || {
             id: userId,
             email: '',
-            name: '',
-            avatarUrl: null,
+            firstName: 'Unknown',
+            lastName: 'User',
+            profileImageUrl: null,
             stripeCustomerId: null,
             stripeSubscriptionId: null,
+            phoneVerified: false,
+            emailVerified: false,
             createdAt: new Date(),
             updatedAt: new Date()
           } as User
