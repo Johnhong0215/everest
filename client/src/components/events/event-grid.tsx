@@ -71,7 +71,7 @@ export default function EventGrid({
 
 
 
-  // Check for saved location and start continuous tracking
+  // Force clear all cached location data and start fresh tracking
   useEffect(() => {
     // Enhanced geolocation availability check
     const isGeolocationAvailable = () => {
@@ -89,47 +89,44 @@ export default function EventGrid({
       return;
     }
 
-    // Check for saved location data and permission in localStorage
+    // Force clear all cached location data to ensure fresh location across devices
+    console.log('Clearing all cached location data for fresh tracking...');
+    localStorage.removeItem('userLocation');
+    
+    // Also clear React Query cache to force fresh data fetch
+    queryClient.clear();
+    
+    // Check for saved permission but always get fresh location
     try {
       const savedPermission = localStorage.getItem('locationPermission');
       
       if (savedPermission === 'granted') {
-        console.log('Location permission previously granted, starting real-time tracking...');
+        console.log('Location permission previously granted, starting fresh real-time tracking...');
         setLocationPermission('granted');
-        // Start continuous location tracking immediately - don't use cached location
+        // Always start fresh location tracking - no cached data
         startLocationTracking();
       } else if (savedPermission === 'denied') {
-        console.log('Location permission previously denied');
+        console.log('Location permission previously denied, will not track');
         setLocationPermission('denied');
-        // Only use saved location as fallback when permission is denied
-        const savedLocation = localStorage.getItem('userLocation');
-        if (savedLocation) {
-          const location = JSON.parse(savedLocation);
-          if (location.lat && location.lng) {
-            setUserLocation(location);
-            console.log('Using fallback saved location (permission denied):', location);
-          }
-        }
       } else {
-        console.log('No location permission saved, will request when needed');
-        // Don't restore cached location on startup - wait for user to request or grant permission
-        // This ensures we always get fresh location data
+        console.log('No location permission saved, will request fresh permission...');
+        // Clear location state to ensure no stale data
+        setUserLocation(null);
         
-        // Automatically try to get fresh location permission on first visit
-        if (!savedPermission) {
-          console.log('No saved permission, attempting automatic real-time location request...');
-          setTimeout(() => {
-            if (locationPermission === 'prompt') {
-              requestLocation();
-            }
-          }, 1000); // Give UI time to load before requesting location
-        }
+        // Automatically request fresh location permission
+        console.log('Attempting automatic fresh location request...');
+        setTimeout(() => {
+          if (locationPermission === 'prompt') {
+            requestLocation();
+          }
+        }, 1000); // Give UI time to load before requesting location
       }
     } catch (error) {
-      console.warn('Failed to restore saved location:', error);
-      // Clear invalid data
+      console.warn('Failed to check saved permission:', error);
+      // Clear all location data on error
       localStorage.removeItem('userLocation');
       localStorage.removeItem('locationPermission');
+      setUserLocation(null);
     }
 
     // Cleanup function to stop tracking when component unmounts
@@ -192,6 +189,7 @@ export default function EventGrid({
         if (hasSignificantChange) {
           console.log('Location updated with significant change:', newLocation);
           setUserLocation(newLocation);
+          console.log('UserLocation state updated to:', newLocation);
           
           // Update permission state to granted
           if (locationPermission !== 'granted') {
@@ -205,6 +203,9 @@ export default function EventGrid({
           } catch (error) {
             console.warn('Failed to save updated location:', error);
           }
+          
+          // Force refresh events data with new location
+          queryClient.invalidateQueries({ queryKey: ['/api/events'] });
         } else {
           console.log('Location update too small, skipping');
         }

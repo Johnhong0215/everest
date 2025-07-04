@@ -45,9 +45,19 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
     return R * c;
   };
 
+  // Debug distance calculation
+  console.log('EventCard distance calculation:', {
+    userLocation,
+    eventLat: event.latitude,
+    eventLng: event.longitude,
+    eventId: event.id
+  });
+
   const distance = userLocation && event.latitude && event.longitude 
     ? calculateDistance(userLocation.lat, userLocation.lng, parseFloat(event.latitude), parseFloat(event.longitude))
     : null;
+
+  console.log('Calculated distance:', distance, 'for event', event.id);
 
   return (
     <Card className={`card-hover border ${
