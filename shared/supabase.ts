@@ -1,8 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Frontend environment variables (available in browser)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+// Check if we're in a browser environment (for client-side) or Node.js (for server-side)
+const isClient = typeof window !== 'undefined'
+
+// Get environment variables with fallbacks
+const supabaseUrl = isClient 
+  ? (import.meta as any)?.env?.VITE_SUPABASE_URL || '' 
+  : process.env.SUPABASE_URL || ''
+
+const supabaseAnonKey = isClient 
+  ? (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || '' 
+  : process.env.SUPABASE_ANON_KEY || ''
 
 // Server-side environment variables (only available on server)
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''

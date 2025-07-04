@@ -1,0 +1,190 @@
+-- Data Migration Script
+-- Insert all existing data into Supabase
+
+-- Insert users
+INSERT INTO users (id, email, first_name, last_name, profile_image_url, stripe_customer_id, stripe_subscription_id, phone_verified, id_verified, bio, created_at, updated_at) VALUES
+('44146632', 'k6dft4mxzj@privaterelay.appleid.com', '', '', NULL, NULL, NULL, false, false, NULL, '2025-06-22 23:30:16.789618+00', '2025-06-22 23:30:16.789618+00'),
+('44291205', 'seyakim2@illinois.edu', '', '', NULL, NULL, NULL, false, false, NULL, '2025-06-26 13:16:15.003624+00', '2025-06-26 13:16:15.003624+00'),
+('2794292', 'seokjun2@illinois.edu', 'John', 'Hong', NULL, NULL, NULL, false, false, NULL, '2025-06-22 04:03:02.32582+00', '2025-07-02 22:32:26.178+00'),
+('36555114', 'seokjun0215@gmail.com', '', '', NULL, NULL, NULL, false, false, NULL, '2025-06-22 02:58:44.005544+00', '2025-07-04 15:23:27.591+00');
+
+-- Insert events with proper ID sequencing
+ALTER SEQUENCE events_id_seq RESTART WITH 33;
+INSERT INTO events (id, host_id, title, description, sport, skill_level, gender_mix, start_time, end_time, location, latitude, longitude, max_players, current_players, price_per_person, sport_config, status, notes, created_at, updated_at) VALUES
+(33, '2794292', 'test1', '', 'tennis', 'intermediate', 'mixed', '2025-06-25 19:27:00+00', '2025-06-25 21:27:00+00', 'Activities and Recreation Center,  201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"format": "Singles", "scoring": "Standard sets", "ballType": "Pressurized", "courtSurface": "Clay", "courtLighting": "Day play", "equipmentRental": "None"}', 'published', NULL, '2025-06-24 19:28:00.240455+00', '2025-06-24 19:28:00.240455+00'),
+(34, '2794292', 'test 2', '', 'basketball', 'intermediate', 'mixed', '2025-06-25 19:27:00+00', '2025-06-25 21:27:00+00', 'Activities and Recreation Center,  201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"venue": "Indoor gym", "format": "3×3 half-court", "referee": "Self-officiated", "duration": "Timed quarters", "ballSupply": "Host-provided", "hoopHeight": "Standard 10′", "skillDivision": "Casual pickup"}', 'published', NULL, '2025-06-24 19:28:15.043323+00', '2025-06-24 19:28:15.043323+00'),
+(39, '2794292', 'table', '', 'tennis', 'intermediate', 'mixed', '2025-06-27 02:42:00+00', '2025-06-27 04:42:00+00', 'Activities and Recreation Center,  201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"format": "Singles", "scoring": "Standard sets", "ballType": "Pressurized", "courtSurface": "Hard", "courtLighting": "Day play", "equipmentRental": "Racquets"}', 'published', NULL, '2025-06-26 03:28:45.016745+00', '2025-06-26 03:28:45.016745+00'),
+(40, '36555114', 'a', '', 'tennis', 'intermediate', 'mixed', '2025-06-27 02:50:00+00', '2025-06-27 04:50:00+00', 'Activities and Recreation Center,  201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"format": "Doubles", "scoring": "Standard sets", "ballType": "Pressureless", "courtSurface": "Clay", "courtLighting": "Day play", "equipmentRental": "None"}', 'published', NULL, '2025-06-26 03:29:46.40081+00', '2025-06-26 03:29:46.40081+00'),
+(41, '36555114', '배구', '', 'volleyball', 'intermediate', 'mixed', '2025-06-27 03:30:00+00', '2025-06-27 05:30:00+00', 'Activities and Recreation Center,  201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"surface": "Gym floor", "netHeight": "Women''s regulation", "ballSupply": "Indoor volleyballs", "discipline": "Beach 2×2", "skillLevel": "Recreational", "rotationRules": "Strict", "weatherBackup": "None"}', 'published', NULL, '2025-06-26 03:31:19.17271+00', '2025-06-26 03:31:19.17271+00'),
+(42, '36555114', '농구', '', 'basketball', 'intermediate', 'mixed', '2025-06-27 03:32:00+00', '2025-06-27 05:32:00+00', '605,  South Fourth Street', 40.11104950, -88.23386820, 6, 1, 3.00, '{"venue": "Outdoor public court", "format": "3×3 half-court", "referee": "Self-officiated", "duration": "Timed quarters", "ballSupply": "BYO ball", "hoopHeight": "Standard 10′", "skillDivision": "Casual pickup"}', 'published', NULL, '2025-06-26 03:33:09.210931+00', '2025-06-26 03:33:09.210931+00'),
+(44, '36555114', '축구', '', 'soccer', 'intermediate', 'mixed', '2025-06-28 02:25:00+00', '2025-06-28 04:25:00+00', 'Current Location', 40.11335443, -88.23251245, 4, 1, 12.00, '{"format": "5-a-side", "referee": "None", "ballSize": "Size 4", "goalType": "Portable", "matchLength": "2×30 min", "pitchSurface": "Grass", "cleatsRequirement": "Turf shoes"}', 'published', NULL, '2025-06-27 02:26:18.779537+00', '2025-06-27 02:26:18.779537+00'),
+(45, '36555114', '테니스', '', 'tennis', 'intermediate', 'mixed', '2025-06-28 02:38:00+00', '2025-06-28 04:38:00+00', 'Jipbap Taste of Korea,   601', 40.11137870, -88.23058400, 4, 1, 12.00, '{"format": "Singles", "scoring": "Standard sets", "ballType": "Pressurized", "courtSurface": "Hard", "courtLighting": "Night play", "equipmentRental": "None"}', 'published', NULL, '2025-06-27 02:40:38.181496+00', '2025-06-27 02:40:38.181496+00'),
+(46, '36555114', 'syf', '', 'tennis', 'intermediate', 'mixed', '2025-07-01 14:21:00+00', '2025-07-01 16:21:00+00', 'Current Location', 40.09252904, -88.23708336, 4, 1, 12.00, '{"format": "Singles", "scoring": "Standard sets", "ballType": "Pressurized", "courtSurface": "Hard", "courtLighting": "Day play", "equipmentRental": "None"}', 'published', NULL, '2025-06-30 14:29:11.900549+00', '2025-06-30 14:29:11.900549+00'),
+(47, '2794292', 'tennis', '', 'tennis', 'intermediate', 'mixed', '2025-07-02 01:26:00+00', '2025-07-02 03:26:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"format": "Doubles", "scoring": "Standard sets", "ballType": "Pressurized", "courtSurface": "Hard", "courtLighting": "Day play", "equipmentRental": "None"}', 'published', NULL, '2025-07-01 01:28:02.863088+00', '2025-07-01 01:28:02.863088+00'),
+(48, '36555114', 'soccer', '', 'soccer', 'intermediate', 'mixed', '2025-07-02 01:29:00+00', '2025-07-02 03:29:00+00', 'Current Location', 40.11376086, -88.23274805, 4, 1, 12.00, '{"format": "7-a-side", "referee": "None", "ballSize": "Size 4", "goalType": "Regulation goals", "matchLength": "2×30 min", "pitchSurface": "Grass", "cleatsRequirement": "Turf shoes"}', 'published', NULL, '2025-07-01 01:37:30.326439+00', '2025-07-01 01:37:30.326439+00'),
+(49, '36555114', 'badminton', '', 'badminton', 'intermediate', 'mixed', '2025-07-02 01:40:00+00', '2025-07-02 03:40:00+00', 'Current Location', 40.11366048, -88.23268442, 4, 1, 12.00, '{"format": "Doubles", "lighting": "Daylight", "courtType": "Indoor wood", "equipment": "BYO racket", "shuttlecock": "Feather (slow)"}', 'published', NULL, '2025-07-01 01:41:24.981697+00', '2025-07-01 01:41:24.981697+00'),
+(52, '36555114', 'basketball', '', 'basketball', 'intermediate', 'mixed', '2025-07-02 02:03:00+00', '2025-07-02 04:03:00+00', '406 East Stoughton Street, Champaign, Illinois, 61820', 40.11354544, -88.23272358, 4, 1, 12.00, '{"venue": "Indoor gym", "format": "5×5 full-court", "referee": "Self-officiated", "duration": "Timed quarters", "ballSupply": "BYO ball", "hoopHeight": "Adjustable", "skillDivision": "Casual pickup"}', 'published', NULL, '2025-07-01 02:04:13.718001+00', '2025-07-01 02:04:13.718001+00'),
+(53, '36555114', 'test', '', 'badminton', 'intermediate', 'mixed', '2025-07-02 18:56:00+00', '2025-07-02 20:56:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-01 18:57:10.051023+00', '2025-07-01 18:57:10.051023+00'),
+(55, '36555114', 'soccer test', '', 'soccer', 'intermediate', 'mixed', '2025-07-02 20:00:00+00', '2025-07-02 21:00:00+00', '605,   South Fourth Street', 40.11104950, -88.23386820, 10, 1, 5.00, '{"format": "5-a-side", "referee": "None", "ballSize": "Size 3", "goalType": "Regulation goals", "matchLength": "2×30 min", "pitchSurface": "Turf", "cleatsRequirement": "Turf shoes"}', 'published', NULL, '2025-07-01 19:58:45.110057+00', '2025-07-01 19:58:45.110057+00'),
+(56, '36555114', 'basketball', '', 'basketball', 'intermediate', 'mixed', '2025-07-01 20:40:00+00', '2025-07-01 21:40:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"ballSupply": "BYO ball"}', 'published', NULL, '2025-07-01 20:42:48.770445+00', '2025-07-01 20:42:48.770445+00'),
+(57, '36555114', 'tennis test', '', 'tennis', 'intermediate', 'mixed', '2025-07-15 20:40:00+00', '2025-07-15 21:40:00+00', 'Gerty Drive, Champaign, Illinois, 61820', 40.09260603, -88.23708418, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-01 20:43:16.438962+00', '2025-07-01 20:43:16.438962+00'),
+(60, '36555114', 'basketball test ', '', 'basketball', 'intermediate', 'mixed', '2025-07-02 11:00:00+00', '2025-07-02 12:00:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{"venue": "Outdoor public court", "format": "5×5 full-court", "referee": "Paid official", "duration": "First to X points", "ballSupply": "Host-provided", "hoopHeight": "Adjustable", "skillDivision": "Casual pickup"}', 'published', NULL, '2025-07-02 02:53:45.230388+00', '2025-07-02 02:53:45.230388+00'),
+(62, '36555114', 'tennis', '', 'tennis', 'intermediate', 'mixed', '2025-07-03 19:10:00+00', '2025-07-03 20:10:00+00', 'Arctic Village Airport,   Airport Road', 68.11442540, -145.57909110, 4, 1, 12.00, '{"format": "Singles", "scoring": "Pro-sets", "ballType": "Pressureless", "courtSurface": "Clay", "courtLighting": "Night play", "equipmentRental": "Racquets"}', 'published', NULL, '2025-07-02 19:09:05.35157+00', '2025-07-02 19:09:05.35157+00'),
+(65, '36555114', 'table tennis', '', 'tabletennis', 'intermediate', 'mixed', '2025-07-24 20:00:00+00', '2025-07-24 21:00:00+00', 'Starbucks,   1401', 40.10956000, -88.22702700, 5, 1, 12.00, '{}', 'published', NULL, '2025-07-02 19:29:07.667056+00', '2025-07-02 19:29:07.667056+00'),
+(66, '2794292', 'badminton', '', 'badminton', 'advanced', 'mens', '2025-07-24 22:00:00+00', '2025-07-24 23:00:00+00', 'Grainger Engineering Library,   1301', 40.11247400, -88.22685820, 4, 1, 2.00, '{}', 'published', NULL, '2025-07-02 22:15:49.611164+00', '2025-07-02 22:15:49.611164+00'),
+(67, '36555114', 'dd', '', 'basketball', 'intermediate', 'mixed', '2025-07-11 22:00:00+00', '2025-07-11 23:00:00+00', '605,   South Fourth Street', 40.11104950, -88.23386820, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-02 22:29:52.248502+00', '2025-07-02 22:29:52.248502+00'),
+(68, '36555114', 'adfga', '', 'tabletennis', 'intermediate', 'mixed', '2025-07-02 22:50:00+00', '2025-07-02 23:50:00+00', 'Sticky Rice,   415', 40.11985820, -88.24367320, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-02 22:35:53.519126+00', '2025-07-02 22:35:53.519126+00'),
+(69, '36555114', 'soccer test', '', 'soccer', 'intermediate', 'mixed', '2025-07-04 15:50:00+00', '2025-07-04 16:50:00+00', 'Vancouver,   Clark County', 45.63069540, -122.67445570, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 15:51:19.131215+00', '2025-07-03 15:51:19.131215+00'),
+(70, '36555114', 'd', '', 'badminton', 'intermediate', 'mixed', '2025-07-03 15:45:00+00', '2025-07-03 16:50:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 15:59:23.834272+00', '2025-07-03 15:59:23.834272+00'),
+(72, '36555114', 'basketball', '', 'basketball', 'intermediate', 'mixed', '2025-07-04 17:45:00+00', '2025-07-04 18:45:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 17:40:04.25157+00', '2025-07-03 17:40:04.25157+00'),
+(74, '36555114', 'test', '', 'volleyball', 'intermediate', 'mixed', '2025-07-07 18:15:00+00', '2025-07-07 19:15:00+00', 'Downtown,   Champaign', 40.11696450, -88.24136410, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 18:02:31.64297+00', '2025-07-03 18:02:31.64297+00'),
+(75, '36555114', 'location test', '', 'soccer', 'intermediate', 'mixed', '2025-07-03 18:15:00+00', '2025-07-03 19:15:00+00', '309,   South Fourth Street', 40.11381650, -88.23340790, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 18:15:22.477304+00', '2025-07-03 18:15:22.477304+00'),
+(76, '36555114', 'testing', '', 'badminton', 'intermediate', 'mixed', '2025-07-03 18:30:00+00', '2025-07-03 19:30:00+00', 'HERE Champaign,   308', 40.11058730, -88.23403130, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 18:16:08.900328+00', '2025-07-03 18:16:08.900328+00'),
+(77, '36555114', 'adsf', '', 'badminton', 'intermediate', 'mixed', '2025-07-04 15:45:00+00', '2025-07-04 16:45:00+00', 'Activities and Recreation Center,   201', 40.10063700, -88.23605030, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-04 15:31:08.577947+00', '2025-07-04 15:31:08.577947+00'),
+(73, '36555114', 'change2', '', 'volleyball', 'intermediate', 'mixed', '2025-07-04 14:30:00+00', '2025-07-04 15:30:00+00', 'Gerty Drive, Champaign, Illinois, 61820', 40.09253493, -88.23714889, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-03 17:41:00.30156+00', '2025-07-03 18:25:14.924+00'),
+(78, '36555114', 'dfsdfdsf', '', 'basketball', 'intermediate', 'mixed', '2025-07-04 15:45:00+00', '2025-07-04 16:45:00+00', '605 South Fourth Street, Champaign, Illinois, 61820', 40.11106093, -88.23380515, 4, 1, 12.00, '{}', 'published', NULL, '2025-07-04 15:41:21.279781+00', '2025-07-04 15:41:21.279781+00'),
+(71, '36555114', 'testing change', '', 'volleyball', 'beginner', 'mixed', '2025-07-04 01:45:00+00', '2025-07-04 02:45:00+00', 'Gerty Drive, Champaign, Illinois, 61820', 40.09258270, -88.23709111, 4, 1, 12.00, '{"ballSupply": "Indoor volleyballs"}', 'published', NULL, '2025-07-03 16:09:50.056698+00', '2025-07-03 19:28:24.717+00');
+
+-- Update sequence to next available number
+SELECT setval('events_id_seq', (SELECT MAX(id) FROM events) + 1);
+
+-- Insert bookings with proper ID sequencing
+ALTER SEQUENCE bookings_id_seq RESTART WITH 6;
+INSERT INTO bookings (id, event_id, user_id, status, payment_intent_id, amount_paid, created_at, updated_at) VALUES
+(6, 34, '36555114', 'accepted', NULL, NULL, '2025-06-24 19:52:32.218931+00', '2025-06-24 19:52:41.939+00'),
+(10, 42, '2794292', 'rejected', NULL, NULL, '2025-06-26 03:42:59.440166+00', '2025-06-26 03:52:36.347+00'),
+(13, 42, '44291205', 'accepted', NULL, NULL, '2025-06-26 13:18:16.647313+00', '2025-06-26 13:18:31.04+00'),
+(14, 44, '2794292', 'accepted', NULL, NULL, '2025-06-27 02:30:25.054149+00', '2025-06-27 02:30:35.387+00'),
+(15, 46, '2794292', 'accepted', NULL, NULL, '2025-06-30 15:13:09.293651+00', '2025-06-30 15:13:24.369+00'),
+(16, 47, '36555114', 'accepted', NULL, NULL, '2025-07-01 02:36:14.659141+00', '2025-07-01 02:43:38.332+00'),
+(11, 33, '36555114', 'accepted', NULL, NULL, '2025-06-26 03:46:46.57549+00', '2025-07-01 02:43:40.233+00'),
+(9, 39, '36555114', 'accepted', NULL, NULL, '2025-06-26 03:36:33.310264+00', '2025-07-01 02:43:41.586+00');
+
+-- Update sequence to next available number
+SELECT setval('bookings_id_seq', (SELECT MAX(id) FROM bookings) + 1);
+
+-- Insert chat messages with proper ID sequencing
+ALTER SEQUENCE chat_messages_id_seq RESTART WITH 52;
+INSERT INTO chat_messages (id, event_id, sender_id, content, message_type, metadata, created_at, read_by, receiver_id) VALUES
+(53, 33, '36555114', 'test 1\\', 'text', NULL, '2025-06-24 19:28:34.882504+00', '["36555114", "2794292"]', '2794292'),
+(54, 33, '36555114', 'hi', 'text', NULL, '2025-06-26 02:14:26.565833+00', '["36555114", "2794292"]', '2794292'),
+(55, 33, '36555114', 'test 3', 'text', NULL, '2025-06-26 02:24:03.490385+00', '["36555114", "2794292"]', '2794292'),
+(56, 33, '36555114', 'test 3', 'text', NULL, '2025-06-26 02:24:03.511516+00', '["36555114", "2794292"]', '2794292'),
+(52, 34, '36555114', 'test 2', 'text', NULL, '2025-06-24 19:28:27.095748+00', '["36555114", "2794292"]', '2794292'),
+(58, 34, '2794292', 'hello', 'text', NULL, '2025-06-26 02:28:58.599733+00', '["2794292", "36555114"]', '36555114'),
+(59, 34, '2794292', 'hello', 'text', NULL, '2025-06-26 02:28:58.710324+00', '["2794292", "36555114"]', '36555114'),
+(60, 34, '2794292', 'why', 'text', NULL, '2025-06-26 02:29:11.897218+00', '["2794292", "36555114"]', '36555114'),
+(61, 34, '2794292', 'why', 'text', NULL, '2025-06-26 02:29:11.929052+00', '["2794292", "36555114"]', '36555114'),
+(57, 33, '2794292', 'hi', 'text', NULL, '2025-06-26 02:28:50.202819+00', '["2794292", "36555114"]', '36555114'),
+(62, 33, '2794292', '?', 'text', NULL, '2025-06-26 02:29:17.226205+00', '["2794292", "36555114"]', '36555114'),
+(67, 33, '36555114', 'it sends twice', 'text', NULL, '2025-06-26 02:40:14.838648+00', '["36555114", "2794292"]', '2794292'),
+(68, 33, '36555114', 'it sends twice', 'text', NULL, '2025-06-26 02:40:14.840053+00', '["36555114", "2794292"]', '2794292'),
+(69, 33, '36555114', 'why', 'text', NULL, '2025-06-26 02:40:37.142942+00', '["36555114", "2794292"]', '2794292'),
+(70, 33, '36555114', 'why', 'text', NULL, '2025-06-26 02:40:37.337193+00', '["36555114", "2794292"]', '2794292'),
+(71, 33, '36555114', 'still twice?', 'text', NULL, '2025-06-26 02:42:43.596742+00', '["36555114", "2794292"]', '2794292'),
+(72, 33, '36555114', 'no it''s good', 'text', NULL, '2025-06-26 02:42:46.971299+00', '["36555114", "2794292"]', '2794292'),
+(73, 33, '2794292', 'ok it''s good', 'text', NULL, '2025-06-26 02:43:00.428469+00', '["2794292", "36555114"]', '36555114'),
+(74, 34, '36555114', 'is it still sending two?', 'text', NULL, '2025-06-26 03:25:57.478533+00', '["36555114", "2794292"]', '2794292'),
+(77, 42, '44291205', 'hello', 'text', NULL, '2025-06-26 13:17:28.346768+00', '["44291205", "36555114"]', '36555114'),
+(78, 42, '36555114', '안녕', 'text', NULL, '2025-06-26 13:17:40.095937+00', '["36555114", "44291205"]', '44291205'),
+(79, 42, '36555114', '농구하고싶니?', 'text', NULL, '2025-06-26 13:17:43.395012+00', '["36555114", "44291205"]', '44291205'),
+(80, 42, '44291205', 'dmd', 'text', NULL, '2025-06-26 13:18:00.789388+00', '["44291205", "36555114"]', '36555114'),
+(82, 46, '2794292', 'hi', 'text', NULL, '2025-06-30 15:13:35.219701+00', '["2794292", "36555114"]', '36555114'),
+(81, 34, '36555114', 'hi', 'text', NULL, '2025-06-30 14:22:17.256179+00', '["36555114", "2794292"]', '2794292');
+
+-- Update sequence to next available number
+SELECT setval('chat_messages_id_seq', (SELECT MAX(id) FROM chat_messages) + 1);
+
+-- Insert sports settings
+INSERT INTO sports_settings (id, sport, setting_key, setting_value, display_order, created_at) VALUES
+(1, 'badminton', 'format', 'Singles', 1, '2025-07-01 19:19:18.754687+00'),
+(2, 'badminton', 'format', 'Doubles', 2, '2025-07-01 19:19:18.754687+00'),
+(3, 'badminton', 'courtType', 'Indoor wood', 1, '2025-07-01 19:19:18.754687+00'),
+(4, 'badminton', 'courtType', 'Outdoor concrete', 2, '2025-07-01 19:19:18.754687+00'),
+(5, 'badminton', 'shuttlecock', 'Feather (slow)', 1, '2025-07-01 19:19:18.754687+00'),
+(6, 'badminton', 'shuttlecock', 'Feather (medium)', 2, '2025-07-01 19:19:18.754687+00'),
+(7, 'badminton', 'shuttlecock', 'Feather (fast)', 3, '2025-07-01 19:19:18.754687+00'),
+(8, 'badminton', 'shuttlecock', 'Nylon', 4, '2025-07-01 19:19:18.754687+00'),
+(9, 'badminton', 'lighting', 'Daylight', 1, '2025-07-01 19:19:18.754687+00'),
+(10, 'badminton', 'lighting', 'Evening floodlights', 2, '2025-07-01 19:19:18.754687+00'),
+(11, 'badminton', 'equipment', 'BYO racket', 1, '2025-07-01 19:19:18.754687+00'),
+(12, 'badminton', 'equipment', 'Host-provided rental', 2, '2025-07-01 19:19:18.754687+00'),
+(13, 'basketball', 'format', '3×3 half-court', 1, '2025-07-01 19:19:18.754687+00'),
+(14, 'basketball', 'format', '5×5 full-court', 2, '2025-07-01 19:19:18.754687+00'),
+(15, 'basketball', 'venue', 'Outdoor public court', 1, '2025-07-01 19:19:18.754687+00'),
+(16, 'basketball', 'venue', 'Indoor gym', 2, '2025-07-01 19:19:18.754687+00'),
+(17, 'basketball', 'hoopHeight', 'Standard 10′', 1, '2025-07-01 19:19:18.754687+00'),
+(18, 'basketball', 'hoopHeight', 'Adjustable', 2, '2025-07-01 19:19:18.754687+00'),
+(19, 'basketball', 'ballSupply', 'BYO ball', 1, '2025-07-01 19:19:18.754687+00'),
+(20, 'basketball', 'ballSupply', 'Host-provided', 2, '2025-07-01 19:19:18.754687+00'),
+(21, 'basketball', 'skillDivision', 'Casual pickup', 1, '2025-07-01 19:19:18.754687+00'),
+(22, 'basketball', 'skillDivision', 'Competitive', 2, '2025-07-01 19:19:18.754687+00'),
+(23, 'basketball', 'referee', 'Self-officiated', 1, '2025-07-01 19:19:18.754687+00'),
+(24, 'basketball', 'referee', 'Paid official', 2, '2025-07-01 19:19:18.754687+00'),
+(25, 'basketball', 'duration', 'Timed quarters', 1, '2025-07-01 19:19:18.754687+00'),
+(26, 'basketball', 'duration', 'First to X points', 2, '2025-07-01 19:19:18.754687+00'),
+(27, 'soccer', 'format', '5-a-side', 1, '2025-07-01 19:19:18.754687+00'),
+(28, 'soccer', 'format', '7-a-side', 2, '2025-07-01 19:19:18.754687+00'),
+(29, 'soccer', 'format', '11-a-side', 3, '2025-07-01 19:19:18.754687+00'),
+(30, 'soccer', 'pitchSurface', 'Grass', 1, '2025-07-01 19:19:18.754687+00'),
+(31, 'soccer', 'pitchSurface', 'Turf', 2, '2025-07-01 19:19:18.754687+00'),
+(32, 'soccer', 'pitchSurface', 'Indoor dome', 3, '2025-07-01 19:19:18.754687+00'),
+(33, 'soccer', 'goalType', 'Portable', 1, '2025-07-01 19:19:18.754687+00'),
+(34, 'soccer', 'goalType', 'Regulation goals', 2, '2025-07-01 19:19:18.754687+00'),
+(35, 'soccer', 'ballSize', 'Size 3', 1, '2025-07-01 19:19:18.754687+00'),
+(36, 'soccer', 'ballSize', 'Size 4', 2, '2025-07-01 19:19:18.754687+00'),
+(37, 'soccer', 'ballSize', 'Size 5', 3, '2025-07-01 19:19:18.754687+00'),
+(38, 'soccer', 'referee', 'None', 1, '2025-07-01 19:19:18.754687+00'),
+(39, 'soccer', 'referee', 'Certified referee', 2, '2025-07-01 19:19:18.754687+00'),
+(40, 'soccer', 'matchLength', '2×30 min', 1, '2025-07-01 19:19:18.754687+00'),
+(41, 'soccer', 'matchLength', '2×45 min', 2, '2025-07-01 19:19:18.754687+00'),
+(42, 'soccer', 'matchLength', 'Custom', 3, '2025-07-01 19:19:18.754687+00'),
+(43, 'soccer', 'cleatsRequirement', 'Turf shoes', 1, '2025-07-01 19:19:18.754687+00'),
+(44, 'soccer', 'cleatsRequirement', 'Studs', 2, '2025-07-01 19:19:18.754687+00'),
+(45, 'tennis', 'format', 'Singles', 1, '2025-07-01 19:19:18.754687+00'),
+(46, 'tennis', 'format', 'Doubles', 2, '2025-07-01 19:19:18.754687+00'),
+(47, 'tennis', 'courtSurface', 'Hard', 1, '2025-07-01 19:19:18.754687+00'),
+(48, 'tennis', 'courtSurface', 'Clay', 2, '2025-07-01 19:19:18.754687+00'),
+(49, 'tennis', 'courtSurface', 'Grass', 3, '2025-07-01 19:19:18.754687+00'),
+(50, 'tennis', 'courtSurface', 'Indoor carpet', 4, '2025-07-01 19:19:18.754687+00'),
+(51, 'tennis', 'ballType', 'Pressurized', 1, '2025-07-01 19:19:18.754687+00'),
+(52, 'tennis', 'ballType', 'Pressureless', 2, '2025-07-01 19:19:18.754687+00'),
+(53, 'tennis', 'scoring', 'Standard sets', 1, '2025-07-01 19:19:18.754687+00'),
+(54, 'tennis', 'scoring', 'Pro-sets', 2, '2025-07-01 19:19:18.754687+00'),
+(55, 'tennis', 'scoring', 'Tiebreak-only', 3, '2025-07-01 19:19:18.754687+00'),
+(56, 'tennis', 'equipmentRental', 'None', 1, '2025-07-01 19:19:18.754687+00'),
+(57, 'tennis', 'equipmentRental', 'Racquets', 2, '2025-07-01 19:19:18.754687+00'),
+(58, 'tennis', 'equipmentRental', 'Ball machine', 3, '2025-07-01 19:19:18.754687+00'),
+(59, 'tennis', 'courtLighting', 'Day play', 1, '2025-07-01 19:19:18.754687+00'),
+(60, 'tennis', 'courtLighting', 'Night play', 2, '2025-07-01 19:19:18.754687+00'),
+(61, 'volleyball', 'discipline', 'Indoor 6×6', 1, '2025-07-01 19:19:18.754687+00'),
+(62, 'volleyball', 'discipline', 'Beach 2×2', 2, '2025-07-01 19:19:18.754687+00'),
+(63, 'volleyball', 'discipline', 'Beach 4×4', 3, '2025-07-01 19:19:18.754687+00'),
+(64, 'volleyball', 'surface', 'Gym floor', 1, '2025-07-01 19:19:18.754687+00'),
+(65, 'volleyball', 'surface', 'Sand', 2, '2025-07-01 19:19:18.754687+00'),
+(66, 'volleyball', 'netHeight', 'Men''s regulation', 1, '2025-07-01 19:19:18.754687+00'),
+(67, 'volleyball', 'netHeight', 'Women''s regulation', 2, '2025-07-01 19:19:18.754687+00'),
+(68, 'volleyball', 'ballSupply', 'Indoor volleyballs', 1, '2025-07-01 19:19:18.754687+00'),
+(69, 'volleyball', 'ballSupply', 'Beach volleyballs', 2, '2025-07-01 19:19:18.754687+00'),
+(70, 'volleyball', 'skillLevel', 'Recreational', 1, '2025-07-01 19:19:18.754687+00'),
+(71, 'volleyball', 'skillLevel', 'Competitive', 2, '2025-07-01 19:19:18.754687+00'),
+(72, 'volleyball', 'rotationRules', 'Casual', 1, '2025-07-01 19:19:18.754687+00'),
+(73, 'volleyball', 'rotationRules', 'Strict', 2, '2025-07-01 19:19:18.754687+00'),
+(74, 'volleyball', 'weatherBackup', 'None', 1, '2025-07-01 19:19:18.754687+00'),
+(75, 'volleyball', 'weatherBackup', 'Indoor alternative', 2, '2025-07-01 19:19:18.754687+00'),
+(76, 'tabletennis', 'format', 'Singles', 1, '2025-07-01 19:19:18.754687+00'),
+(77, 'tabletennis', 'format', 'Doubles', 2, '2025-07-01 19:19:18.754687+00'),
+(78, 'tabletennis', 'format', 'Mini-tournament', 3, '2025-07-01 19:19:18.754687+00'),
+(79, 'tabletennis', 'tableType', 'Regulation', 1, '2025-07-01 19:19:18.754687+00'),
+(80, 'tabletennis', 'tableType', 'Portable', 2, '2025-07-01 19:19:18.754687+00'),
+(81, 'tabletennis', 'ballGrade', '3-star', 1, '2025-07-01 19:19:18.754687+00'),
+(82, 'tabletennis', 'ballGrade', 'Training', 2, '2025-07-01 19:19:18.754687+00'),
+(83, 'tabletennis', 'paddleRental', 'BYO', 1, '2025-07-01 19:19:18.754687+00'),
+(84, 'tabletennis', 'paddleRental', 'Host-provided', 2, '2025-07-01 19:19:18.754687+00'),
+(85, 'tabletennis', 'scoring', 'Best-of-5 to 11', 1, '2025-07-01 19:19:18.754687+00'),
+(86, 'tabletennis', 'scoring', 'Best-of-7 to 11', 2, '2025-07-01 19:19:18.754687+00'),
+(87, 'tabletennis', 'spaceAndLighting', 'Standard clearance', 1, '2025-07-01 19:19:18.754687+00'),
+(88, 'tabletennis', 'spaceAndLighting', 'Professional setup', 2, '2025-07-01 19:19:18.754687+00');
+
+-- Update sequence to next available number
+SELECT setval('sports_settings_id_seq', (SELECT MAX(id) FROM sports_settings) + 1);
