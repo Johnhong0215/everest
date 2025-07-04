@@ -256,6 +256,8 @@ export class ArraySupabaseStorage implements IStorage {
       if (error) throw new Error(`Events fetch failed: ${error.message}`);
       if (!events) return [];
 
+      console.log(`Found ${events.length} events from database:`, events.map(e => ({ id: e.id, title: e.title })));
+
       // Map events to expected format without host lookup for now
       return events.map(event => ({
         id: event.id,
@@ -815,34 +817,51 @@ export class ArraySupabaseStorage implements IStorage {
   // Chat operations - these remain the same as they don't depend on bookings
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     try {
+      // Try alternative approach using raw SQL if PostgREST has schema issues
       const { data, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          event_id: message.eventId,
-          sender_id: message.senderId,
-          receiver_id: message.receiverId,
-          content: message.content,
-          message_type: message.messageType || null,
-          metadata: message.metadata || null,
-          read_by: message.readBy || []
-        })
-        .select()
-        .single();
+        .rpc('insert_chat_message', {
+          p_event_id: message.eventId,
+          p_sender_id: message.senderId,
+          p_receiver_id: message.receiverId,
+          p_content: message.content,
+          p_message_type: message.messageType || 'text'
+        });
 
-      if (error) throw new Error(`Chat message creation failed: ${error.message}`);
+      if (error) {
+        // Fallback to direct insert if RPC doesn't exist
+        console.log('RPC failed, trying direct insert:', error.message);
+        const { data: directData, error: directError } = await supabase
+          .from('chat_messages')
+          .insert([{
+            event_id: message.eventId,
+            sender_id: message.senderId,
+            receiver_id: message.receiverId,
+            content: message.content,
+            message_type: message.messageType || 'text',
+            metadata: message.metadata || null,
+            read_by: JSON.stringify([]),
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (directError) throw new Error(`Chat message creation failed: ${directError.message}`);
+        
+        return {
+          id: directData.id,
+          eventId: directData.event_id,
+          senderId: directData.sender_id,
+          receiverId: directData.receiver_id,
+          content: directData.content,
+          messageType: directData.message_type,
+          metadata: directData.metadata,
+          readBy: JSON.parse(directData.read_by || '[]'),
+          createdAt: new Date(directData.created_at),
+          updatedAt: new Date(directData.created_at)
+        } as ChatMessage;
+      }
       
-      return {
-        id: data.id,
-        eventId: data.event_id,
-        senderId: data.sender_id,
-        receiverId: data.receiver_id,
-        content: data.content,
-        messageType: data.message_type,
-        metadata: data.metadata,
-        readBy: data.read_by || [],
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at)
-      } as ChatMessage;
+      return data as ChatMessage;
     } catch (error) {
       console.error('Error creating chat message:', error);
       throw error;
