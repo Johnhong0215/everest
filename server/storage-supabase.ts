@@ -128,14 +128,58 @@ export class SupabaseStorage implements IStorage {
 
   // Event operations
   async createEvent(event: InsertEvent): Promise<Event> {
+    // Map camelCase fields to snake_case for database insertion
+    const dbEvent = {
+      host_id: event.hostId,
+      title: event.title,
+      description: event.description,
+      sport: event.sport,
+      skill_level: event.skillLevel,
+      gender_mix: event.genderMix,
+      start_time: event.startTime,
+      end_time: event.endTime,
+      location: event.location,
+      latitude: event.latitude,
+      longitude: event.longitude,
+      max_players: event.maxPlayers,
+      current_players: 1, // Host is always playing
+      price_per_person: event.pricePerPerson,
+      sport_config: event.sportConfig,
+      status: event.status || 'published',
+      notes: event.notes
+    };
+
     const { data, error } = await supabaseAdmin
       .from('events')
-      .insert(event)
+      .insert(dbEvent)
       .select()
       .single();
 
     if (error) throw error;
-    return data as Event;
+    
+    // Return with camelCase mapping
+    return {
+      id: data.id,
+      hostId: data.host_id,
+      title: data.title,
+      description: data.description,
+      sport: data.sport,
+      skillLevel: data.skill_level,
+      genderMix: data.gender_mix,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      maxPlayers: data.max_players,
+      currentPlayers: data.current_players,
+      pricePerPerson: data.price_per_person,
+      sportConfig: data.sport_config,
+      status: data.status,
+      notes: data.notes,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    } as Event;
   }
 
   async getEvent(id: number): Promise<EventWithHost | undefined> {
@@ -306,18 +350,61 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {
+    // Map camelCase fields to snake_case for database update
+    const dbUpdates: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only include fields that are being updated
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.sport !== undefined) dbUpdates.sport = updates.sport;
+    if (updates.skillLevel !== undefined) dbUpdates.skill_level = updates.skillLevel;
+    if (updates.genderMix !== undefined) dbUpdates.gender_mix = updates.genderMix;
+    if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime;
+    if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
+    if (updates.location !== undefined) dbUpdates.location = updates.location;
+    if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
+    if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
+    if (updates.maxPlayers !== undefined) dbUpdates.max_players = updates.maxPlayers;
+    // currentPlayers is managed automatically through booking logic
+    if (updates.pricePerPerson !== undefined) dbUpdates.price_per_person = updates.pricePerPerson;
+    if (updates.sportConfig !== undefined) dbUpdates.sport_config = updates.sportConfig;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
     const { data, error } = await supabaseAdmin
       .from('events')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
 
     if (error) return undefined;
-    return data as Event;
+    
+    // Return with camelCase mapping
+    return {
+      id: data.id,
+      hostId: data.host_id,
+      title: data.title,
+      description: data.description,
+      sport: data.sport,
+      skillLevel: data.skill_level,
+      genderMix: data.gender_mix,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      maxPlayers: data.max_players,
+      currentPlayers: data.current_players,
+      pricePerPerson: data.price_per_person,
+      sportConfig: data.sport_config,
+      status: data.status,
+      notes: data.notes,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    } as Event;
   }
 
   async updateEventPlayerCount(id: number, playerCount: number): Promise<boolean> {
