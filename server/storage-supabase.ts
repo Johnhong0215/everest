@@ -141,25 +141,92 @@ export class SupabaseStorage implements IStorage {
   async getEvent(id: number): Promise<EventWithHost | undefined> {
     const { data, error } = await supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        host:users(*),
-        bookings(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
-    if (error || !data) return undefined;
+    if (error || !data) {
+      console.error('Error fetching event:', error);
+      return undefined;
+    }
+
+    console.log('Event data:', data);
+
+    // Query the custom users table directly
+    const { data: hostData, error: hostError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', data.host_id)
+      .single();
+
+    let host;
+    if (hostError || !hostData) {
+      console.error('Error fetching host from users table:', hostError);
+      // Create a minimal host object as fallback
+      host = {
+        id: data.host_id,
+        email: 'host@example.com',
+        firstName: 'Host',
+        lastName: 'User',
+        profileImageUrl: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+    } else {
+      // Map database fields to expected structure
+      host = {
+        id: hostData.id,
+        email: hostData.email,
+        firstName: hostData.first_name || hostData.firstName,
+        lastName: hostData.last_name || hostData.lastName,
+        profileImageUrl: hostData.profile_image_url || hostData.profileImageUrl,
+        stripeCustomerId: hostData.stripe_customer_id || hostData.stripeCustomerId,
+        stripeSubscriptionId: hostData.stripe_subscription_id || hostData.stripeSubscriptionId,
+        createdAt: hostData.created_at || hostData.createdAt,
+        updatedAt: hostData.updated_at || hostData.updatedAt
+      };
+    }
+
+    console.log('Host data:', host);
+
+    // Get bookings for this event
+    const { data: bookings, error: bookingsError } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .eq('event_id', id);
+
+    if (bookingsError) throw bookingsError;
 
     // Calculate current players dynamically: host (1) + accepted bookings
-    const acceptedBookings = data.bookings?.filter((b: any) => b.status === 'accepted') || [];
+    const acceptedBookings = bookings?.filter((b: any) => b.status === 'accepted') || [];
     const currentPlayers = 1 + acceptedBookings.length;
 
+    // Return with proper camelCase mapping
     return {
-      ...data,
-      host: data.host,
-      bookings: data.bookings || [],
-      current_players: currentPlayers,
+      id: data.id,
+      hostId: data.host_id,
+      title: data.title,
+      description: data.description,
+      sport: data.sport,
+      skillLevel: data.skill_level,
+      genderMix: data.gender_mix,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      maxPlayers: data.max_players,
+      currentPlayers: currentPlayers,
+      pricePerPerson: data.price_per_person,
+      sportConfig: data.sport_config,
+      status: data.status,
+      notes: data.notes,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      host: host,
+      bookings: bookings || [],
     } as EventWithHost;
   }
 

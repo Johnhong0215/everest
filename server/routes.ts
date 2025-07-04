@@ -71,31 +71,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const events = await storage.getEvents(filters);
       
-      // Map database fields to frontend camelCase format
-      const mappedEvents = events.map(event => ({
-        id: event.id,
-        hostId: event.host_id || event.hostId,
-        title: event.title,
-        description: event.description,
-        sport: event.sport,
-        skillLevel: event.skill_level || event.skillLevel,
-        genderMix: event.gender_mix || event.genderMix,
-        startTime: event.start_time || event.startTime,
-        endTime: event.end_time || event.endTime,
-        location: event.location,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        maxPlayers: event.max_players || event.maxPlayers,
-        currentPlayers: event.current_players || event.currentPlayers || 1,
-        pricePerPerson: event.price_per_person || event.pricePerPerson,
-        sportConfig: event.sport_config || event.sportConfig,
-        status: event.status,
-        notes: event.notes,
-        createdAt: event.created_at || event.createdAt,
-        updatedAt: event.updated_at || event.updatedAt,
-        host: event.host,
-        bookings: event.bookings || []
-      }));
+      // Events are already properly formatted from storage
+      const mappedEvents = events;
       
       res.json(mappedEvents);
     } catch (error) {
@@ -107,12 +84,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/events/:id', async (req, res) => {
     try {
       const eventId = parseInt(req.params.id);
+      console.log('Fetching event with ID:', eventId);
       const event = await storage.getEvent(eventId);
       
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
 
+      // Event is already properly formatted from storage
       res.json(event);
     } catch (error) {
       console.error("Error fetching event:", error);
@@ -159,6 +138,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user owns the event
       const existingEvent = await storage.getEvent(eventId);
+      console.log("Checking authorization - Event hostId:", existingEvent?.hostId, "User ID:", userId);
+      
       if (!existingEvent || existingEvent.hostId !== userId) {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }

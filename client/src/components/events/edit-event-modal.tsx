@@ -30,7 +30,10 @@ const editEventFormSchema = z.object({
   endTime: z.string(),
   location: z.string().min(1, "Location is required"),
   maxPlayers: z.coerce.number().min(2).max(22),
-  pricePerPerson: z.string().min(1),
+  pricePerPerson: z.coerce.number().min(0).max(999.99).refine(
+    (val) => Number.isInteger(val * 100),
+    { message: "Price must have at most 2 decimal places" }
+  ),
   sportConfig: z.record(z.string(), z.any()),
 });
 
@@ -160,7 +163,7 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
       endTime: '',
       location: '',
       maxPlayers: 4,
-      pricePerPerson: '12.00',
+      pricePerPerson: 12.00,
       sportConfig: {},
     },
   });
@@ -194,7 +197,7 @@ export default function EditEventModal({ isOpen, onClose, event }: EditEventModa
         endTime: endTimeString,
         location: event.location,
         maxPlayers: event.maxPlayers,
-        pricePerPerson: event.pricePerPerson,
+        pricePerPerson: typeof event.pricePerPerson === 'number' ? event.pricePerPerson : Number(event.pricePerPerson),
         sportConfig: event.sportConfig || {},
       });
       if (event.latitude && event.longitude) {
