@@ -176,60 +176,48 @@ export class SupabaseStorage implements IStorage {
     offset?: number;
     userTimezone?: string;
   }): Promise<EventWithHost[]> {
-    let query = supabaseAdmin
+    // Simple direct query without complex joins to fix PostgREST issues
+    const { data: events, error } = await supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        host:users(*),
-        bookings(*)
-      `)
+      .select('*')
       .eq('status', 'published')
       .gte('start_time', new Date().toISOString())
       .order('start_time', { ascending: true });
 
-    if (filters?.sports && filters.sports.length > 0) {
-      query = query.in('sport', filters.sports);
-    }
-
-    if (filters?.skillLevels && filters.skillLevels.length > 0) {
-      query = query.in('skill_level', filters.skillLevels);
-    }
-
-    if (filters?.genders && filters.genders.length > 0) {
-      query = query.in('gender_mix', filters.genders);
-    }
-
-    if (filters?.priceMax) {
-      query = query.lte('price_per_person', filters.priceMax);
-    }
-
-    if (filters?.search) {
-      query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,location.ilike.%${filters.search}%`);
-    }
-
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-
-    if (filters?.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
-    }
-
-    const { data, error } = await query;
-
     if (error) throw error;
+    if (!events || events.length === 0) return [];
 
-    return (data || []).map((event: any) => {
-      const acceptedBookings = event.bookings?.filter((b: any) => b.status === 'accepted') || [];
-      const currentPlayers = 1 + acceptedBookings.length;
-
-      return {
-        ...event,
-        host: event.host,
-        bookings: event.bookings || [],
-        current_players: currentPlayers,
-      } as EventWithHost;
+    // Get unique host IDs and fetch them separately
+    const hostIds = [...new Set(events.map(event => event.host_id))];
+    
+    // Fetch host data separately with simple query
+    const hostPromises = hostIds.map(async (hostId) => {
+      const { data: host, error: hostError } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', hostId)
+        .single();
+      
+      return { hostId, host: hostError ? null : host };
     });
+
+    const hostsData = await Promise.all(hostPromises);
+    const hostMap = new Map();
+    hostsData.forEach(({ hostId, host }) => {
+      if (host) hostMap.set(hostId, host);
+    });
+
+    // Return events with host data
+    return events.map((event: any) => ({
+      ...event,
+      host: hostMap.get(event.host_id) || { 
+        id: event.host_id, 
+        first_name: 'Unknown', 
+        last_name: 'Host' 
+      },
+      bookings: [],
+      current_players: 1,
+    })) as EventWithHost[];
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {

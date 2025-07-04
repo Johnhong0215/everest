@@ -267,6 +267,14 @@ export const insertEventSchema = createInsertSchema(events).omit({
   currentPlayers: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  pricePerPerson: z.coerce.number().min(0).max(999.99).refine(
+    (val) => {
+      // Ensure the number has at most 2 decimal places
+      return Number.isInteger(val * 100);
+    },
+    { message: "Price must have at most 2 decimal places" }
+  ),
 });
 
 export const insertBookingSchema = createInsertSchema(bookings).omit({

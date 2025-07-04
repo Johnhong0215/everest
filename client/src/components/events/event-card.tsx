@@ -23,8 +23,9 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
   const sport = SPORTS.find(s => s.id === event.sport);
   const sportColor = sport?.color || 'sport-badminton';
   
-  const formatDateTime = (date: Date) => {
-    return formatDateForDisplay(date);
+  const formatDateTime = (date: string | Date) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return formatDateForDisplay(dateObj);
   };
 
   const currentPlayers = event.currentPlayers || 0;

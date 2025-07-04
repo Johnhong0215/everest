@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage";
+import { storage } from "./storage-supabase";
 import { setupAuth, isAuthenticated } from "./supabaseAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events, chatMessages } from "@shared/schema";
 import { z } from "zod";
@@ -190,6 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user owns the event
       const event = await storage.getEvent(eventId);
+      console.log(`Authorization check: userId=${userId}, event.hostId=${event?.hostId}, match=${event?.hostId === userId}`);
       if (!event || event.hostId !== userId) {
         return res.status(403).json({ message: "Not authorized to edit this event" });
       }
