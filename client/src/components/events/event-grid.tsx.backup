@@ -145,11 +145,20 @@ export default function EventGrid({
           requestLocation();
         }
       }, 500);
+    }
     } catch (error) {
       console.warn('Failed to restore saved location:', error);
       // Clear invalid data
       localStorage.removeItem('userLocation');
       localStorage.removeItem('locationPermission');
+      
+      // Still try to get location if no saved data
+      setTimeout(() => {
+        if (locationPermission === 'prompt') {
+          console.log('No saved data, attempting initial location request...');
+          requestLocation();
+        }
+      }, 500);
     }
 
     // Cleanup function to stop tracking when component unmounts
@@ -259,8 +268,8 @@ export default function EventGrid({
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000, // 15 second timeout for better reliability  
-        maximumAge: 5000 // Cache location for 5 seconds for real-time updates
+        timeout: 20000, // Longer timeout for better reliability
+        maximumAge: 10000 // Cache location for 10 seconds for more frequent updates
       }
     );
     
@@ -334,7 +343,7 @@ export default function EventGrid({
           // If quick attempt fails, try with more time but still fast settings
           tryBackupLocation();
         },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 } // Quick attempt with faster response
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 } // Quick attempt with reasonable timeout
       );
     };
 
