@@ -109,6 +109,9 @@ export const events = pgTable("events", {
   sportConfig: jsonb("sport_config").notNull(), // Sport-specific configuration
   status: eventStatusEnum("status").default("published"),
   notes: text("notes"),
+  requestedUsers: text("requested_users").array().default([]), // UUIDs of users who requested to join
+  acceptedUsers: text("accepted_users").array().default([]), // UUIDs of users who are accepted
+  rejectedUsers: text("rejected_users").array().default([]), // UUIDs of users who are rejected
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -265,6 +268,9 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const insertEventSchema = createInsertSchema(events).omit({
   id: true,
   currentPlayers: true,
+  requestedUsers: true,
+  acceptedUsers: true,
+  rejectedUsers: true,
   createdAt: true,
   updatedAt: true,
 }).extend({

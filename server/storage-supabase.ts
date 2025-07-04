@@ -51,7 +51,7 @@ export interface IStorage {
   getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]>;
   getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]>;
   getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]>;
-  updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
+  updateBookingStatus(eventId: number, userId: string, status: string): Promise<Booking | undefined>;
   cancelBooking(id: number): Promise<boolean>;
 
   // Chat operations
@@ -267,6 +267,9 @@ export class SupabaseStorage implements IStorage {
       sportConfig: data.sport_config,
       status: data.status,
       notes: data.notes,
+      requestedUsers: data.requested_users || [],
+      acceptedUsers: data.accepted_users || [],
+      rejectedUsers: data.rejected_users || [],
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       host: host,
@@ -338,6 +341,9 @@ export class SupabaseStorage implements IStorage {
       sportConfig: event.sport_config,
       status: event.status,
       notes: event.notes,
+      requestedUsers: event.requested_users || [],
+      acceptedUsers: event.accepted_users || [],
+      rejectedUsers: event.rejected_users || [],
       createdAt: event.created_at,
       updatedAt: event.updated_at,
       host: hostMap.get(event.host_id) || { 
@@ -520,33 +526,39 @@ export class SupabaseStorage implements IStorage {
 
   // Booking operations
   async createBooking(booking: InsertBooking): Promise<Booking> {
-    // Map camelCase fields to snake_case for database insertion
-    const dbBooking = {
-      event_id: booking.eventId,
-      user_id: booking.userId,
-      status: booking.status || 'requested',
-      payment_intent_id: booking.paymentIntentId,
-      amount_paid: booking.amountPaid
-    };
+    // Add user to requested_users array in the event
+    const { data: eventData, error: fetchError } = await supabaseAdmin
+      .from('events')
+      .select('requested_users, accepted_users, rejected_users')
+      .eq('id', booking.eventId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const requestedUsers = [...(eventData.requested_users || [])];
+    if (!requestedUsers.includes(booking.userId)) {
+      requestedUsers.push(booking.userId);
+    }
 
     const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .insert(dbBooking)
+      .from('events')
+      .update({ requested_users: requestedUsers })
+      .eq('id', booking.eventId)
       .select()
       .single();
 
     if (error) throw error;
-    
-    // Return with camelCase mapping
+
+    // Return a booking-like object for compatibility
     return {
-      id: data.id,
-      eventId: data.event_id,
-      userId: data.user_id,
-      status: data.status,
-      paymentIntentId: data.payment_intent_id,
-      amountPaid: data.amount_paid,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
+      id: Date.now(), // Generate a temporary ID
+      eventId: booking.eventId,
+      userId: booking.userId,
+      status: 'requested',
+      paymentIntentId: booking.paymentIntentId,
+      amountPaid: booking.amountPaid,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     } as Booking;
   }
 
@@ -816,19 +828,73 @@ export class SupabaseStorage implements IStorage {
     }));
   }
 
-  async updateBookingStatus(id: number, status: string): Promise<Booking | undefined> {
+  async updateBookingStatus(eventId: number, userId: string, status: string): Promise<Booking | undefined> {
+    // Get current event data
+    const { data: eventData, error: fetchError } = await supabaseAdmin
+      .from('events')
+      .select('requested_users, accepted_users, rejected_users, current_players, max_players')
+      .eq('id', eventId)
+      .single();
+
+    if (fetchError) return undefined;
+
+    let requestedUsers = [...(eventData.requested_users || [])];
+    let acceptedUsers = [...(eventData.accepted_users || [])];
+    let rejectedUsers = [...(eventData.rejected_users || [])];
+    let currentPlayers = eventData.current_players || 1;
+
+    // Remove user from all arrays first
+    const wasAccepted = acceptedUsers.includes(userId);
+    requestedUsers = requestedUsers.filter(id => id !== userId);
+    acceptedUsers = acceptedUsers.filter(id => id !== userId);
+    rejectedUsers = rejectedUsers.filter(id => id !== userId);
+
+    // Add user to appropriate array and adjust player count
+    if (status === 'accepted') {
+      acceptedUsers.push(userId);
+      // Only increment if user wasn't already accepted
+      if (!wasAccepted) {
+        currentPlayers = Math.min(currentPlayers + 1, eventData.max_players);
+      }
+    } else if (status === 'rejected') {
+      rejectedUsers.push(userId);
+      // Decrement if user was previously accepted
+      if (wasAccepted) {
+        currentPlayers = Math.max(currentPlayers - 1, 1);
+      }
+    } else if (status === 'requested') {
+      requestedUsers.push(userId);
+      // Decrement if user was previously accepted
+      if (wasAccepted) {
+        currentPlayers = Math.max(currentPlayers - 1, 1);
+      }
+    }
+
     const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
+      .from('events')
+      .update({ 
+        requested_users: requestedUsers,
+        accepted_users: acceptedUsers,
+        rejected_users: rejectedUsers,
+        current_players: currentPlayers
       })
-      .eq('id', id)
+      .eq('id', eventId)
       .select()
       .single();
 
     if (error) return undefined;
-    return data as Booking;
+
+    // Return a booking-like object for compatibility
+    return {
+      id: Date.now(),
+      eventId: eventId,
+      userId: userId,
+      status: status,
+      paymentIntentId: null,
+      amountPaid: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    } as Booking;
   }
 
   async cancelBooking(id: number): Promise<boolean> {

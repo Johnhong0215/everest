@@ -231,20 +231,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Booking routes
+  // Booking routes - Updated for user participation arrays
   app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const bookingData = insertBookingSchema.parse({
-        ...req.body,
-        userId,
-        status: "requested", // Always set status to requested for new bookings
-      });
+      const { eventId } = req.body;
 
-      // Check if event has space
-      const event = await storage.getEvent(bookingData.eventId);
+      if (!eventId) {
+        return res.status(400).json({ message: "Event ID is required" });
+      }
+
+      // Check if event exists and has space
+      const event = await storage.getEvent(eventId);
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
+      }
+
+      // Check if user already has a participation status
+      const userAlreadyRequested = event.requestedUsers?.includes(userId);
+      const userAlreadyAccepted = event.acceptedUsers?.includes(userId);
+      const userAlreadyRejected = event.rejectedUsers?.includes(userId);
+
+      if (userAlreadyRequested || userAlreadyAccepted || userAlreadyRejected) {
+        return res.status(400).json({ message: "You have already requested to join this event" });
       }
 
       if ((event.currentPlayers || 0) >= event.maxPlayers) {
