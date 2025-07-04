@@ -662,15 +662,19 @@ export class ArraySupabaseStorage implements IStorage {
 
   async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
     try {
-      // Get events where user is host and there are requested users
+      // Get events where user is host
       const { data: events, error } = await supabase
         .from('events')
         .select('*')
-        .eq('host_id', hostId)
-        .not('requested_users', 'is', null);
+        .eq('host_id', hostId);
 
       if (error) throw new Error(`Pending bookings fetch failed: ${error.message}`);
       if (!events) return [];
+
+      console.log(`Found ${events.length} events for host ${hostId}:`);
+      events.forEach(event => {
+        console.log(`Event ${event.id}: requested_users = ${JSON.stringify(event.requested_users)}`);
+      });
 
       const pendingBookings: BookingWithEventAndUser[] = [];
 

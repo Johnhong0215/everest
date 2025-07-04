@@ -282,6 +282,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Event participant management routes
+  app.patch('/api/events/:eventId/participants/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const hostId = req.user.id;
+      const eventId = parseInt(req.params.eventId);
+      const userId = req.params.userId;
+      const { action } = req.body; // 'approve' or 'reject'
+
+      console.log(`Host ${hostId} attempting to ${action} user ${userId} for event ${eventId}`);
+
+      // Get the event and verify user is the host
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      if (event.hostId !== hostId) {
+        return res.status(403).json({ message: "Not authorized to manage this event" });
+      }
+
+      // Check if user is in requested_users array
+      if (!event.requestedUsers?.includes(userId)) {
+        return res.status(400).json({ message: "User has not requested to join this event" });
+      }
+
+      // Remove user from requested_users array
+      const updatedRequestedUsers = event.requestedUsers.filter(id => id !== userId);
+      
+      if (action === 'approve') {
+        // Add to accepted_users array and increment current players
+        const updatedAcceptedUsers = [...(event.acceptedUsers || []), userId];
+        const newCurrentPlayers = (event.currentPlayers || 1) + 1;
+        
+        await storage.updateEvent(eventId, {
+          requestedUsers: updatedRequestedUsers,
+          acceptedUsers: updatedAcceptedUsers,
+          currentPlayers: newCurrentPlayers
+        } as any);
+        
+        res.json({ message: "User approved successfully", status: 'accepted' });
+      } else if (action === 'reject') {
+        // Add to rejected_users array
+        const updatedRejectedUsers = [...(event.rejectedUsers || []), userId];
+        
+        await storage.updateEvent(eventId, {
+          requestedUsers: updatedRequestedUsers,
+          rejectedUsers: updatedRejectedUsers
+        } as any);
+        
+        res.json({ message: "User rejected successfully", status: 'rejected' });
+      } else {
+        return res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
+      }
+    } catch (error) {
+      console.error("Error managing event participant:", error);
+      res.status(500).json({ message: "Failed to manage event participant" });
+    }
+  });
+
   // Booking routes - Updated for user participation arrays
   app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {
