@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.updateEvent(eventId, {
         requestedUsers: updatedRequestedUsers
-      });
+      } as any);
 
       res.json({ message: "Join request sent successfully" });
     } catch (error) {
@@ -310,7 +310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.updateEvent(eventId, {
         requestedUsers: updatedRequestedUsers
-      });
+      } as any);
 
       // Return a mock booking object for compatibility
       const booking = {

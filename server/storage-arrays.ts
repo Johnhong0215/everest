@@ -323,6 +323,12 @@ export class ArraySupabaseStorage implements IStorage {
       if (updates.sportConfig) updateData.sport_config = updates.sportConfig;
       if (updates.status) updateData.status = updates.status;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
+      
+      // Handle participant arrays - cast updates to any to access these fields
+      const anyUpdates = updates as any;
+      if (anyUpdates.requestedUsers !== undefined) updateData.requested_users = anyUpdates.requestedUsers;
+      if (anyUpdates.acceptedUsers !== undefined) updateData.accepted_users = anyUpdates.acceptedUsers;
+      if (anyUpdates.rejectedUsers !== undefined) updateData.rejected_users = anyUpdates.rejectedUsers;
 
       updateData.updated_at = new Date().toISOString();
 
@@ -817,51 +823,37 @@ export class ArraySupabaseStorage implements IStorage {
   // Chat operations - these remain the same as they don't depend on bookings
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     try {
-      // Try alternative approach using raw SQL if PostgREST has schema issues
+      // Use the correct column name 'content' based on actual database structure
       const { data, error } = await supabase
-        .rpc('insert_chat_message', {
-          p_event_id: message.eventId,
-          p_sender_id: message.senderId,
-          p_receiver_id: message.receiverId,
-          p_content: message.content,
-          p_message_type: message.messageType || 'text'
-        });
+        .from('chat_messages')
+        .insert({
+          event_id: message.eventId,
+          sender_id: message.senderId,
+          receiver_id: message.receiverId,
+          content: message.content, // Use 'content' column as confirmed by database inspection
+          message_type: message.messageType || 'text',
+          metadata: message.metadata || null,
+          read_by: JSON.stringify([message.senderId]), // Mark as read by sender
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-      if (error) {
-        // Fallback to direct insert if RPC doesn't exist
-        console.log('RPC failed, trying direct insert:', error.message);
-        const { data: directData, error: directError } = await supabase
-          .from('chat_messages')
-          .insert([{
-            event_id: message.eventId,
-            sender_id: message.senderId,
-            receiver_id: message.receiverId,
-            content: message.content,
-            message_type: message.messageType || 'text',
-            metadata: message.metadata || null,
-            read_by: JSON.stringify([]),
-            created_at: new Date().toISOString()
-          }])
-          .select()
-          .single();
-
-        if (directError) throw new Error(`Chat message creation failed: ${directError.message}`);
-        
-        return {
-          id: directData.id,
-          eventId: directData.event_id,
-          senderId: directData.sender_id,
-          receiverId: directData.receiver_id,
-          content: directData.content,
-          messageType: directData.message_type,
-          metadata: directData.metadata,
-          readBy: JSON.parse(directData.read_by || '[]'),
-          createdAt: new Date(directData.created_at),
-          updatedAt: new Date(directData.created_at)
-        } as ChatMessage;
-      }
+      if (error) throw new Error(`Chat message creation failed: ${error.message}`);
       
-      return data as ChatMessage;
+      return {
+        id: data.id,
+        eventId: data.event_id,
+        senderId: data.sender_id,
+        receiverId: data.receiver_id,
+        content: data.content, // Use content field directly
+        messageType: data.message_type,
+        metadata: data.metadata,
+        readBy: JSON.parse(data.read_by || '[]'),
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at || data.created_at)
+      } as ChatMessage;
     } catch (error) {
       console.error('Error creating chat message:', error);
       throw error;
@@ -894,7 +886,7 @@ export class ArraySupabaseStorage implements IStorage {
           eventId: msg.event_id,
           senderId: msg.sender_id,
           receiverId: msg.receiver_id,
-          content: msg.content,
+          content: msg.content, // Use 'content' column from database
           messageType: msg.message_type,
           metadata: msg.metadata,
           readBy: msg.read_by || [],
