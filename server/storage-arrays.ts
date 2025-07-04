@@ -685,12 +685,13 @@ export class ArraySupabaseStorage implements IStorage {
             console.log(`Fetching user details for userId: ${userId}`);
             
             // Fetch user details separately
-            const { data: user, error: userError } = await supabase
+            const { data: userData, error: userError } = await supabase
               .from('users')
               .select('*')
               .eq('id', userId)
               .single();
 
+            let user = userData;
             if (userError) {
               console.log(`Error fetching user ${userId}:`, userError);
               // Create a placeholder user entry for missing users

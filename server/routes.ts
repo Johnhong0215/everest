@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage-arrays";
+import { storage } from "./storage-clean";
 import { setupAuth, isAuthenticated } from "./supabaseAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events, chatMessages } from "@shared/schema";
 import { z } from "zod";
