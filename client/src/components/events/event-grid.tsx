@@ -74,7 +74,7 @@ export default function EventGrid({
   // Check for saved location and start continuous tracking
   useEffect(() => {
     if (!('geolocation' in navigator)) {
-      console.log('Geolocation not available:', navigator);
+      console.log('Geolocation not available - browser does not support it');
       setLocationPermission('denied');
       return;
     }
@@ -84,18 +84,42 @@ export default function EventGrid({
       const savedPermission = localStorage.getItem('locationPermission');
       
       if (savedPermission === 'granted') {
+        console.log('Location permission previously granted, starting tracking...');
         setLocationPermission('granted');
         // Start continuous location tracking
         startLocationTracking();
-      } else {
-        // For initial load, still try to restore last known location for display
+      } else if (savedPermission === 'denied') {
+        console.log('Location permission previously denied');
+        setLocationPermission('denied');
+        // Still try to restore last known location for display
         const savedLocation = localStorage.getItem('userLocation');
         if (savedLocation) {
           const location = JSON.parse(savedLocation);
           if (location.lat && location.lng) {
             setUserLocation(location);
-            console.log('Restored saved location:', location);
+            console.log('Restored saved location (permission denied):', location);
           }
+        }
+      } else {
+        console.log('No location permission saved, will prompt user when needed');
+        // For initial load, try to restore last known location for display
+        const savedLocation = localStorage.getItem('userLocation');
+        if (savedLocation) {
+          const location = JSON.parse(savedLocation);
+          if (location.lat && location.lng) {
+            setUserLocation(location);
+            console.log('Restored saved location (no permission yet):', location);
+          }
+        }
+        
+        // Automatically try to get location permission on first visit if no saved preference
+        if (!savedPermission) {
+          console.log('No saved permission, attempting automatic location request...');
+          setTimeout(() => {
+            if (locationPermission === 'prompt') {
+              requestLocation();
+            }
+          }, 1000); // Small delay to let the UI settle
         }
       }
     } catch (error) {
@@ -137,8 +161,14 @@ export default function EventGrid({
 
   // Function to start continuous location tracking
   const startLocationTracking = () => {
-    if (!('geolocation' in navigator) || watchId !== null) {
-      return; // Already tracking or not available
+    if (!('geolocation' in navigator)) {
+      console.log('Geolocation not supported by browser');
+      return;
+    }
+    
+    if (watchId !== null) {
+      console.log('Location tracking already active');
+      return; // Already tracking
     }
 
     console.log('Starting continuous location tracking...');
@@ -150,13 +180,21 @@ export default function EventGrid({
           lng: position.coords.longitude
         };
         
+        console.log('Raw location update:', newLocation, 'accuracy:', position.coords.accuracy);
+        
         // Only update if location has changed significantly (more than ~10 meters)
         const hasSignificantChange = !userLocation || 
           calculateDistance(userLocation.lat, userLocation.lng, newLocation.lat, newLocation.lng) > 0.01; // ~10 meters
         
         if (hasSignificantChange) {
-          console.log('Location updated:', newLocation);
+          console.log('Location updated with significant change:', newLocation);
           setUserLocation(newLocation);
+          
+          // Update permission state to granted
+          if (locationPermission !== 'granted') {
+            setLocationPermission('granted');
+            localStorage.setItem('locationPermission', 'granted');
+          }
           
           // Save updated location to localStorage
           try {
@@ -164,35 +202,51 @@ export default function EventGrid({
           } catch (error) {
             console.warn('Failed to save updated location:', error);
           }
+        } else {
+          console.log('Location update too small, skipping');
         }
       },
       (error) => {
         console.error('Location tracking error:', error);
         
-        // Only show error for significant issues, not temporary GPS problems
+        // Handle different error types
         if (error.code === error.PERMISSION_DENIED) {
+          console.log('Location permission denied by user');
           setLocationPermission('denied');
           localStorage.setItem('locationPermission', 'denied');
+          
+          // Stop tracking
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            setWatchId(null);
+          }
+          
           toast({
             title: "Location Access Denied",
-            description: "Please allow location access to see distance to events.",
+            description: "Enable location access in browser settings to see distance to events.",
             variant: "destructive",
           });
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          console.log('Location position unavailable');
+          // Don't change permission state for temporary issues
+        } else if (error.code === error.TIMEOUT) {
+          console.log('Location request timed out');
+          // Don't change permission state for timeouts
         }
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000 // Cache location for 30 seconds
+        timeout: 15000, // Longer timeout for better reliability
+        maximumAge: 60000 // Cache location for 1 minute
       }
     );
     
     setWatchId(id);
+    console.log('Location tracking started with watchId:', id);
   };
 
   const requestLocation = () => {
-    console.log('Requesting location permission...');
-    setLocationPermission('prompt'); // Reset to prompt state
+    console.log('User requested location permission...');
     setLocationLoading(true);
     
     if (!('geolocation' in navigator)) {
@@ -208,7 +262,7 @@ export default function EventGrid({
     }
 
     // Check if the page is served over HTTPS (required for geolocation in modern browsers)
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
       console.error('Geolocation requires HTTPS');
       setLocationPermission('denied');
       setLocationLoading(false);
@@ -220,7 +274,7 @@ export default function EventGrid({
       return;
     }
 
-    console.log('Requesting geolocation...');
+    console.log('Attempting to get location permission and coordinates...');
     
     // Try with fast, low-accuracy location first
     const tryQuickLocation = () => {
@@ -257,7 +311,7 @@ export default function EventGrid({
           // If quick attempt fails, try with more time but still fast settings
           tryBackupLocation();
         },
-        { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 } // Very fast first attempt
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 } // Quick attempt with reasonable timeout
       );
     };
 
