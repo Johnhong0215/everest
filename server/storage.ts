@@ -285,9 +285,9 @@ export class SupabaseStorage implements IStorage {
 
     if (error || !event) return undefined;
 
-    // Get host information
+    // Get host information from user_profiles
     const { data: host, error: hostError } = await supabaseAdmin
-      .from('users')
+      .from('user_profiles')
       .select('*')
       .eq('id', event.host_id)
       .single();
@@ -367,10 +367,10 @@ export class SupabaseStorage implements IStorage {
     if (error) throw error;
     if (!events || events.length === 0) return [];
 
-    // Get host information for all events
+    // Get host information for all events from user_profiles
     const hostIds = [...new Set(events.map(event => event.host_id))];
     const { data: hosts, error: hostError } = await supabaseAdmin
-      .from('users')
+      .from('user_profiles')
       .select('*')
       .in('id', hostIds);
 
@@ -470,7 +470,7 @@ export class SupabaseStorage implements IStorage {
       .from('events')
       .select(`
         *,
-        host:users(*),
+        host:user_profiles(*),
         bookings(*)
       `)
       .eq('host_id', hostId)
@@ -508,8 +508,8 @@ export class SupabaseStorage implements IStorage {
       .from('bookings')
       .select(`
         *,
-        event:events(*,host:users(*)),
-        user:users(*)
+        event:events(*,host:user_profiles(*)),
+        user:user_profiles(*)
       `)
       .eq('id', id)
       .single();
@@ -523,8 +523,8 @@ export class SupabaseStorage implements IStorage {
       .from('bookings')
       .select(`
         *,
-        event:events(*,host:users(*)),
-        user:users(*)
+        event:events(*,host:user_profiles(*)),
+        user:user_profiles(*)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -538,8 +538,8 @@ export class SupabaseStorage implements IStorage {
       .from('bookings')
       .select(`
         *,
-        event:events(*,host:users(*)),
-        user:users(*)
+        event:events(*,host:user_profiles(*)),
+        user:user_profiles(*)
       `)
       .eq('event_id', eventId)
       .order('created_at', { ascending: false });
@@ -553,8 +553,8 @@ export class SupabaseStorage implements IStorage {
       .from('bookings')
       .select(`
         *,
-        event:events!inner(*,host:users(*)),
-        user:users(*)
+        event:events!inner(*,host:user_profiles(*)),
+        user:user_profiles(*)
       `)
       .eq('event.host_id', hostId)
       .eq('status', 'requested')
@@ -608,7 +608,7 @@ export class SupabaseStorage implements IStorage {
       .from('chat_messages')
       .select(`
         *,
-        sender:users(*)
+        sender:user_profiles(*)
       `)
       .eq('event_id', eventId)
       .order('created_at', { ascending: true })
@@ -623,7 +623,7 @@ export class SupabaseStorage implements IStorage {
       .from('chat_messages')
       .select(`
         *,
-        sender:users(*)
+        sender:user_profiles(*)
       `)
       .eq('event_id', eventId)
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
