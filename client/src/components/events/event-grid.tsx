@@ -94,42 +94,35 @@ export default function EventGrid({
       const savedPermission = localStorage.getItem('locationPermission');
       
       if (savedPermission === 'granted') {
-        console.log('Location permission previously granted, starting tracking...');
+        console.log('Location permission previously granted, starting real-time tracking...');
         setLocationPermission('granted');
-        // Start continuous location tracking
+        // Start continuous location tracking immediately - don't use cached location
         startLocationTracking();
       } else if (savedPermission === 'denied') {
         console.log('Location permission previously denied');
         setLocationPermission('denied');
-        // Still try to restore last known location for display
+        // Only use saved location as fallback when permission is denied
         const savedLocation = localStorage.getItem('userLocation');
         if (savedLocation) {
           const location = JSON.parse(savedLocation);
           if (location.lat && location.lng) {
             setUserLocation(location);
-            console.log('Restored saved location (permission denied):', location);
+            console.log('Using fallback saved location (permission denied):', location);
           }
         }
       } else {
-        console.log('No location permission saved, will prompt user when needed');
-        // For initial load, try to restore last known location for display
-        const savedLocation = localStorage.getItem('userLocation');
-        if (savedLocation) {
-          const location = JSON.parse(savedLocation);
-          if (location.lat && location.lng) {
-            setUserLocation(location);
-            console.log('Restored saved location (no permission yet):', location);
-          }
-        }
+        console.log('No location permission saved, will request when needed');
+        // Don't restore cached location on startup - wait for user to request or grant permission
+        // This ensures we always get fresh location data
         
-        // Automatically try to get location permission on first visit if no saved preference
+        // Automatically try to get fresh location permission on first visit
         if (!savedPermission) {
-          console.log('No saved permission, attempting automatic location request...');
+          console.log('No saved permission, attempting automatic real-time location request...');
           setTimeout(() => {
             if (locationPermission === 'prompt') {
               requestLocation();
             }
-          }, 500); // Smaller delay for faster response
+          }, 1000); // Give UI time to load before requesting location
         }
       }
     } catch (error) {
@@ -192,9 +185,9 @@ export default function EventGrid({
         
         console.log('Raw location update:', newLocation, 'accuracy:', position.coords.accuracy);
         
-        // Only update if location has changed significantly (more than ~10 meters)
+        // Update for any meaningful location change (more than ~5 meters) for real-time tracking
         const hasSignificantChange = !userLocation || 
-          calculateDistance(userLocation.lat, userLocation.lng, newLocation.lat, newLocation.lng) > 0.01; // ~10 meters
+          calculateDistance(userLocation.lat, userLocation.lng, newLocation.lat, newLocation.lng) > 0.005; // ~5 meters for more responsive tracking
         
         if (hasSignificantChange) {
           console.log('Location updated with significant change:', newLocation);
@@ -247,7 +240,7 @@ export default function EventGrid({
       {
         enableHighAccuracy: true,
         timeout: 15000, // 15 second timeout for better reliability  
-        maximumAge: 5000 // Cache location for 5 seconds for real-time updates
+        maximumAge: 0 // No cache - always get fresh location for real-time updates
       }
     );
     

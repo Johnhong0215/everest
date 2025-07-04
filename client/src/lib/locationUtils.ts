@@ -16,13 +16,13 @@ export interface LocationOptions {
 export const REALTIME_LOCATION_OPTIONS: LocationOptions = {
   enableHighAccuracy: true,
   timeout: 10000, // 10 seconds - balanced for reliability
-  maximumAge: 3000 // 3 seconds cache for frequent updates
+  maximumAge: 0 // No cache - always get fresh location
 };
 
 export const QUICK_LOCATION_OPTIONS: LocationOptions = {
   enableHighAccuracy: false,
   timeout: 5000, // 5 seconds for quick response
-  maximumAge: 10000 // 10 seconds cache
+  maximumAge: 0 // No cache - always get fresh location
 };
 
 // Enhanced geolocation check
@@ -89,7 +89,7 @@ export const requestLocationAggressively = (
             {
               enableHighAccuracy: false,
               timeout: 15000, // 15 seconds final attempt
-              maximumAge: 60000, // Accept older cached locations
+              maximumAge: 0, // No cache - always get fresh location
             }
           );
         },
