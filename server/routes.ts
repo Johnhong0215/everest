@@ -6,7 +6,6 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events, chatMessages } from "@shared/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { db } from "./db";
 
 // WebSocket connections by user ID
 const connections = new Map<string, WebSocket>();

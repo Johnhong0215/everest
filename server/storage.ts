@@ -139,26 +139,39 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getEvent(id: number): Promise<EventWithHost | undefined> {
-    const { data, error } = await supabaseAdmin
+    const { data: event, error } = await supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        host:users(*),
-        bookings(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
-    if (error || !data) return undefined;
+    if (error || !event) return undefined;
+
+    // Get host information
+    const { data: host, error: hostError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', event.host_id)
+      .single();
+
+    if (hostError) return undefined;
+
+    // Get bookings for this event
+    const { data: bookings, error: bookingsError } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .eq('event_id', id);
+
+    if (bookingsError) throw bookingsError;
 
     // Calculate current players dynamically: host (1) + accepted bookings
-    const acceptedBookings = data.bookings?.filter((b: any) => b.status === 'accepted') || [];
+    const acceptedBookings = bookings?.filter((b: any) => b.status === 'accepted') || [];
     const currentPlayers = 1 + acceptedBookings.length;
 
     return {
-      ...data,
-      host: data.host,
-      bookings: data.bookings || [],
+      ...event,
+      host: host,
+      bookings: bookings || [],
       current_players: currentPlayers,
     } as EventWithHost;
   }
@@ -178,11 +191,7 @@ export class SupabaseStorage implements IStorage {
   }): Promise<EventWithHost[]> {
     let query = supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        host:users(*),
-        bookings(*)
-      `)
+      .select('*')
       .eq('status', 'published')
       .gte('start_time', new Date().toISOString())
       .order('start_time', { ascending: true });
@@ -215,18 +224,50 @@ export class SupabaseStorage implements IStorage {
       query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
     }
 
-    const { data, error } = await query;
+    const { data: events, error } = await query;
 
     if (error) throw error;
+    if (!events || events.length === 0) return [];
 
-    return (data || []).map((event: any) => {
-      const acceptedBookings = event.bookings?.filter((b: any) => b.status === 'accepted') || [];
+    // Get host information for all events
+    const hostIds = [...new Set(events.map(event => event.host_id))];
+    const { data: hosts, error: hostError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .in('id', hostIds);
+
+    if (hostError) throw hostError;
+
+    // Get bookings for all events
+    const eventIds = events.map(event => event.id);
+    const { data: bookings, error: bookingsError } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .in('event_id', eventIds);
+
+    if (bookingsError) throw bookingsError;
+
+    // Create maps for easy lookup
+    const hostMap = new Map(hosts?.map(host => [host.id, host]) || []);
+    const bookingsMap: Record<number, any[]> = {};
+    eventIds.forEach(id => bookingsMap[id] = []);
+    
+    bookings?.forEach(booking => {
+      if (!bookingsMap[booking.event_id]) {
+        bookingsMap[booking.event_id] = [];
+      }
+      bookingsMap[booking.event_id].push(booking);
+    });
+
+    return events.map((event: any) => {
+      const eventBookings = bookingsMap[event.id] || [];
+      const acceptedBookings = eventBookings.filter((b: any) => b.status === 'accepted');
       const currentPlayers = 1 + acceptedBookings.length;
 
       return {
         ...event,
-        host: event.host,
-        bookings: event.bookings || [],
+        host: hostMap.get(event.host_id),
+        bookings: eventBookings,
         current_players: currentPlayers,
       } as EventWithHost;
     });
