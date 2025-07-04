@@ -100,17 +100,33 @@ export const isQuickFilterDate = (dateString: string): boolean => {
  * Format a date for display using the user's locale and timezone
  */
 export const formatDateForDisplay = (date: Date | string): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short'
-  }).format(dateObj);
+  try {
+    // Handle null, undefined, or empty dates
+    if (!date) {
+      return 'Date TBD';
+    }
+    
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date received:', date);
+      return 'Invalid date';
+    }
+    
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }).format(dateObj);
+  } catch (error) {
+    console.error('Error formatting date:', error, 'Original date:', date);
+    return 'Date error';
+  }
 };
 
 /**

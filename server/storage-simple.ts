@@ -145,14 +145,8 @@ export class SimpleSupabaseStorage implements IStorage {
     
     if (error || !event) return undefined;
     
-    // Get host separately
-    const { data: host } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', event.host_id)
-      .single();
-
-    const hostData = host || {
+    // Get host from Supabase Auth
+    let hostData = {
       id: event.host_id,
       email: '',
       firstName: 'Host',
@@ -167,10 +161,56 @@ export class SimpleSupabaseStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
+
+    try {
+      const { data: user } = await supabaseAdmin.auth.admin.getUserById(event.host_id);
+      if (user?.user) {
+        hostData = {
+          id: user.user.id,
+          email: user.user.email || '',
+          firstName: user.user.user_metadata?.first_name || 'User',
+          lastName: user.user.user_metadata?.last_name || '',
+          displayName: user.user.user_metadata?.display_name || `${user.user.user_metadata?.first_name || 'User'} ${user.user.user_metadata?.last_name || ''}`,
+          profileImageUrl: user.user.user_metadata?.avatar_url || null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: user.user.phone_confirmed_at ? true : false,
+          idVerified: false,
+          bio: null,
+          createdAt: user.user.created_at ? new Date(user.user.created_at) : new Date(),
+          updatedAt: user.user.updated_at ? new Date(user.user.updated_at) : new Date()
+        };
+      }
+    } catch (error) {
+      console.log(`Could not fetch user data for host ${event.host_id}:`, error);
+    }
     
     return {
-      ...event,
-      host: hostData
+      id: event.id,
+      createdAt: event.created_at ? new Date(event.created_at) : null,
+      updatedAt: event.updated_at ? new Date(event.updated_at) : null,
+      hostId: event.host_id,
+      title: event.title,
+      description: event.description,
+      sport: event.sport,
+      skillLevel: event.skill_level,
+      genderMix: event.gender_mix,
+      startTime: new Date(event.start_time),
+      endTime: new Date(event.end_time),
+      location: event.location,
+      latitude: event.latitude?.toString() || '0',
+      longitude: event.longitude?.toString() || '0',
+      maxPlayers: event.max_players,
+      currentPlayers: event.current_players || 0,
+      pricePerPerson: event.price_per_person,
+      sportConfig: event.sport_config,
+      status: event.status || 'published',
+      notes: event.notes,
+      requestedUsers: event.requested_users || [],
+      acceptedUsers: event.accepted_users || [],
+      rejectedUsers: event.rejected_users || [],
+      host: hostData,
+      bookings: [] // Added to match type
     } as EventWithHost;
   }
 
@@ -188,20 +228,35 @@ export class SimpleSupabaseStorage implements IStorage {
     // Get all unique host IDs
     const hostIds = [...new Set(events.map(e => e.host_id))];
     
-    // Fetch all hosts in one query
-    const { data: hosts } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .in('id', hostIds);
-
+    // Fetch host data from Supabase Auth
     const hostMap = new Map();
-    if (hosts) {
-      hosts.forEach(host => hostMap.set(host.id, host));
+    for (const hostId of hostIds) {
+      try {
+        const { data: user } = await supabaseAdmin.auth.admin.getUserById(hostId);
+        if (user?.user) {
+          hostMap.set(hostId, {
+            id: user.user.id,
+            email: user.user.email || '',
+            firstName: user.user.user_metadata?.first_name || 'User',
+            lastName: user.user.user_metadata?.last_name || '',
+            displayName: user.user.user_metadata?.display_name || `${user.user.user_metadata?.first_name || 'User'} ${user.user.user_metadata?.last_name || ''}`,
+            profileImageUrl: user.user.user_metadata?.avatar_url || null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            phoneVerified: user.user.phone_confirmed_at ? true : false,
+            idVerified: false,
+            bio: null,
+            createdAt: user.user.created_at ? new Date(user.user.created_at) : new Date(),
+            updatedAt: user.user.updated_at ? new Date(user.user.updated_at) : new Date()
+          });
+        }
+      } catch (error) {
+        console.log(`Could not fetch user data for host ${hostId}:`, error);
+      }
     }
 
-    return events.map(event => ({
-      ...event,
-      host: hostMap.get(event.host_id) || {
+    return events.map(event => {
+      const host = hostMap.get(event.host_id) || {
         id: event.host_id,
         email: '',
         firstName: 'Host',
@@ -215,8 +270,36 @@ export class SimpleSupabaseStorage implements IStorage {
         bio: null,
         createdAt: new Date(),
         updatedAt: new Date()
-      }
-    })) as EventWithHost[];
+      };
+
+      return {
+        id: event.id,
+        createdAt: event.created_at ? new Date(event.created_at) : null,
+        updatedAt: event.updated_at ? new Date(event.updated_at) : null,
+        hostId: event.host_id,
+        title: event.title,
+        description: event.description,
+        sport: event.sport,
+        skillLevel: event.skill_level,
+        genderMix: event.gender_mix,
+        startTime: new Date(event.start_time),
+        endTime: new Date(event.end_time),
+        location: event.location,
+        latitude: event.latitude?.toString() || '0',
+        longitude: event.longitude?.toString() || '0',
+        maxPlayers: event.max_players,
+        currentPlayers: event.current_players || 0,
+        pricePerPerson: event.price_per_person,
+        sportConfig: event.sport_config,
+        status: event.status || 'published',
+        notes: event.notes,
+        requestedUsers: event.requested_users || [],
+        acceptedUsers: event.accepted_users || [],
+        rejectedUsers: event.rejected_users || [],
+        host: host,
+        bookings: [] // Added to match type
+      };
+    }) as EventWithHost[];
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {
@@ -352,11 +435,7 @@ export class SimpleSupabaseStorage implements IStorage {
         for (const userId of event.requested_users) {
           console.log(`Fetching user data for userId: ${userId}`);
           
-          const { data: user, error: userError } = await supabaseAdmin
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
+          const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
 
           console.log(`User data for ${userId}:`, user ? 'found' : 'not found', userError ? userError : '');
 
@@ -372,41 +451,42 @@ export class SimpleSupabaseStorage implements IStorage {
               event: {
                 id: event.id,
                 title: event.title,
-                description: '',
-                sport: 'badminton',
-                skillLevel: 'any',
-                genderMix: 'mixed',
-                startTime: new Date(),
-                endTime: new Date(),
-                location: '',
-                latitude: '0',
-                longitude: '0',
-                maxPlayers: 10,
-                pricePerPerson: null,
-                sportConfig: null,
-                status: 'active',
-                notes: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
+                description: event.description || '',
+                sport: event.sport,
+                skillLevel: event.skill_level,
+                genderMix: event.gender_mix,
+                startTime: new Date(event.start_time),
+                endTime: new Date(event.end_time),
+                location: event.location,
+                latitude: event.latitude?.toString() || '0',
+                longitude: event.longitude?.toString() || '0',
+                maxPlayers: event.max_players,
+                currentPlayers: event.current_players || 0,
+                pricePerPerson: event.price_per_person,
+                sportConfig: event.sport_config,
+                status: event.status || 'published',
+                notes: event.notes,
+                createdAt: new Date(event.created_at),
+                updatedAt: new Date(event.updated_at),
                 hostId: hostId,
                 requestedUsers: event.requested_users,
-                acceptedUsers: [],
-                rejectedUsers: []
+                acceptedUsers: event.accepted_users || [],
+                rejectedUsers: event.rejected_users || []
               },
               user: {
-                id: user.id,
-                email: user.email,
-                firstName: user.first_name,
-                lastName: user.last_name,
-                displayName: user.display_name || `${user.first_name} ${user.last_name}`,
-                profileImageUrl: user.profile_image_url,
-                stripeCustomerId: user.stripe_customer_id,
-                stripeSubscriptionId: user.stripe_subscription_id,
-                phoneVerified: user.phone_verified,
-                idVerified: user.id_verified,
-                bio: user.bio,
-                createdAt: user.created_at,
-                updatedAt: user.updated_at
+                id: user.user?.id || userId,
+                email: user.user?.email || '',
+                firstName: user.user?.user_metadata?.first_name || 'User',
+                lastName: user.user?.user_metadata?.last_name || '',
+                displayName: user.user?.user_metadata?.display_name || `${user.user?.user_metadata?.first_name || 'User'} ${user.user?.user_metadata?.last_name || ''}`,
+                profileImageUrl: user.user?.user_metadata?.avatar_url || null,
+                stripeCustomerId: null,
+                stripeSubscriptionId: null,
+                phoneVerified: user.user?.phone_confirmed_at ? true : false,
+                idVerified: false,
+                bio: null,
+                createdAt: user.user?.created_at ? new Date(user.user.created_at) : new Date(),
+                updatedAt: user.user?.updated_at ? new Date(user.user.updated_at) : new Date()
               }
             });
           }
