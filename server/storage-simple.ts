@@ -569,7 +569,152 @@ export class SimpleSupabaseStorage implements IStorage {
   }
 
   async getChatMessages(eventId: number, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
-    return [];
+    try {
+      // Check if we have the new chat structure (with chats and chat_messages tables)
+      const { data: chats, error: chatsError } = await supabaseAdmin
+        .from('chats')
+        .select('id')
+        .eq('event_id', eventId);
+
+      if (!chatsError && chats && chats.length > 0) {
+        // Use new chat structure
+        const chatIds = chats.map(chat => chat.id);
+        
+        const { data: messages, error } = await supabaseAdmin
+          .from('chat_messages')
+          .select('*')
+          .in('chat_id', chatIds)
+          .order('created_at', { ascending: true })
+          .range(offset, offset + limit - 1);
+
+        if (error) throw error;
+        if (!messages) return [];
+
+        // Fetch sender information using Supabase Auth
+        const messagesWithSenders = [];
+        for (const msg of messages) {
+          let senderData = {
+            id: msg.sender_id,
+            email: '',
+            firstName: 'User',
+            lastName: '',
+            displayName: 'User',
+            profileImageUrl: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            phoneVerified: false,
+            idVerified: false,
+            bio: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          try {
+            const { data: user } = await supabaseAdmin.auth.admin.getUserById(msg.sender_id);
+            if (user?.user) {
+              senderData = {
+                id: user.user.id,
+                email: user.user.email || '',
+                firstName: user.user.user_metadata?.first_name || 'User',
+                lastName: user.user.user_metadata?.last_name || '',
+                displayName: user.user.user_metadata?.display_name || `${user.user.user_metadata?.first_name || 'User'} ${user.user.user_metadata?.last_name || ''}`.trim(),
+                profileImageUrl: user.user.user_metadata?.avatar_url || null,
+                stripeCustomerId: null,
+                stripeSubscriptionId: null,
+                phoneVerified: user.user.phone_confirmed_at ? true : false,
+                idVerified: false,
+                bio: null,
+                createdAt: user.user.created_at ? new Date(user.user.created_at) : new Date(),
+                updatedAt: user.user.updated_at ? new Date(user.user.updated_at) : new Date()
+              };
+            }
+          } catch (error) {
+            console.log(`Could not fetch user data for sender ${msg.sender_id}:`, error);
+          }
+
+          messagesWithSenders.push({
+            id: msg.id,
+            chatId: msg.chat_id,
+            senderId: msg.sender_id,
+            content: msg.content,
+            readAt: msg.read_at ? new Date(msg.read_at) : null,
+            createdAt: new Date(msg.created_at),
+            sender: senderData
+          });
+        }
+
+        return messagesWithSenders as ChatMessageWithSender[];
+      } else {
+        // Try legacy structure (direct event_id in chat_messages)
+        const { data: messages, error } = await supabaseAdmin
+          .from('chat_messages')
+          .select('*')
+          .eq('event_id', eventId)
+          .order('created_at', { ascending: true })
+          .range(offset, offset + limit - 1);
+
+        if (error) throw error;
+        if (!messages) return [];
+
+        // Fetch sender information using Supabase Auth
+        const messagesWithSenders = [];
+        for (const msg of messages) {
+          let senderData = {
+            id: msg.sender_id,
+            email: '',
+            firstName: 'User',
+            lastName: '',
+            displayName: 'User',
+            profileImageUrl: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            phoneVerified: false,
+            idVerified: false,
+            bio: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          try {
+            const { data: user } = await supabaseAdmin.auth.admin.getUserById(msg.sender_id);
+            if (user?.user) {
+              senderData = {
+                id: user.user.id,
+                email: user.user.email || '',
+                firstName: user.user.user_metadata?.first_name || 'User',
+                lastName: user.user.user_metadata?.last_name || '',
+                displayName: user.user.user_metadata?.display_name || `${user.user.user_metadata?.first_name || 'User'} ${user.user.user_metadata?.last_name || ''}`.trim(),
+                profileImageUrl: user.user.user_metadata?.avatar_url || null,
+                stripeCustomerId: null,
+                stripeSubscriptionId: null,
+                phoneVerified: user.user.phone_confirmed_at ? true : false,
+                idVerified: false,
+                bio: null,
+                createdAt: user.user.created_at ? new Date(user.user.created_at) : new Date(),
+                updatedAt: user.user.updated_at ? new Date(user.user.updated_at) : new Date()
+              };
+            }
+          } catch (error) {
+            console.log(`Could not fetch user data for sender ${msg.sender_id}:`, error);
+          }
+
+          messagesWithSenders.push({
+            id: msg.id,
+            chatId: msg.chat_id || 0,
+            senderId: msg.sender_id,
+            content: msg.content,
+            readAt: msg.read_at ? new Date(msg.read_at) : null,
+            createdAt: new Date(msg.created_at),
+            sender: senderData
+          });
+        }
+
+        return messagesWithSenders as ChatMessageWithSender[];
+      }
+    } catch (error) {
+      console.error('Error fetching chat messages:', error);
+      return [];
+    }
   }
 
   async getChatMessagesForConversation(eventId: number, userId1: string, userId2: string, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {

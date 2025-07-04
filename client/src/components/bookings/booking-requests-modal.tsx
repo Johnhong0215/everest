@@ -32,8 +32,10 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
 
   // Accept booking mutation
   const acceptBookingMutation = useMutation({
-    mutationFn: async (bookingId: number) => {
-      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, { status: 'accepted' });
+    mutationFn: async (booking: BookingWithEventAndUser) => {
+      const response = await apiRequest('PATCH', `/api/events/${booking.eventId}/participants/${booking.userId}`, {
+        action: 'approve'
+      });
       return response;
     },
     onSuccess: () => {
@@ -56,8 +58,10 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
 
   // Reject booking mutation
   const rejectBookingMutation = useMutation({
-    mutationFn: async (bookingId: number) => {
-      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, { status: 'rejected' });
+    mutationFn: async (booking: BookingWithEventAndUser) => {
+      const response = await apiRequest('PATCH', `/api/events/${booking.eventId}/participants/${booking.userId}`, {
+        action: 'reject'
+      });
       return response;
     },
     onSuccess: () => {
@@ -172,7 +176,7 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
                         {/* Action Buttons */}
                         <div className="flex space-x-2">
                           <Button
-                            onClick={() => acceptBookingMutation.mutate(request.id)}
+                            onClick={() => acceptBookingMutation.mutate(request)}
                             disabled={acceptBookingMutation.isPending || rejectBookingMutation.isPending}
                             className="bg-green-600 hover:bg-green-700 text-white"
                             size="sm"
@@ -181,7 +185,7 @@ export default function BookingRequestsModal({ isOpen, onClose }: BookingRequest
                             Accept
                           </Button>
                           <Button
-                            onClick={() => rejectBookingMutation.mutate(request.id)}
+                            onClick={() => rejectBookingMutation.mutate(request)}
                             disabled={acceptBookingMutation.isPending || rejectBookingMutation.isPending}
                             variant="destructive"
                             size="sm"
