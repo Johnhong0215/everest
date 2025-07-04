@@ -207,16 +207,34 @@ export class SupabaseStorage implements IStorage {
       if (host) hostMap.set(hostId, host);
     });
 
-    // Return events with host data
+    // Return events with host data and proper field mapping
     return events.map((event: any) => ({
-      ...event,
+      id: event.id,
+      hostId: event.host_id,
+      title: event.title,
+      description: event.description,
+      sport: event.sport,
+      skillLevel: event.skill_level,
+      genderMix: event.gender_mix,
+      startTime: event.start_time,
+      endTime: event.end_time,
+      location: event.location,
+      latitude: event.latitude,
+      longitude: event.longitude,
+      maxPlayers: event.max_players,
+      currentPlayers: event.current_players || 1,
+      pricePerPerson: event.price_per_person,
+      sportConfig: event.sport_config,
+      status: event.status,
+      notes: event.notes,
+      createdAt: event.created_at,
+      updatedAt: event.updated_at,
       host: hostMap.get(event.host_id) || { 
         id: event.host_id, 
         first_name: 'Unknown', 
         last_name: 'Host' 
       },
       bookings: [],
-      current_players: 1,
     })) as EventWithHost[];
   }
 

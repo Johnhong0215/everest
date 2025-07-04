@@ -70,7 +70,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const events = await storage.getEvents(filters);
-      res.json(events);
+      
+      // Map database fields to frontend camelCase format
+      const mappedEvents = events.map(event => ({
+        id: event.id,
+        hostId: event.host_id || event.hostId,
+        title: event.title,
+        description: event.description,
+        sport: event.sport,
+        skillLevel: event.skill_level || event.skillLevel,
+        genderMix: event.gender_mix || event.genderMix,
+        startTime: event.start_time || event.startTime,
+        endTime: event.end_time || event.endTime,
+        location: event.location,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        maxPlayers: event.max_players || event.maxPlayers,
+        currentPlayers: event.current_players || event.currentPlayers || 1,
+        pricePerPerson: event.price_per_person || event.pricePerPerson,
+        sportConfig: event.sport_config || event.sportConfig,
+        status: event.status,
+        notes: event.notes,
+        createdAt: event.created_at || event.createdAt,
+        updatedAt: event.updated_at || event.updatedAt,
+        host: event.host,
+        bookings: event.bookings || []
+      }));
+      
+      res.json(mappedEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
       res.status(500).json({ message: "Failed to fetch events" });

@@ -434,6 +434,13 @@ export default function EventGrid({
     events.forEach(event => {
       // Convert event UTC timestamp to user's timezone date
       const eventDate = new Date(event.startTime);
+      
+      // Check if date is valid
+      if (isNaN(eventDate.getTime())) {
+        console.error('Invalid date for event:', event.id, 'startTime:', event.startTime);
+        return; // Skip this event if date is invalid
+      }
+      
       const eventDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(eventDate);
       
       let groupKey: string;
