@@ -431,27 +431,91 @@ export class SupabaseStorage implements IStorage {
   async getEventsByHost(hostId: string): Promise<EventWithHost[]> {
     const { data, error } = await supabaseAdmin
       .from('events')
-      .select(`
-        *,
-        host:users(*),
-        bookings(*)
-      `)
+      .select('*')
       .eq('host_id', hostId)
       .order('start_time', { ascending: false });
 
     if (error) throw error;
 
-    return (data || []).map((event: any) => {
-      const acceptedBookings = event.bookings?.filter((b: any) => b.status === 'accepted') || [];
+    // Get host info separately
+    const { data: hostData } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', hostId)
+      .single();
+
+    // Get bookings for each event and map to expected format
+    const eventsWithHost = await Promise.all((data || []).map(async (event: any) => {
+      const { data: bookings } = await supabaseAdmin
+        .from('bookings')
+        .select('*')
+        .eq('event_id', event.id);
+
+      const acceptedBookings = bookings?.filter((b: any) => b.status === 'accepted') || [];
       const currentPlayers = 1 + acceptedBookings.length;
 
       return {
-        ...event,
-        host: event.host,
-        bookings: event.bookings || [],
-        current_players: currentPlayers,
-      } as EventWithHost;
-    });
+        id: event.id,
+        hostId: event.host_id,
+        title: event.title,
+        description: event.description,
+        sport: event.sport,
+        skillLevel: event.skill_level,
+        genderMix: event.gender_mix,
+        startTime: event.start_time,
+        endTime: event.end_time,
+        location: event.location,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        maxPlayers: event.max_players,
+        currentPlayers,
+        pricePerPerson: event.price_per_person,
+        sportConfig: event.sport_config,
+        status: event.status,
+        notes: event.notes,
+        createdAt: event.created_at,
+        updatedAt: event.updated_at,
+        bookings: (bookings || []).map((b: any) => ({
+          id: b.id,
+          eventId: b.event_id,
+          userId: b.user_id,
+          status: b.status,
+          paymentIntentId: b.payment_intent_id,
+          amountPaid: b.amount_paid,
+          createdAt: b.created_at,
+          updatedAt: b.updated_at
+        })),
+        host: hostData ? {
+          id: hostData.id,
+          email: hostData.email,
+          firstName: hostData.first_name,
+          lastName: hostData.last_name,
+          profileImageUrl: hostData.profile_image_url,
+          stripeCustomerId: hostData.stripe_customer_id,
+          stripeSubscriptionId: hostData.stripe_subscription_id,
+          phoneVerified: hostData.phone_verified,
+          idVerified: hostData.id_verified,
+          bio: hostData.bio,
+          createdAt: hostData.created_at,
+          updatedAt: hostData.updated_at
+        } : {
+          id: hostId,
+          email: '',
+          firstName: 'Host',
+          lastName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          idVerified: false,
+          bio: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      };
+    }));
+
+    return eventsWithHost;
   }
 
   // Booking operations
@@ -506,14 +570,109 @@ export class SupabaseStorage implements IStorage {
       .from('bookings')
       .select(`
         *,
-        event:events(*,host:users(*)),
-        user:users(*)
+        events(*),
+        users(*)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []) as BookingWithEventAndUser[];
+    
+    // Map the response to the expected format
+    return (data || []).map((booking: any) => ({
+      id: booking.id,
+      eventId: booking.event_id,
+      userId: booking.user_id,
+      status: booking.status,
+      paymentIntentId: booking.payment_intent_id,
+      amountPaid: booking.amount_paid,
+      createdAt: booking.created_at,
+      updatedAt: booking.updated_at,
+      event: booking.events ? {
+        id: booking.events.id,
+        hostId: booking.events.host_id,
+        title: booking.events.title,
+        description: booking.events.description,
+        sport: booking.events.sport,
+        skillLevel: booking.events.skill_level,
+        genderMix: booking.events.gender_mix,
+        startTime: booking.events.start_time,
+        endTime: booking.events.end_time,
+        location: booking.events.location,
+        latitude: booking.events.latitude,
+        longitude: booking.events.longitude,
+        maxPlayers: booking.events.max_players,
+        currentPlayers: booking.events.current_players || 1,
+        pricePerPerson: booking.events.price_per_person,
+        sportConfig: booking.events.sport_config,
+        status: booking.events.status,
+        notes: booking.events.notes,
+        createdAt: booking.events.created_at,
+        updatedAt: booking.events.updated_at,
+        bookings: [],
+        host: {
+          id: booking.events.host_id || '',
+          email: '',
+          firstName: 'Host',
+          lastName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          idVerified: false,
+          bio: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      } : {
+        id: 0,
+        hostId: '',
+        title: '',
+        description: '',
+        sport: 'badminton' as const,
+        skillLevel: 'beginner' as const,
+        genderMix: 'mixed' as const,
+        startTime: new Date().toISOString(),
+        endTime: new Date().toISOString(),
+        location: '',
+        latitude: 0,
+        longitude: 0,
+        maxPlayers: 4,
+        currentPlayers: 1,
+        pricePerPerson: 0,
+        sportConfig: {},
+        status: 'published' as const,
+        notes: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        bookings: [],
+        host: {
+          id: '',
+          email: '',
+          firstName: 'Host',
+          lastName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          idVerified: false,
+          bio: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      },
+      user: booking.users ? {
+        id: booking.users.id,
+        email: booking.users.email,
+        firstName: booking.users.first_name,
+        lastName: booking.users.last_name,
+        profileImageUrl: booking.users.profile_image_url,
+        stripeCustomerId: booking.users.stripe_customer_id,
+        stripeSubscriptionId: booking.users.stripe_subscription_id,
+        createdAt: booking.users.created_at,
+        updatedAt: booking.users.updated_at
+      } : undefined
+    }));
   }
 
   async getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]> {
@@ -532,19 +691,129 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
+    // First get all events for this host
+    const { data: hostEvents, error: eventsError } = await supabaseAdmin
+      .from('events')
+      .select('id')
+      .eq('host_id', hostId);
+
+    if (eventsError) throw eventsError;
+
+    if (!hostEvents || hostEvents.length === 0) return [];
+
+    const eventIds = hostEvents.map(e => e.id);
+
+    // Then get bookings for those events
     const { data, error } = await supabaseAdmin
       .from('bookings')
       .select(`
         *,
-        event:events!inner(*,host:users(*)),
-        user:users(*)
+        events(*),
+        users(*)
       `)
-      .eq('event.host_id', hostId)
+      .in('event_id', eventIds)
       .eq('status', 'requested')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []) as BookingWithEventAndUser[];
+    
+    // Map the response to the expected format
+    return (data || []).map((booking: any) => ({
+      id: booking.id,
+      eventId: booking.event_id,
+      userId: booking.user_id,
+      status: booking.status,
+      paymentIntentId: booking.payment_intent_id,
+      amountPaid: booking.amount_paid,
+      createdAt: booking.created_at,
+      updatedAt: booking.updated_at,
+      event: booking.events ? {
+        id: booking.events.id,
+        hostId: booking.events.host_id,
+        title: booking.events.title,
+        description: booking.events.description,
+        sport: booking.events.sport,
+        skillLevel: booking.events.skill_level,
+        genderMix: booking.events.gender_mix,
+        startTime: booking.events.start_time,
+        endTime: booking.events.end_time,
+        location: booking.events.location,
+        latitude: booking.events.latitude,
+        longitude: booking.events.longitude,
+        maxPlayers: booking.events.max_players,
+        currentPlayers: booking.events.current_players || 1,
+        pricePerPerson: booking.events.price_per_person,
+        sportConfig: booking.events.sport_config,
+        status: booking.events.status,
+        notes: booking.events.notes,
+        createdAt: booking.events.created_at,
+        updatedAt: booking.events.updated_at,
+        host: {
+          id: hostId,
+          email: '',
+          firstName: 'Host',
+          lastName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      } : {
+        id: 0,
+        hostId: hostId,
+        title: '',
+        description: '',
+        sport: 'badminton' as const,
+        skillLevel: 'beginner' as const,
+        genderMix: 'mixed' as const,
+        startTime: new Date().toISOString(),
+        endTime: new Date().toISOString(),
+        location: '',
+        latitude: 0,
+        longitude: 0,
+        maxPlayers: 4,
+        currentPlayers: 1,
+        pricePerPerson: 0,
+        sportConfig: {},
+        status: 'published' as const,
+        notes: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        host: {
+          id: hostId,
+          email: '',
+          firstName: 'Host',
+          lastName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      },
+      user: booking.users ? {
+        id: booking.users.id,
+        email: booking.users.email,
+        firstName: booking.users.first_name,
+        lastName: booking.users.last_name,
+        profileImageUrl: booking.users.profile_image_url,
+        stripeCustomerId: booking.users.stripe_customer_id,
+        stripeSubscriptionId: booking.users.stripe_subscription_id,
+        createdAt: booking.users.created_at,
+        updatedAt: booking.users.updated_at
+      } : {
+        id: '',
+        email: '',
+        firstName: 'User',
+        lastName: '',
+        profileImageUrl: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    }));
   }
 
   async updateBookingStatus(id: number, status: string): Promise<Booking | undefined> {
