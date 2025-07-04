@@ -189,7 +189,6 @@ export default function EventGrid({
         if (hasSignificantChange) {
           console.log('Location updated with significant change:', newLocation);
           setUserLocation(newLocation);
-          console.log('UserLocation state updated to:', newLocation);
           
           // Update permission state to granted
           if (locationPermission !== 'granted') {
@@ -240,7 +239,7 @@ export default function EventGrid({
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000, // 15 second timeout for better reliability  
+        timeout: 20000, // 20 second timeout - match the manual request timeout
         maximumAge: 0 // No cache - always get fresh location for real-time updates
       }
     );
@@ -265,129 +264,72 @@ export default function EventGrid({
       return;
     }
 
-    // Check if the page is served over HTTPS (required for geolocation in modern browsers)
-    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      console.error('Geolocation requires HTTPS');
-      setLocationPermission('denied');
-      setLocationLoading(false);
-      toast({
-        title: "HTTPS Required",
-        description: "Location services require a secure connection.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log('Attempting to get location permission and coordinates...');
+    console.log('Attempting to get current location...');
     
-    // Try with fast, low-accuracy location first
-    const tryQuickLocation = () => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('Quick location success:', position);
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(location);
-          setLocationPermission('granted');
-          setLocationLoading(false);
-          
-          // Save to localStorage for persistence
-          try {
-            localStorage.setItem('userLocation', JSON.stringify(location));
-            localStorage.setItem('locationPermission', 'granted');
-            console.log('Saved location to localStorage');
-          } catch (error) {
-            console.warn('Failed to save location to localStorage:', error);
-          }
-          
-          toast({
-            title: "Location Enabled",
-            description: "Your location has been enabled for distance calculations.",
-          });
+    // Single, reliable location request with optimized settings
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('Location request successful:', position);
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        
+        setUserLocation(location);
+        setLocationPermission('granted');
+        setLocationLoading(false);
+        
+        // Save to localStorage for persistence
+        try {
+          localStorage.setItem('userLocation', JSON.stringify(location));
+          localStorage.setItem('locationPermission', 'granted');
+          console.log('Location saved successfully');
+        } catch (error) {
+          console.warn('Failed to save location:', error);
+        }
+        
+        toast({
+          title: "Location Enabled",
+          description: "Your location has been enabled for distance calculations.",
+        });
 
-          // Start continuous location tracking
-          startLocationTracking();
-        },
-        (error) => {
-          console.log('Quick location failed, trying with higher timeout...', error);
-          // If quick attempt fails, try with more time but still fast settings
-          tryBackupLocation();
-        },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 } // Quick attempt with faster response
-      );
-    };
-
-    // Backup attempt with slightly longer timeout
-    const tryBackupLocation = () => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('Backup location success:', position);
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(location);
-          setLocationPermission('granted');
-          setLocationLoading(false);
-          
-          // Save to localStorage for persistence
-          try {
-            localStorage.setItem('userLocation', JSON.stringify(location));
-            localStorage.setItem('locationPermission', 'granted');
-            console.log('Saved location to localStorage');
-          } catch (error) {
-            console.warn('Failed to save location to localStorage:', error);
-          }
-          
-          toast({
-            title: "Location Enabled",
-            description: "Your location has been enabled for distance calculations.",
-          });
-
-          // Start continuous location tracking
-          startLocationTracking();
-        },
-        (error) => {
-          console.error('All location attempts failed:', error);
-          let errorMessage = "Unable to get your location.";
-          
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = "Location access denied. Please allow location permissions in your browser.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location services are not available on this device.";
-              break;
-            case error.TIMEOUT:
-              errorMessage = "Location request timed out. Your device may not have GPS/location services enabled.";
-              break;
-          }
-          
-          setLocationPermission('denied');
-          setLocationLoading(false);
-          
-          // Clear saved location data when denied
-          try {
-            localStorage.removeItem('userLocation');
-            localStorage.removeItem('locationPermission');
-          } catch (error) {
-            console.warn('Failed to clear location data:', error);
-          }
-          
-          toast({
-            title: "Location Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
-        },
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 } // Longer timeout for backup
-      );
-    };
-
-    // Start with quick attempt
-    tryQuickLocation();
+        // Start continuous location tracking
+        startLocationTracking();
+        
+        // Force refresh events data with new location
+        queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      },
+      (error) => {
+        console.error('Location request failed:', error);
+        let errorMessage = "Unable to get your location.";
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location access denied. Please allow location permissions in your browser.";
+            setLocationPermission('denied');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location services are not available. Please check your device settings.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out. Please ensure location services are enabled and try again.";
+            break;
+        }
+        
+        setLocationLoading(false);
+        
+        toast({
+          title: "Location Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      },
+      {
+        enableHighAccuracy: true,    // Try for best accuracy
+        timeout: 20000,             // 20 second timeout - generous but not infinite
+        maximumAge: 0               // No cache - always get fresh location
+      }
+    );
   };
 
 
