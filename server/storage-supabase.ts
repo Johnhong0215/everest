@@ -456,14 +456,34 @@ export class SupabaseStorage implements IStorage {
 
   // Booking operations
   async createBooking(booking: InsertBooking): Promise<Booking> {
+    // Map camelCase fields to snake_case for database insertion
+    const dbBooking = {
+      event_id: booking.eventId,
+      user_id: booking.userId,
+      status: booking.status || 'requested',
+      payment_intent_id: booking.paymentIntentId,
+      amount_paid: booking.amountPaid
+    };
+
     const { data, error } = await supabaseAdmin
       .from('bookings')
-      .insert(booking)
+      .insert(dbBooking)
       .select()
       .single();
 
     if (error) throw error;
-    return data as Booking;
+    
+    // Return with camelCase mapping
+    return {
+      id: data.id,
+      eventId: data.event_id,
+      userId: data.user_id,
+      status: data.status,
+      paymentIntentId: data.payment_intent_id,
+      amountPaid: data.amount_paid,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    } as Booking;
   }
 
   async getBooking(id: number): Promise<BookingWithEventAndUser | undefined> {
