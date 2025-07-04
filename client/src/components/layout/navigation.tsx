@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Activity, Plus, MessageCircle, Calendar, Menu } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import AuthModal from "@/components/auth/auth-modal";
 
 interface NavigationProps {
   onCreateEvent: () => void;
@@ -20,8 +21,9 @@ interface NavigationProps {
 }
 
 export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, onOpenRequests }: NavigationProps) {
-  const { user } = useAuth();
+  const { user, signOut, isAuthenticated } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   // Fetch chat notifications count
   const { data: chats = [] } = useQuery({
@@ -38,8 +40,11 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
   const unreadCount = Array.isArray(chats) ? chats.reduce((total: number, chat: any) => total + (chat.unreadCount || 0), 0) : 0;
   const pendingRequestsCount = Array.isArray(pendingBookings) ? pendingBookings.length : 0;
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    const { error } = await signOut();
+    if (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -56,73 +61,85 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
 
           {/* Right: Navigation Links + User Avatar */}
           <div className="flex items-center space-x-6">
-            {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center space-x-6">
-              <button 
-                onClick={onOpenBookings}
-                className="text-gray-600 hover:text-gray-900 font-medium"
-              >
-                My Bookings
-              </button>
-              <button 
-                onClick={onOpenChat}
-                className="text-gray-600 hover:text-gray-900 relative font-medium"
-              >
-                <div className="flex items-center space-x-1">
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Chat</span>
-                  {unreadCount > 0 && (
-                    <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
-                      {unreadCount}
-                    </Badge>
-                  )}
+            {isAuthenticated ? (
+              <>
+                {/* Desktop Navigation Links */}
+                <div className="hidden md:flex items-center space-x-6">
+                  <button 
+                    onClick={onOpenBookings}
+                    className="text-gray-600 hover:text-gray-900 font-medium"
+                  >
+                    My Bookings
+                  </button>
+                  <button 
+                    onClick={onOpenChat}
+                    className="text-gray-600 hover:text-gray-900 relative font-medium"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Chat</span>
+                      {unreadCount > 0 && (
+                        <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                          {unreadCount}
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                  <button 
+                    onClick={onOpenRequests}
+                    className="text-gray-600 hover:text-gray-900 relative font-medium"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>Requests</span>
+                      {pendingRequestsCount > 0 && (
+                        <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
+                          {pendingRequestsCount}
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
                 </div>
-              </button>
-              <button 
-                onClick={onOpenRequests}
-                className="text-gray-600 hover:text-gray-900 relative font-medium"
-              >
-                <div className="flex items-center space-x-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>Requests</span>
-                  {pendingRequestsCount > 0 && (
-                    <Badge variant="destructive" className="ml-1 w-5 h-5 p-0 flex items-center justify-center text-xs">
-                      {pendingRequestsCount}
-                    </Badge>
-                  )}
-                </div>
-              </button>
-            </div>
 
-            {/* User Avatar */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} alt="Profile" />
-                    <AvatarFallback>
-                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" forceMount>
-                <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium leading-none">
-                    {(user as any)?.firstName && (user as any)?.lastName 
-                      ? `${(user as any).firstName} ${(user as any).lastName}`
-                      : (user as any)?.email
-                    }
-                  </p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {(user as any)?.email}
-                  </p>
-                </div>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                {/* User Avatar */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.user_metadata?.avatar || undefined} alt="Profile" />
+                        <AvatarFallback>
+                          {user?.user_metadata?.firstName?.[0] || user?.email?.[0] || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" forceMount>
+                    <div className="flex flex-col space-y-1 p-2">
+                      <p className="text-sm font-medium leading-none">
+                        {user?.user_metadata?.firstName && user?.user_metadata?.lastName 
+                          ? `${user.user_metadata.firstName} ${user.user_metadata.lastName}`
+                          : user?.user_metadata?.name || user?.email
+                        }
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              /* Login Button for Unauthenticated Users */
+              <Button 
+                onClick={() => setShowAuthModal(true)}
+                className="bg-everest-blue hover:bg-blue-700"
+              >
+                Login
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -139,7 +156,7 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
         </div>
 
         {/* Mobile Menu */}
-        {isMobileMenuOpen && (
+        {isMobileMenuOpen && isAuthenticated && (
           <div className="md:hidden border-t border-gray-200 pb-3 pt-4">
             <div className="space-y-3">
               <button 
@@ -188,16 +205,16 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
               <div className="border-t border-gray-200 pt-3">
                 <div className="flex items-center px-3 py-2">
                   <Avatar className="h-8 w-8 mr-3">
-                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
+                    <AvatarImage src={user?.user_metadata?.avatar || undefined} />
                     <AvatarFallback>
-                      {(user as any)?.firstName?.[0] || (user as any)?.email?.[0] || 'U'}
+                      {user?.user_metadata?.firstName?.[0] || user?.email?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">
-                      {(user as any)?.firstName && (user as any)?.lastName 
-                        ? `${(user as any).firstName} ${(user as any).lastName}`
-                        : (user as any)?.email?.split('@')[0]
+                      {user?.user_metadata?.firstName && user?.user_metadata?.lastName 
+                        ? `${user.user_metadata.firstName} ${user.user_metadata.lastName}`
+                        : user?.user_metadata?.name || user?.email?.split('@')[0]
                       }
                     </p>
                   </div>
@@ -213,6 +230,12 @@ export default function Navigation({ onCreateEvent, onOpenBookings, onOpenChat, 
           </div>
         )}
       </div>
+      
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </nav>
   );
 }
