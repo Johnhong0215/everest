@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./supabaseAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events, chatMessages } from "@shared/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -25,7 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id; // Supabase user ID is directly on user object
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -96,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/events', isAuthenticated, async (req: any, res) => {
     try {
       console.log("Creating event with body:", req.body);
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       console.log("User ID:", userId);
       
       // Convert datetime strings to Date objects and set currentPlayers to 1 (host is playing)
@@ -127,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
@@ -161,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
@@ -185,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
@@ -213,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/my-events', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const events = await storage.getEventsByHost(userId);
       res.json(events);
     } catch (error) {
@@ -225,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Booking routes
   app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId,
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/my-bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const bookings = await storage.getBookingsByUser(userId);
       res.json(bookings);
     } catch (error) {
@@ -274,7 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/pending-bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const pendingBookings = await storage.getPendingBookingsForHost(userId);
       res.json(pendingBookings);
     } catch (error) {
@@ -285,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/events/:id/bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
@@ -304,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/bookings/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const bookingId = parseInt(req.params.id);
       const { status } = req.body;
 
@@ -336,7 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/bookings/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const bookingId = parseInt(req.params.id);
       
       // Verify user owns this booking
@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/events/:id/chatroom', isAuthenticated, async (req: any, res) => {
     try {
       const eventId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       const success = await storage.deleteChatroom(eventId, userId);
       
@@ -473,7 +473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Simple booking creation without payment processing
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { eventId } = req.body;
       
       // Check if event exists and has capacity
@@ -513,7 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cancel booking (by participant)
   app.put('/api/bookings/:id/cancel', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const bookingId = parseInt(req.params.id);
       
       // Get the booking and verify the user owns it
@@ -546,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Review routes
   app.post('/api/reviews', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const reviewData = {
         ...req.body,
         reviewerId: userId,

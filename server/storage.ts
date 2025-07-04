@@ -86,33 +86,109 @@ export interface IStorage {
 export class SupabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const { data, error } = await supabaseAdmin
-      .from('users')
+    // Get user from auth.users and combine with profile data
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(id);
+    if (authError || !authUser.user) return undefined;
+
+    // Get profile data
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
       .select('*')
       .eq('id', id)
       .single();
-    
-    if (error || !data) return undefined;
-    return data as User;
+
+    // If no profile exists, create one
+    if (profileError && profileError.code === 'PGRST116') {
+      const { data: newProfile, error: createError } = await supabaseAdmin
+        .from('user_profiles')
+        .insert({
+          id: id,
+          first_name: authUser.user.user_metadata?.first_name || '',
+          last_name: authUser.user.user_metadata?.last_name || '',
+        })
+        .select()
+        .single();
+      
+      if (createError) return undefined;
+      
+      return {
+        id: authUser.user.id,
+        email: authUser.user.email || '',
+        firstName: newProfile.first_name,
+        lastName: newProfile.last_name,
+        profileImageUrl: newProfile.profile_image_url,
+        stripeCustomerId: newProfile.stripe_customer_id,
+        stripeSubscriptionId: newProfile.stripe_subscription_id,
+        phoneVerified: newProfile.phone_verified,
+        idVerified: newProfile.id_verified,
+        bio: newProfile.bio,
+        createdAt: new Date(authUser.user.created_at),
+        updatedAt: new Date(newProfile.updated_at),
+      } as User;
+    }
+
+    if (profileError) return undefined;
+
+    return {
+      id: authUser.user.id,
+      email: authUser.user.email || '',
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      profileImageUrl: profile.profile_image_url,
+      stripeCustomerId: profile.stripe_customer_id,
+      stripeSubscriptionId: profile.stripe_subscription_id,
+      phoneVerified: profile.phone_verified,
+      idVerified: profile.id_verified,
+      bio: profile.bio,
+      createdAt: new Date(authUser.user.created_at),
+      updatedAt: new Date(profile.updated_at),
+    } as User;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Update profile data
     const { data, error } = await supabaseAdmin
-      .from('users')
+      .from('user_profiles')
       .upsert({
-        ...userData,
+        id: userData.id,
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        profile_image_url: userData.profileImageUrl,
+        stripe_customer_id: userData.stripeCustomerId,
+        stripe_subscription_id: userData.stripeSubscriptionId,
+        phone_verified: userData.phoneVerified,
+        id_verified: userData.idVerified,
+        bio: userData.bio,
         updated_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (error) throw error;
-    return data as User;
+
+    // Get auth user data
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userData.id);
+    if (authError || !authUser.user) throw authError;
+
+    return {
+      id: authUser.user.id,
+      email: authUser.user.email || userData.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profileImageUrl: data.profile_image_url,
+      stripeCustomerId: data.stripe_customer_id,
+      stripeSubscriptionId: data.stripe_subscription_id,
+      phoneVerified: data.phone_verified,
+      idVerified: data.id_verified,
+      bio: data.bio,
+      createdAt: new Date(authUser.user.created_at),
+      updatedAt: new Date(data.updated_at),
+    } as User;
   }
 
   async updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User> {
     const { data, error } = await supabaseAdmin
-      .from('users')
+      .from('user_profiles')
       .update({
         stripe_customer_id: customerId,
         stripe_subscription_id: subscriptionId,
@@ -123,7 +199,25 @@ export class SupabaseStorage implements IStorage {
       .single();
 
     if (error) throw error;
-    return data as User;
+
+    // Get auth user data
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (authError || !authUser.user) throw authError;
+
+    return {
+      id: authUser.user.id,
+      email: authUser.user.email || '',
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profileImageUrl: data.profile_image_url,
+      stripeCustomerId: data.stripe_customer_id,
+      stripeSubscriptionId: data.stripe_subscription_id,
+      phoneVerified: data.phone_verified,
+      idVerified: data.id_verified,
+      bio: data.bio,
+      createdAt: new Date(authUser.user.created_at),
+      updatedAt: new Date(data.updated_at),
+    } as User;
   }
 
   // Event operations
