@@ -144,13 +144,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }
 
-      // Parse and convert dates
+      // Parse and convert data types
       const bodyData = req.body;
       if (bodyData.startTime && typeof bodyData.startTime === 'string') {
         bodyData.startTime = new Date(bodyData.startTime);
       }
       if (bodyData.endTime && typeof bodyData.endTime === 'string') {
         bodyData.endTime = new Date(bodyData.endTime);
+      }
+      // Convert numbers to strings for latitude/longitude
+      if (bodyData.latitude && typeof bodyData.latitude === 'number') {
+        bodyData.latitude = bodyData.latitude.toString();
+      }
+      if (bodyData.longitude && typeof bodyData.longitude === 'number') {
+        bodyData.longitude = bodyData.longitude.toString();
       }
       
       const updates = insertEventSchema.partial().parse(bodyData);
@@ -231,6 +238,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Join event request route (adds user to requested_users array)
+  app.post('/api/events/:id/join', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const eventId = parseInt(req.params.id);
+      
+      // Get the event
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      // Check if user is the host
+      if (event.hostId === userId) {
+        return res.status(400).json({ message: "You cannot join your own event" });
+      }
+
+      // Check if user is already in any array
+      if (event.requestedUsers?.includes(userId) || 
+          event.acceptedUsers?.includes(userId) || 
+          event.rejectedUsers?.includes(userId)) {
+        return res.status(400).json({ message: "You have already requested to join this event" });
+      }
+
+      // Check if event is full (excluding host)
+      const acceptedCount = event.acceptedUsers?.length || 0;
+      if (acceptedCount >= event.maxPlayers - 1) { // -1 for host
+        return res.status(400).json({ message: "Event is full" });
+      }
+
+      // Add user to requested_users array
+      const updatedRequestedUsers = [...(event.requestedUsers || []), userId];
+      
+      await storage.updateEvent(eventId, {
+        requestedUsers: updatedRequestedUsers
+      });
+
+      res.json({ message: "Join request sent successfully" });
+    } catch (error) {
+      console.error("Error creating join request:", error);
+      res.status(500).json({ message: "Failed to send join request" });
+    }
+  });
+
   // Booking routes - Updated for user participation arrays
   app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {
@@ -241,37 +292,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Event ID is required" });
       }
 
-      // Check if event exists and has space
+      // Get the event and add user to requested_users array
       const event = await storage.getEvent(eventId);
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
 
-      // Check if user already has a participation status
-      const userAlreadyRequested = event.requestedUsers?.includes(userId);
-      const userAlreadyAccepted = event.acceptedUsers?.includes(userId);
-      const userAlreadyRejected = event.rejectedUsers?.includes(userId);
-
-      if (userAlreadyRequested || userAlreadyAccepted || userAlreadyRejected) {
+      // Check if user is already in any array
+      if (event.requestedUsers?.includes(userId) || 
+          event.acceptedUsers?.includes(userId) || 
+          event.rejectedUsers?.includes(userId)) {
         return res.status(400).json({ message: "You have already requested to join this event" });
       }
 
-      if ((event.currentPlayers || 0) >= event.maxPlayers) {
-        return res.status(400).json({ message: "Event is full" });
-      }
+      // Add user to requested_users array directly
+      const updatedRequestedUsers = [...(event.requestedUsers || []), userId];
+      
+      await storage.updateEvent(eventId, {
+        requestedUsers: updatedRequestedUsers
+      });
 
-      // Create booking request using the new user participation system
-      const booking = await storage.createBooking({
+      // Return a mock booking object for compatibility
+      const booking = {
+        id: Date.now(),
         eventId: eventId,
         userId: userId,
-        status: "requested"
-      });
+        status: "requested",
+        paymentIntentId: null,
+        amountPaid: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid booking data", errors: error.errors });
-      }
       res.status(500).json({ message: "Failed to create booking" });
     }
   });

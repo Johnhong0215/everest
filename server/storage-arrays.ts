@@ -655,28 +655,32 @@ export class ArraySupabaseStorage implements IStorage {
   async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
     try {
       // Get events where user is host and there are requested users
-      const { data, error } = await supabase
+      const { data: events, error } = await supabase
         .from('events')
-        .select(`
-          *,
-          host:host_id(*)
-        `)
+        .select('*')
         .eq('host_id', hostId)
         .not('requested_users', 'is', null);
 
       if (error) throw new Error(`Pending bookings fetch failed: ${error.message}`);
-      if (!data) return [];
+      if (!events) return [];
 
       const pendingBookings: BookingWithEventAndUser[] = [];
 
-      for (const event of data) {
+      for (const event of events) {
         if (event.requested_users && event.requested_users.length > 0) {
           for (const userId of event.requested_users) {
-            // Fetch user details
+            // Fetch user details separately
             const { data: user } = await supabase
               .from('users')
               .select('*')
               .eq('id', userId)
+              .single();
+
+            // Fetch host details separately  
+            const { data: host } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', hostId)
               .single();
 
             if (user) {
@@ -690,22 +694,44 @@ export class ArraySupabaseStorage implements IStorage {
                 createdAt: new Date(event.created_at),
                 updatedAt: new Date(event.updated_at),
                 event: {
-                  ...event,
+                  id: event.id,
                   hostId: event.host_id,
+                  title: event.title,
+                  description: event.description,
+                  sport: event.sport,
                   skillLevel: event.skill_level,
                   genderMix: event.gender_mix,
                   startTime: event.start_time,
                   endTime: event.end_time,
+                  location: event.location,
+                  latitude: parseFloat(event.latitude) || 0,
+                  longitude: parseFloat(event.longitude) || 0,
                   maxPlayers: event.max_players,
-                  currentPlayers: event.current_players,
-                  pricePerPerson: event.price_per_person,
-                  sportConfig: event.sport_config,
-                  createdAt: event.created_at,
-                  updatedAt: event.updated_at,
+                  currentPlayers: event.current_players || 1,
+                  pricePerPerson: parseFloat(event.price_per_person) || 0,
+                  sportConfig: event.sport_config || {},
+                  status: event.status,
+                  notes: event.notes,
+                  createdAt: new Date(event.created_at),
+                  updatedAt: new Date(event.updated_at),
                   requestedUsers: event.requested_users || [],
                   acceptedUsers: event.accepted_users || [],
                   rejectedUsers: event.rejected_users || [],
-                  host: event.host
+                  host: host || {
+                    id: hostId,
+                    email: '',
+                    firstName: 'Unknown',
+                    lastName: 'Host',
+                    profileImageUrl: null,
+                    stripeCustomerId: null,
+                    stripeSubscriptionId: null,
+                    phoneVerified: false,
+                    emailVerified: false,
+                    idVerified: false,
+                    bio: null,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                  }
                 } as EventWithHost,
                 user: user as User
               });
@@ -794,7 +820,10 @@ export class ArraySupabaseStorage implements IStorage {
         .insert({
           event_id: message.eventId,
           sender_id: message.senderId,
-          message: message.message,
+          receiver_id: message.receiverId,
+          content: message.content,
+          message_type: message.messageType || null,
+          metadata: message.metadata || null,
           read_by: message.readBy || []
         })
         .select()
@@ -803,12 +832,16 @@ export class ArraySupabaseStorage implements IStorage {
       if (error) throw new Error(`Chat message creation failed: ${error.message}`);
       
       return {
-        ...data,
+        id: data.id,
         eventId: data.event_id,
         senderId: data.sender_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        readBy: data.read_by
+        receiverId: data.receiver_id,
+        content: data.content,
+        messageType: data.message_type,
+        metadata: data.metadata,
+        readBy: data.read_by || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at)
       } as ChatMessage;
     } catch (error) {
       console.error('Error creating chat message:', error);
@@ -818,28 +851,55 @@ export class ArraySupabaseStorage implements IStorage {
 
   async getChatMessages(eventId: number, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
     try {
-      const { data, error } = await supabase
+      const { data: messages, error } = await supabase
         .from('chat_messages')
-        .select(`
-          *,
-          sender:sender_id(*)
-        `)
+        .select('*')
         .eq('event_id', eventId)
         .order('created_at', { ascending: true })
         .range(offset, offset + limit - 1);
 
       if (error) throw new Error(`Chat messages fetch failed: ${error.message}`);
-      if (!data) return [];
+      if (!messages) return [];
 
-      return data.map(msg => ({
-        ...msg,
-        eventId: msg.event_id,
-        senderId: msg.sender_id,
-        createdAt: msg.created_at,
-        updatedAt: msg.updated_at,
-        readBy: msg.read_by || [],
-        sender: msg.sender
-      })) as ChatMessageWithSender[];
+      // Fetch sender information separately for each message
+      const messagesWithSenders = [];
+      for (const msg of messages) {
+        const { data: sender } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', msg.sender_id)
+          .single();
+
+        messagesWithSenders.push({
+          id: msg.id,
+          eventId: msg.event_id,
+          senderId: msg.sender_id,
+          receiverId: msg.receiver_id,
+          content: msg.content,
+          messageType: msg.message_type,
+          metadata: msg.metadata,
+          readBy: msg.read_by || [],
+          createdAt: new Date(msg.created_at),
+          updatedAt: new Date(msg.updated_at),
+          sender: sender || {
+            id: msg.sender_id,
+            email: '',
+            firstName: 'Unknown',
+            lastName: 'User',
+            profileImageUrl: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            phoneVerified: false,
+            emailVerified: false,
+            idVerified: false,
+            bio: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+      }
+
+      return messagesWithSenders as ChatMessageWithSender[];
     } catch (error) {
       console.error('Error fetching chat messages:', error);
       return [];
