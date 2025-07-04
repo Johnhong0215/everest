@@ -578,115 +578,18 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]> {
-    // Get all events where user is in any of the participation arrays
-    const { data: events, error } = await supabaseAdmin
-      .from('events')
-      .select('*')
-      .or(`requested_users.cs.["${userId}"],accepted_users.cs.["${userId}"],rejected_users.cs.["${userId}"]`)
+    const { data, error } = await supabaseAdmin
+      .from('bookings')
+      .select(`
+        *,
+        events(*),
+        users(*)
+      `)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-
-    const bookings: BookingWithEventAndUser[] = [];
-
-    // Convert events to booking format
-    for (const event of events || []) {
-      let status: 'requested' | 'accepted' | 'rejected' = 'requested';
-      
-      if (event.accepted_users && event.accepted_users.includes(userId)) {
-        status = 'accepted';
-      } else if (event.rejected_users && event.rejected_users.includes(userId)) {
-        status = 'rejected';
-      } else if (event.requested_users && event.requested_users.includes(userId)) {
-        status = 'requested';
-      }
-
-      // Get user data
-      const { data: userData, error: userError } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      bookings.push({
-        id: `${event.id}-${userId}`,
-        eventId: event.id,
-        userId: userId,
-        status: status,
-        paymentIntentId: null,
-        amountPaid: null,
-        createdAt: event.created_at,
-        updatedAt: event.updated_at,
-        event: {
-          id: event.id,
-          hostId: event.host_id,
-          title: event.title,
-          description: event.description,
-          sport: event.sport,
-          skillLevel: event.skill_level,
-          genderMix: event.gender_mix,
-          startTime: event.start_time,
-          endTime: event.end_time,
-          location: event.location,
-          latitude: event.latitude,
-          longitude: event.longitude,
-          maxPlayers: event.max_players,
-          currentPlayers: event.current_players,
-          pricePerPerson: event.price_per_person,
-          sportConfig: event.sport_config,
-          status: event.status,
-          notes: event.notes,
-          createdAt: event.created_at,
-          updatedAt: event.updated_at,
-          requestedUsers: event.requested_users || [],
-          acceptedUsers: event.accepted_users || [],
-          rejectedUsers: event.rejected_users || [],
-          host: {
-            id: event.host_id,
-            email: '',
-            firstName: 'Host',
-            lastName: 'User',
-            profileImageUrl: null,
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-            phoneVerified: false,
-            idVerified: false,
-            bio: null,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }
-        },
-        user: userData ? {
-          id: userData.id,
-          email: userData.email,
-          firstName: userData.first_name,
-          lastName: userData.last_name,
-          profileImageUrl: userData.profile_image_url,
-          stripeCustomerId: userData.stripe_customer_id,
-          stripeSubscriptionId: userData.stripe_subscription_id,
-          phoneVerified: userData.phone_verified,
-          idVerified: userData.id_verified,
-          bio: userData.bio,
-          createdAt: userData.created_at,
-          updatedAt: userData.updated_at
-        } : {
-          id: userId,
-          email: '',
-          firstName: 'User',
-          lastName: '',
-          profileImageUrl: null,
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-          phoneVerified: false,
-          idVerified: false,
-          bio: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      });
-    }
-
-    return bookings;
+    return (data || []).map(this.mapBookingResponse);
   }
 
   async getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]> {
@@ -705,18 +608,19 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
-    // Get all events for this host that have requested users
-    const { data: hostEvents, error: eventsError } = await supabaseAdmin
-      .from('events')
-      .select('*')
-      .eq('host_id', hostId)
-      .not('requested_users', 'is', null);
+    // Get bookings for events hosted by this user with requested status
+    const { data, error } = await supabaseAdmin
+      .from('bookings')
+      .select(`
+        *,
+        events(*),
+        users(*)
+      `)
+      .eq('events.host_id', hostId)
+      .eq('status', 'requested')
+      .order('created_at', { ascending: false });
 
-    if (eventsError) throw eventsError;
-
-    if (!hostEvents || hostEvents.length === 0) return [];
-
-    const bookings: BookingWithEventAndUser[] = [];
+    if (error) throw error;
 
     // Convert requested users to booking format
     for (const event of hostEvents) {
@@ -1250,4 +1154,4 @@ export class SupabaseStorage implements IStorage {
   }
 }
 
-export const storage = new SupabaseStorage();
+export const storage = new CleanSupabaseStorage();
