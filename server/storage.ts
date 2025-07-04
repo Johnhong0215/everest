@@ -128,14 +128,58 @@ export class SupabaseStorage implements IStorage {
 
   // Event operations
   async createEvent(event: InsertEvent): Promise<Event> {
+    // Map camelCase to snake_case for Supabase
+    const supabaseEvent = {
+      host_id: event.hostId,
+      title: event.title,
+      description: event.description,
+      sport: event.sport,
+      skill_level: event.skillLevel,
+      gender_mix: event.genderMix,
+      start_time: event.startTime,
+      end_time: event.endTime,
+      location: event.location,
+      latitude: event.latitude,
+      longitude: event.longitude,
+      max_players: event.maxPlayers,
+      current_players: 1,
+      price_per_person: event.pricePerPerson,
+      sport_config: event.sportConfig || {},
+      status: event.status || 'published',
+      notes: event.notes,
+    };
+
     const { data, error } = await supabaseAdmin
       .from('events')
-      .insert(event)
+      .insert(supabaseEvent)
       .select()
       .single();
 
     if (error) throw error;
-    return data as Event;
+    
+    // Map back to camelCase for the response
+    return {
+      id: data.id,
+      hostId: data.host_id,
+      title: data.title,
+      description: data.description,
+      sport: data.sport,
+      skillLevel: data.skill_level,
+      genderMix: data.gender_mix,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      maxPlayers: data.max_players,
+      currentPlayers: data.current_players,
+      pricePerPerson: data.price_per_person,
+      sportConfig: data.sport_config,
+      status: data.status,
+      notes: data.notes,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    } as Event;
   }
 
   async getEvent(id: number): Promise<EventWithHost | undefined> {
@@ -265,10 +309,28 @@ export class SupabaseStorage implements IStorage {
       const currentPlayers = 1 + acceptedBookings.length;
 
       return {
-        ...event,
+        id: event.id,
+        hostId: event.host_id,
+        title: event.title,
+        description: event.description,
+        sport: event.sport,
+        skillLevel: event.skill_level,
+        genderMix: event.gender_mix,
+        startTime: event.start_time,
+        endTime: event.end_time,
+        location: event.location,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        maxPlayers: event.max_players,
+        currentPlayers: currentPlayers,
+        pricePerPerson: event.price_per_person,
+        sportConfig: event.sport_config,
+        status: event.status,
+        notes: event.notes,
+        createdAt: event.created_at,
+        updatedAt: event.updated_at,
         host: hostMap.get(event.host_id),
         bookings: eventBookings,
-        current_players: currentPlayers,
       } as EventWithHost;
     });
   }
