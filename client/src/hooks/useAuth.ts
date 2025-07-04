@@ -9,22 +9,32 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setIsLoading(false)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Failed to get initial session:', error)
+        setIsLoading(false)
+      }
     }
 
     getInitialSession()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-        setIsLoading(false)
-      }
-    )
+    let subscription: any
+    supabase.auth.onAuthStateChange((event: string, session: any) => {
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+    }).then((sub) => {
+      subscription = sub
+    })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      if (subscription?.data?.subscription) {
+        subscription.data.subscription.unsubscribe()
+      }
+    }
   }, [])
 
   const signInWithEmail = async (email: string, password: string) => {

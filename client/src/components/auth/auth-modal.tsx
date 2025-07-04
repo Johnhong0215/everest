@@ -88,9 +88,32 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return
     }
 
+    // Check for at least one number and one special character
+    const hasNumber = /\d/.test(signupForm.password)
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(signupForm.password)
+    
+    if (!hasNumber || !hasSpecialChar) {
+      toast({
+        variant: "destructive",
+        title: "Password Requirements",
+        description: "Password must contain at least one number and one special character."
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
+      console.log('Attempting signup with:', {
+        email: signupForm.email,
+        passwordLength: signupForm.password.length,
+        metadata: {
+          firstName: signupForm.firstName,
+          lastName: signupForm.lastName,
+          name: `${signupForm.firstName} ${signupForm.lastName}`.trim()
+        }
+      })
+      
       const { data, error } = await signUpWithEmail(
         signupForm.email, 
         signupForm.password,
@@ -101,7 +124,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         }
       )
       
+      console.log('Signup response:', { data, error })
+      
       if (error) {
+        console.error('Signup error:', error)
         toast({
           variant: "destructive",
           title: "Signup Failed",
@@ -118,10 +144,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setActiveTab('login')
       }
     } catch (error) {
+      console.error('Signup exception:', error)
       toast({
         variant: "destructive",
         title: "Signup Failed",
-        description: "An unexpected error occurred. Please try again."
+        description: `Network error: ${error instanceof Error ? error.message : 'Please try again.'}`
       })
     } finally {
       setIsLoading(false)
@@ -264,7 +291,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       <Input
                         id="signupPassword"
                         type="password"
-                        placeholder="Create password (min 6 characters)"
+                        placeholder="Create password (min 6 chars, 1 number, 1 special char)"
                         className="pl-10"
                         value={signupForm.password}
                         onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
