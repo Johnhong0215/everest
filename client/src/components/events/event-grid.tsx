@@ -137,19 +137,6 @@ export default function EventGrid({
       // Clear invalid data
       localStorage.removeItem('userLocation');
       localStorage.removeItem('locationPermission');
-      
-      // Still try to get location if no saved data
-      setTimeout(() => {
-        if (locationPermission === 'prompt') {
-          console.log('No saved data, attempting initial location request...');
-          requestLocation();
-        }
-      }, 500);
-    } catch (error) {
-      console.warn('Failed to restore saved location:', error);
-      // Clear invalid data
-      localStorage.removeItem('userLocation');
-      localStorage.removeItem('locationPermission');
     }
 
     // Cleanup function to stop tracking when component unmounts
