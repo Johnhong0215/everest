@@ -6,6 +6,12 @@ import { setupAuth, isAuthenticated } from "./supabaseAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events, chatMessages } from "@shared/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // WebSocket connections by user ID
 const connections = new Map<string, WebSocket>();
@@ -528,13 +534,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Content, receiverId, and authenticated user are required" });
       }
 
+      // First, find or create a chat between sender and receiver for this event
+      const { data: existingChat } = await supabase
+        .from('chats')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('sender_id', senderId)
+        .eq('receiver_id', receiverId)
+        .single();
+
+      let chatId;
+      if (existingChat) {
+        chatId = existingChat.id;
+      } else {
+        // Check if reverse chat exists (receiver as sender)
+        const { data: reverseChat } = await supabase
+          .from('chats')
+          .select('id')
+          .eq('event_id', eventId)
+          .eq('sender_id', receiverId)
+          .eq('receiver_id', senderId)
+          .single();
+
+        if (reverseChat) {
+          chatId = reverseChat.id;
+        } else {
+          // Create new chat
+          const { data: newChat, error: chatError } = await supabase
+            .from('chats')
+            .insert({
+              sender_id: senderId,
+              receiver_id: receiverId,
+              event_id: eventId,
+            })
+            .select('id')
+            .single();
+
+          if (chatError) {
+            throw new Error(`Failed to create chat: ${chatError.message}`);
+          }
+          chatId = newChat.id;
+        }
+      }
+
       const message = await storage.createChatMessage({
-        eventId,
+        chatId,
         senderId,
-        receiverId,
         content,
-        messageType,
-        readBy: [senderId] // Sender has read their own message
+        readAt: null,
       });
 
       console.log(`Message created successfully with ID: ${message.id}`);

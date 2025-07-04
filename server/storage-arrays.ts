@@ -693,7 +693,22 @@ export class ArraySupabaseStorage implements IStorage {
 
             if (userError) {
               console.log(`Error fetching user ${userId}:`, userError);
-              continue;
+              // Create a placeholder user entry for missing users
+              user = {
+                id: userId,
+                email: 'unknown@example.com',
+                first_name: 'Unknown',
+                last_name: 'User',
+                profile_image_url: null,
+                stripe_customer_id: null,
+                stripe_subscription_id: null,
+                phone_verified: false,
+                email_verified: false,
+                id_verified: false,
+                bio: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
             }
 
             // Fetch host details separately  
@@ -841,19 +856,13 @@ export class ArraySupabaseStorage implements IStorage {
   // Chat operations - these remain the same as they don't depend on bookings
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     try {
-      // Use the correct column name 'content' based on actual database structure
       const { data, error } = await supabase
         .from('chat_messages')
         .insert({
-          event_id: message.eventId,
+          chat_id: message.chatId,
           sender_id: message.senderId,
-          receiver_id: message.receiverId,
-          content: message.content, // Use 'content' column as confirmed by database inspection
-          message_type: message.messageType || 'text',
-          metadata: message.metadata || null,
-          read_by: JSON.stringify([message.senderId]), // Mark as read by sender
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          content: message.content,
+          read_at: message.readAt || null,
         })
         .select()
         .single();
@@ -862,15 +871,11 @@ export class ArraySupabaseStorage implements IStorage {
       
       return {
         id: data.id,
-        eventId: data.event_id,
+        chatId: data.chat_id,
         senderId: data.sender_id,
-        receiverId: data.receiver_id,
-        content: data.content, // Use content field directly
-        messageType: data.message_type,
-        metadata: data.metadata,
-        readBy: JSON.parse(data.read_by || '[]'),
+        content: data.content,
+        readAt: data.read_at,
         createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at || data.created_at)
       } as ChatMessage;
     } catch (error) {
       console.error('Error creating chat message:', error);
@@ -880,10 +885,23 @@ export class ArraySupabaseStorage implements IStorage {
 
   async getChatMessages(eventId: number, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
     try {
+      // First, get all chats for this event
+      const { data: chats, error: chatsError } = await supabase
+        .from('chats')
+        .select('id')
+        .eq('event_id', eventId);
+
+      if (chatsError) throw new Error(`Chat fetch failed: ${chatsError.message}`);
+      if (!chats || chats.length === 0) return [];
+
+      // Get all chat IDs for this event
+      const chatIds = chats.map(chat => chat.id);
+
+      // Fetch messages from all chats for this event
       const { data: messages, error } = await supabase
         .from('chat_messages')
         .select('*')
-        .eq('event_id', eventId)
+        .in('chat_id', chatIds)
         .order('created_at', { ascending: true })
         .range(offset, offset + limit - 1);
 
@@ -901,15 +919,11 @@ export class ArraySupabaseStorage implements IStorage {
 
         messagesWithSenders.push({
           id: msg.id,
-          eventId: msg.event_id,
+          chatId: msg.chat_id,
           senderId: msg.sender_id,
-          receiverId: msg.receiver_id,
-          content: msg.content, // Use 'content' column from database
-          messageType: msg.message_type,
-          metadata: msg.metadata,
-          readBy: msg.read_by || [],
+          content: msg.content,
+          readAt: msg.read_at,
           createdAt: new Date(msg.created_at),
-          updatedAt: new Date(msg.updated_at),
           sender: sender || {
             id: msg.sender_id,
             email: '',
