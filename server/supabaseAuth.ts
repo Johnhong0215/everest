@@ -36,35 +36,63 @@ export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
     // Extract Bearer token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('No bearer token found in headers');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    console.log('Attempting to verify token for user');
     
     // Verify token with Supabase
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     
-    if (error || !user) {
+    if (error) {
+      console.error('Supabase auth error:', error);
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    if (!user) {
+      console.log('No user found for token');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
+    console.log('User authenticated successfully:', user.id);
+
     // Ensure user profile exists
-    const userProfile = await storage.getUser(user.id);
-    if (!userProfile) {
-      // Create user profile if it doesn't exist
-      await storage.upsertUser({
-        id: user.id,
-        email: user.email || '',
-        firstName: user.user_metadata?.first_name || '',
-        lastName: user.user_metadata?.last_name || '',
-        profileImageUrl: user.user_metadata?.avatar_url || null,
+    try {
+      const userProfile = await storage.getUser(user.id);
+      if (!userProfile) {
+        console.log('Creating user profile for:', user.id);
+        // Create user profile if it doesn't exist
+        await storage.upsertUser({
+          id: user.id,
+          email: user.email || '',
+          firstName: user.user_metadata?.first_name || '',
+          lastName: user.user_metadata?.last_name || '',
+          profileImageUrl: user.user_metadata?.avatar_url || null,
+        });
+        console.log('User profile created successfully');
+      } else {
+        console.log('User profile already exists for:', user.id);
+      }
+    } catch (userError) {
+      console.error('Error managing user profile:', userError);
+      console.error('User profile error details:', {
+        message: userError.message,
+        stack: userError.stack,
+        error: userError
       });
+      // Continue with auth even if user profile management fails
     }
 
     req.user = user;
     next();
   } catch (error) {
-    console.error('Auth error:', error);
+    console.error('Auth error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      error: error
+    });
     return res.status(401).json({ message: 'Unauthorized' });
   }
 };

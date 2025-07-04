@@ -260,15 +260,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Event is full" });
       }
 
-      // Check if user already booked this event
-      const existingBookings = await storage.getBookingsByEvent(bookingData.eventId);
-      const userAlreadyBooked = existingBookings.some(b => b.userId === userId);
-      
-      if (userAlreadyBooked) {
-        return res.status(400).json({ message: "You have already booked this event" });
-      }
-
-      const booking = await storage.createBooking(bookingData);
+      // Create booking request using the new user participation system
+      const booking = await storage.createBooking({
+        eventId: eventId,
+        userId: userId,
+        status: "requested"
+      });
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -337,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to update this booking" });
       }
 
-      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
+      const updatedBooking = await storage.updateBookingStatus(booking.eventId, booking.userId, status);
       
       if (!updatedBooking) {
         return res.status(404).json({ message: "Failed to update booking" });
@@ -550,7 +547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update booking status to cancelled
-      const updatedBooking = await storage.updateBookingStatus(bookingId, 'cancelled');
+      const updatedBooking = await storage.updateBookingStatus(booking.eventId, booking.userId, 'cancelled');
       
       // Player count is now calculated dynamically, no manual manipulation needed
       

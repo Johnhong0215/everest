@@ -578,55 +578,102 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .select(`
-        *,
-        events(*),
-        users(*)
-      `)
-      .eq('user_id', userId)
+    // Get all events where user is in any of the participation arrays
+    const { data: events, error } = await supabaseAdmin
+      .from('events')
+      .select('*')
+      .or(`requested_users.cs.["${userId}"],accepted_users.cs.["${userId}"],rejected_users.cs.["${userId}"]`)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    
-    // Map the response to the expected format
-    return (data || []).map((booking: any) => ({
-      id: booking.id,
-      eventId: booking.event_id,
-      userId: booking.user_id,
-      status: booking.status,
-      paymentIntentId: booking.payment_intent_id,
-      amountPaid: booking.amount_paid,
-      createdAt: booking.created_at,
-      updatedAt: booking.updated_at,
-      event: booking.events ? {
-        id: booking.events.id,
-        hostId: booking.events.host_id,
-        title: booking.events.title,
-        description: booking.events.description,
-        sport: booking.events.sport,
-        skillLevel: booking.events.skill_level,
-        genderMix: booking.events.gender_mix,
-        startTime: booking.events.start_time,
-        endTime: booking.events.end_time,
-        location: booking.events.location,
-        latitude: booking.events.latitude,
-        longitude: booking.events.longitude,
-        maxPlayers: booking.events.max_players,
-        currentPlayers: booking.events.current_players || 1,
-        pricePerPerson: booking.events.price_per_person,
-        sportConfig: booking.events.sport_config,
-        status: booking.events.status,
-        notes: booking.events.notes,
-        createdAt: booking.events.created_at,
-        updatedAt: booking.events.updated_at,
-        bookings: [],
-        host: {
-          id: booking.events.host_id || '',
+
+    const bookings: BookingWithEventAndUser[] = [];
+
+    // Convert events to booking format
+    for (const event of events || []) {
+      let status: 'requested' | 'accepted' | 'rejected' = 'requested';
+      
+      if (event.accepted_users && event.accepted_users.includes(userId)) {
+        status = 'accepted';
+      } else if (event.rejected_users && event.rejected_users.includes(userId)) {
+        status = 'rejected';
+      } else if (event.requested_users && event.requested_users.includes(userId)) {
+        status = 'requested';
+      }
+
+      // Get user data
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      bookings.push({
+        id: `${event.id}-${userId}`,
+        eventId: event.id,
+        userId: userId,
+        status: status,
+        paymentIntentId: null,
+        amountPaid: null,
+        createdAt: event.created_at,
+        updatedAt: event.updated_at,
+        event: {
+          id: event.id,
+          hostId: event.host_id,
+          title: event.title,
+          description: event.description,
+          sport: event.sport,
+          skillLevel: event.skill_level,
+          genderMix: event.gender_mix,
+          startTime: event.start_time,
+          endTime: event.end_time,
+          location: event.location,
+          latitude: event.latitude,
+          longitude: event.longitude,
+          maxPlayers: event.max_players,
+          currentPlayers: event.current_players,
+          pricePerPerson: event.price_per_person,
+          sportConfig: event.sport_config,
+          status: event.status,
+          notes: event.notes,
+          createdAt: event.created_at,
+          updatedAt: event.updated_at,
+          requestedUsers: event.requested_users || [],
+          acceptedUsers: event.accepted_users || [],
+          rejectedUsers: event.rejected_users || [],
+          host: {
+            id: event.host_id,
+            email: '',
+            firstName: 'Host',
+            lastName: 'User',
+            profileImageUrl: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            phoneVerified: false,
+            idVerified: false,
+            bio: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        },
+        user: userData ? {
+          id: userData.id,
+          email: userData.email,
+          firstName: userData.first_name,
+          lastName: userData.last_name,
+          profileImageUrl: userData.profile_image_url,
+          stripeCustomerId: userData.stripe_customer_id,
+          stripeSubscriptionId: userData.stripe_subscription_id,
+          phoneVerified: userData.phone_verified,
+          idVerified: userData.id_verified,
+          bio: userData.bio,
+          createdAt: userData.created_at,
+          updatedAt: userData.updated_at
+        } : {
+          id: userId,
           email: '',
-          firstName: 'Host',
-          lastName: 'User',
+          firstName: 'User',
+          lastName: '',
           profileImageUrl: null,
           stripeCustomerId: null,
           stripeSubscriptionId: null,
@@ -636,55 +683,10 @@ export class SupabaseStorage implements IStorage {
           createdAt: new Date(),
           updatedAt: new Date()
         }
-      } : {
-        id: 0,
-        hostId: '',
-        title: '',
-        description: '',
-        sport: 'badminton' as const,
-        skillLevel: 'beginner' as const,
-        genderMix: 'mixed' as const,
-        startTime: new Date().toISOString(),
-        endTime: new Date().toISOString(),
-        location: '',
-        latitude: 0,
-        longitude: 0,
-        maxPlayers: 4,
-        currentPlayers: 1,
-        pricePerPerson: 0,
-        sportConfig: {},
-        status: 'published' as const,
-        notes: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        bookings: [],
-        host: {
-          id: '',
-          email: '',
-          firstName: 'Host',
-          lastName: 'User',
-          profileImageUrl: null,
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-          phoneVerified: false,
-          idVerified: false,
-          bio: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      },
-      user: booking.users ? {
-        id: booking.users.id,
-        email: booking.users.email,
-        firstName: booking.users.first_name,
-        lastName: booking.users.last_name,
-        profileImageUrl: booking.users.profile_image_url,
-        stripeCustomerId: booking.users.stripe_customer_id,
-        stripeSubscriptionId: booking.users.stripe_subscription_id,
-        createdAt: booking.users.created_at,
-        updatedAt: booking.users.updated_at
-      } : undefined
-    }));
+      });
+    }
+
+    return bookings;
   }
 
   async getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]> {
@@ -703,31 +705,113 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
-    // First get all events for this host
+    // Get all events for this host that have requested users
     const { data: hostEvents, error: eventsError } = await supabaseAdmin
       .from('events')
-      .select('id')
-      .eq('host_id', hostId);
+      .select('*')
+      .eq('host_id', hostId)
+      .not('requested_users', 'is', null);
 
     if (eventsError) throw eventsError;
 
     if (!hostEvents || hostEvents.length === 0) return [];
 
-    const eventIds = hostEvents.map(e => e.id);
+    const bookings: BookingWithEventAndUser[] = [];
 
-    // Then get bookings for those events
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .select(`
-        *,
-        events(*),
-        users(*)
-      `)
-      .in('event_id', eventIds)
-      .eq('status', 'requested')
-      .order('created_at', { ascending: false });
+    // Convert requested users to booking format
+    for (const event of hostEvents) {
+      if (event.requested_users && event.requested_users.length > 0) {
+        for (const userId of event.requested_users) {
+          // Get user data
+          const { data: userData, error: userError } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
 
-    if (error) throw error;
+          if (userError) continue;
+
+          bookings.push({
+            id: `${event.id}-${userId}`,
+            eventId: event.id,
+            userId: userId,
+            status: 'requested' as const,
+            paymentIntentId: null,
+            amountPaid: null,
+            createdAt: event.created_at,
+            updatedAt: event.updated_at,
+            event: {
+              id: event.id,
+              hostId: event.host_id,
+              title: event.title,
+              description: event.description,
+              sport: event.sport,
+              skillLevel: event.skill_level,
+              genderMix: event.gender_mix,
+              startTime: event.start_time,
+              endTime: event.end_time,
+              location: event.location,
+              latitude: event.latitude,
+              longitude: event.longitude,
+              maxPlayers: event.max_players,
+              currentPlayers: event.current_players,
+              pricePerPerson: event.price_per_person,
+              sportConfig: event.sport_config,
+              status: event.status,
+              notes: event.notes,
+              createdAt: event.created_at,
+              updatedAt: event.updated_at,
+              requestedUsers: event.requested_users || [],
+              acceptedUsers: event.accepted_users || [],
+              rejectedUsers: event.rejected_users || [],
+              host: {
+                id: hostId,
+                email: '',
+                firstName: 'Host',
+                lastName: 'User',
+                profileImageUrl: null,
+                stripeCustomerId: null,
+                stripeSubscriptionId: null,
+                phoneVerified: false,
+                idVerified: false,
+                bio: null,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              }
+            },
+            user: userData ? {
+              id: userData.id,
+              email: userData.email,
+              firstName: userData.first_name,
+              lastName: userData.last_name,
+              profileImageUrl: userData.profile_image_url,
+              stripeCustomerId: userData.stripe_customer_id,
+              stripeSubscriptionId: userData.stripe_subscription_id,
+              phoneVerified: userData.phone_verified,
+              idVerified: userData.id_verified,
+              bio: userData.bio,
+              createdAt: userData.created_at,
+              updatedAt: userData.updated_at
+            } : {
+              id: userId,
+              email: '',
+              firstName: 'User',
+              lastName: '',
+              profileImageUrl: null,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              phoneVerified: false,
+              idVerified: false,
+              bio: null,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          });
+        }
+      }
+    }
+
+    return bookings;
     
     // Map the response to the expected format
     return (data || []).map((booking: any) => ({
@@ -953,12 +1037,11 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
-    // This is a complex query that needs to be simplified for Supabase
-    // Get all events where user is host or has bookings
+    // Get all events where user is host or participant
     const { data: userEvents, error: eventsError } = await supabaseAdmin
       .from('events')
       .select('*')
-      .or(`host_id.eq.${userId},bookings.user_id.eq.${userId}`);
+      .or(`host_id.eq.${userId},requested_users.cs.["${userId}"],accepted_users.cs.["${userId}"],rejected_users.cs.["${userId}"]`);
 
     if (eventsError) throw eventsError;
 
