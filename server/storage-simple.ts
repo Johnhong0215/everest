@@ -125,9 +125,31 @@ export class SimpleSupabaseStorage implements IStorage {
 
   // Event operations - completely simplified without joins
   async createEvent(event: InsertEvent): Promise<Event> {
+    // Map camelCase to snake_case for database
+    const eventData = {
+      host_id: event.hostId,
+      title: event.title,
+      description: event.description || '',
+      sport: event.sport,
+      skill_level: event.skillLevel,
+      gender_mix: event.genderMix,
+      start_time: event.startTime,
+      end_time: event.endTime,
+      location: event.location,
+      latitude: event.latitude,
+      longitude: event.longitude,
+      max_players: event.maxPlayers,
+      current_players: 1, // Always start with host as first player
+      price_per_person: event.pricePerPerson,
+      sport_config: event.sportConfig || {},
+      requested_users: [],
+      accepted_users: [],
+      rejected_users: []
+    };
+
     const { data, error } = await supabaseAdmin
       .from('events')
-      .insert(event)
+      .insert(eventData)
       .select()
       .single();
 
@@ -392,8 +414,162 @@ export class SimpleSupabaseStorage implements IStorage {
   }
 
   async getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]> {
-    // Simple implementation - just return empty for now
-    return [];
+    const bookings: BookingWithEventAndUser[] = [];
+    
+    try {
+      // Get all events where user is host, accepted, or requested
+      const { data: events, error } = await supabaseAdmin
+        .from('events')
+        .select('*')
+        .or(`host_id.eq.${userId},accepted_users.cs.["${userId}"],requested_users.cs.["${userId}"]`);
+
+      if (error) throw error;
+      if (!events) return [];
+
+      for (const event of events) {
+        let status = 'unknown';
+        let bookingId = 0;
+
+        // Determine the user's relationship to this event
+        if (event.host_id === userId) {
+          status = 'hosted';
+          bookingId = event.id; // Use event ID as booking ID for hosted events
+        } else if (event.accepted_users && event.accepted_users.includes(userId)) {
+          status = 'accepted';
+          bookingId = event.id + 1000; // Use event ID + offset for accepted
+        } else if (event.requested_users && event.requested_users.includes(userId)) {
+          status = 'requested';
+          bookingId = event.id + 2000; // Use event ID + offset for requested
+        } else {
+          continue; // Skip if user has no relationship to this event
+        }
+
+        // Get host information
+        let hostData = {
+          id: event.host_id,
+          email: '',
+          firstName: 'User',
+          lastName: '',
+          displayName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          idVerified: false,
+          bio: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        try {
+          const { data: hostUser } = await supabaseAdmin.auth.admin.getUserById(event.host_id);
+          if (hostUser?.user) {
+            hostData = {
+              id: hostUser.user.id,
+              email: hostUser.user.email || '',
+              firstName: hostUser.user.user_metadata?.first_name || 'User',
+              lastName: hostUser.user.user_metadata?.last_name || '',
+              displayName: hostUser.user.user_metadata?.display_name || `${hostUser.user.user_metadata?.first_name || 'User'} ${hostUser.user.user_metadata?.last_name || ''}`.trim(),
+              profileImageUrl: hostUser.user.user_metadata?.avatar_url || null,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              phoneVerified: hostUser.user.phone_confirmed_at ? true : false,
+              idVerified: false,
+              bio: null,
+              createdAt: hostUser.user.created_at ? new Date(hostUser.user.created_at) : new Date(),
+              updatedAt: hostUser.user.updated_at ? new Date(hostUser.user.updated_at) : new Date()
+            };
+          }
+        } catch (error) {
+          console.log(`Could not fetch host data for ${event.host_id}:`, error);
+        }
+
+        // Get user information (requester/participant)
+        let userData = {
+          id: userId,
+          email: '',
+          firstName: 'User',
+          lastName: '',
+          displayName: 'User',
+          profileImageUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          phoneVerified: false,
+          idVerified: false,
+          bio: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        try {
+          const { data: user } = await supabaseAdmin.auth.admin.getUserById(userId);
+          if (user?.user) {
+            userData = {
+              id: user.user.id,
+              email: user.user.email || '',
+              firstName: user.user.user_metadata?.first_name || 'User',
+              lastName: user.user.user_metadata?.last_name || '',
+              displayName: user.user.user_metadata?.display_name || `${user.user.user_metadata?.first_name || 'User'} ${user.user.user_metadata?.last_name || ''}`.trim(),
+              profileImageUrl: user.user.user_metadata?.avatar_url || null,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              phoneVerified: user.user.phone_confirmed_at ? true : false,
+              idVerified: false,
+              bio: null,
+              createdAt: user.user.created_at ? new Date(user.user.created_at) : new Date(),
+              updatedAt: user.user.updated_at ? new Date(user.user.updated_at) : new Date()
+            };
+          }
+        } catch (error) {
+          console.log(`Could not fetch user data for ${userId}:`, error);
+        }
+
+        bookings.push({
+          id: bookingId,
+          eventId: event.id,
+          userId: userId,
+          status: status,
+          paymentIntentId: null,
+          amountPaid: null,
+          createdAt: new Date(event.created_at),
+          updatedAt: new Date(event.updated_at || event.created_at),
+          event: {
+            id: event.id,
+            title: event.title,
+            description: event.description || '',
+            sport: event.sport,
+            skillLevel: event.skill_level,
+            genderMix: event.gender_mix,
+            startTime: new Date(event.start_time),
+            endTime: new Date(event.end_time),
+            location: event.location,
+            latitude: event.latitude,
+            longitude: event.longitude,
+            maxPlayers: event.max_players,
+            currentPlayers: event.current_players,
+            pricePerPerson: event.price_per_person,
+            hostId: event.host_id,
+            requestedUsers: event.requested_users || [],
+            acceptedUsers: event.accepted_users || [],
+            rejectedUsers: event.rejected_users || [],
+            sportConfig: event.sport_config || {},
+            status: event.status || 'active',
+            notes: event.notes || null,
+            createdAt: new Date(event.created_at),
+            updatedAt: new Date(event.updated_at || event.created_at),
+            host: hostData,
+            bookings: [],
+            _count: { bookings: 0 }
+          } as unknown as EventWithHost,
+          user: userData
+        } as unknown as BookingWithEventAndUser);
+      }
+
+      return bookings;
+    } catch (error) {
+      console.error('Error fetching user bookings:', error);
+      return [];
+    }
   }
 
   async getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]> {
@@ -471,8 +647,25 @@ export class SimpleSupabaseStorage implements IStorage {
                 hostId: hostId,
                 requestedUsers: event.requested_users,
                 acceptedUsers: event.accepted_users || [],
-                rejectedUsers: event.rejected_users || []
-              },
+                rejectedUsers: event.rejected_users || [],
+                host: {
+                  id: hostId,
+                  email: '',
+                  firstName: 'Host',
+                  lastName: 'User',
+                  displayName: 'Host User',
+                  profileImageUrl: null,
+                  stripeCustomerId: null,
+                  stripeSubscriptionId: null,
+                  phoneVerified: false,
+                  idVerified: false,
+                  bio: null,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                },
+                bookings: [],
+                _count: { bookings: 0 }
+              } as unknown as EventWithHost,
               user: {
                 id: user.user?.id || userId,
                 email: user.user?.email || '',
@@ -488,7 +681,7 @@ export class SimpleSupabaseStorage implements IStorage {
                 createdAt: user.user?.created_at ? new Date(user.user.created_at) : new Date(),
                 updatedAt: user.user?.updated_at ? new Date(user.user.updated_at) : new Date()
               }
-            });
+            } as unknown as BookingWithEventAndUser);
           }
         }
       }
