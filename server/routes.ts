@@ -1,17 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage-simple";
-import { setupAuth, isAuthenticated } from "./supabaseAuth";
+import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertEventSchema, insertBookingSchema, insertChatMessageSchema, events, chatMessages } from "@shared/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from "./db";
 
 // WebSocket connections by user ID
 const connections = new Map<string, WebSocket>();
@@ -20,18 +15,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Supabase configuration endpoint for frontend
-  app.get('/api/supabase-config', (req, res) => {
-    res.json({
-      url: process.env.SUPABASE_URL,
-      anonKey: process.env.SUPABASE_ANON_KEY
-    });
-  });
-
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id; // Supabase user ID is directly on user object
+      const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -76,11 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const events = await storage.getEvents(filters);
-      
-      // Events are already properly formatted from storage
-      const mappedEvents = events;
-      
-      res.json(mappedEvents);
+      res.json(events);
     } catch (error) {
       console.error("Error fetching events:", error);
       res.status(500).json({ message: "Failed to fetch events" });
@@ -90,14 +73,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/events/:id', async (req, res) => {
     try {
       const eventId = parseInt(req.params.id);
-      console.log('Fetching event with ID:', eventId);
       const event = await storage.getEvent(eventId);
       
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
 
-      // Event is already properly formatted from storage
       res.json(event);
     } catch (error) {
       console.error("Error fetching event:", error);
@@ -108,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/events', isAuthenticated, async (req: any, res) => {
     try {
       console.log("Creating event with body:", req.body);
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       console.log("User ID:", userId);
       
       // Convert datetime strings to Date objects and set currentPlayers to 1 (host is playing)
@@ -139,31 +120,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
       const existingEvent = await storage.getEvent(eventId);
-      console.log("Checking authorization - Event hostId:", existingEvent?.hostId, "User ID:", userId);
-      
       if (!existingEvent || existingEvent.hostId !== userId) {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }
 
-      // Parse and convert data types
+      // Parse and convert dates
       const bodyData = req.body;
       if (bodyData.startTime && typeof bodyData.startTime === 'string') {
         bodyData.startTime = new Date(bodyData.startTime);
       }
       if (bodyData.endTime && typeof bodyData.endTime === 'string') {
         bodyData.endTime = new Date(bodyData.endTime);
-      }
-      // Convert numbers to strings for latitude/longitude
-      if (bodyData.latitude && typeof bodyData.latitude === 'number') {
-        bodyData.latitude = bodyData.latitude.toString();
-      }
-      if (bodyData.longitude && typeof bodyData.longitude === 'number') {
-        bodyData.longitude = bodyData.longitude.toString();
       }
       
       const updates = insertEventSchema.partial().parse(bodyData);
@@ -182,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
@@ -206,12 +178,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
       const event = await storage.getEvent(eventId);
-      console.log(`Authorization check: userId=${userId}, event.hostId=${event?.hostId}, match=${event?.hostId === userId}`);
       if (!event || event.hostId !== userId) {
         return res.status(403).json({ message: "Not authorized to edit this event" });
       }
@@ -235,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/my-events', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const events = await storage.getEventsByHost(userId);
       res.json(events);
     } catch (error) {
@@ -244,161 +215,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Join event request route (adds user to requested_users array)
-  app.post('/api/events/:id/join', isAuthenticated, async (req: any, res) => {
+  // Booking routes
+  app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
-      const eventId = parseInt(req.params.id);
-      
-      // Get the event
-      const event = await storage.getEvent(eventId);
+      const userId = req.user.claims.sub;
+      const bookingData = insertBookingSchema.parse({
+        ...req.body,
+        userId,
+        status: "requested", // Always set status to requested for new bookings
+      });
+
+      // Check if event has space
+      const event = await storage.getEvent(bookingData.eventId);
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
 
-      // Check if user is the host
-      if (event.hostId === userId) {
-        return res.status(400).json({ message: "You cannot join your own event" });
-      }
-
-      // Check if user is already in any array
-      if (event.requestedUsers?.includes(userId) || 
-          event.acceptedUsers?.includes(userId) || 
-          event.rejectedUsers?.includes(userId)) {
-        return res.status(400).json({ message: "You have already requested to join this event" });
-      }
-
-      // Check if event is full (excluding host)
-      const acceptedCount = event.acceptedUsers?.length || 0;
-      if (acceptedCount >= event.maxPlayers - 1) { // -1 for host
+      if ((event.currentPlayers || 0) >= event.maxPlayers) {
         return res.status(400).json({ message: "Event is full" });
       }
 
-      // Add user to requested_users array
-      const updatedRequestedUsers = [...(event.requestedUsers || []), userId];
+      // Check if user already booked this event
+      const existingBookings = await storage.getBookingsByEvent(bookingData.eventId);
+      const userAlreadyBooked = existingBookings.some(b => b.userId === userId);
       
-      await storage.updateEvent(eventId, {
-        requestedUsers: updatedRequestedUsers
-      } as any);
-
-      res.json({ message: "Join request sent successfully" });
-    } catch (error) {
-      console.error("Error creating join request:", error);
-      res.status(500).json({ message: "Failed to send join request" });
-    }
-  });
-
-  // Event participant management routes
-  app.patch('/api/events/:eventId/participants/:userId', isAuthenticated, async (req: any, res) => {
-    try {
-      const hostId = req.user.id;
-      const eventId = parseInt(req.params.eventId);
-      const userId = req.params.userId;
-      const { action } = req.body; // 'approve' or 'reject'
-
-      console.log(`Host ${hostId} attempting to ${action} user ${userId} for event ${eventId}`);
-
-      // Get the event and verify user is the host
-      const event = await storage.getEvent(eventId);
-      if (!event) {
-        return res.status(404).json({ message: "Event not found" });
+      if (userAlreadyBooked) {
+        return res.status(400).json({ message: "You have already booked this event" });
       }
 
-      if (event.hostId !== hostId) {
-        return res.status(403).json({ message: "Not authorized to manage this event" });
-      }
-
-      // Check if user is in requested_users array
-      if (!event.requestedUsers?.includes(userId)) {
-        return res.status(400).json({ message: "User has not requested to join this event" });
-      }
-
-      // Remove user from requested_users array
-      const updatedRequestedUsers = event.requestedUsers.filter(id => id !== userId);
-      
-      if (action === 'approve') {
-        // Add to accepted_users array and increment current players
-        const updatedAcceptedUsers = [...(event.acceptedUsers || []), userId];
-        const newCurrentPlayers = (event.currentPlayers || 1) + 1;
-        
-        await storage.updateEvent(eventId, {
-          requestedUsers: updatedRequestedUsers,
-          acceptedUsers: updatedAcceptedUsers,
-          currentPlayers: newCurrentPlayers
-        } as any);
-        
-        res.json({ message: "User approved successfully", status: 'accepted' });
-      } else if (action === 'reject') {
-        // Add to rejected_users array
-        const updatedRejectedUsers = [...(event.rejectedUsers || []), userId];
-        
-        await storage.updateEvent(eventId, {
-          requestedUsers: updatedRequestedUsers,
-          rejectedUsers: updatedRejectedUsers
-        } as any);
-        
-        res.json({ message: "User rejected successfully", status: 'rejected' });
-      } else {
-        return res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
-      }
-    } catch (error) {
-      console.error("Error managing event participant:", error);
-      res.status(500).json({ message: "Failed to manage event participant" });
-    }
-  });
-
-  // Booking routes - Updated for user participation arrays
-  app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { eventId } = req.body;
-
-      if (!eventId) {
-        return res.status(400).json({ message: "Event ID is required" });
-      }
-
-      // Get the event and add user to requested_users array
-      const event = await storage.getEvent(eventId);
-      if (!event) {
-        return res.status(404).json({ message: "Event not found" });
-      }
-
-      // Check if user is already in any array
-      if (event.requestedUsers?.includes(userId) || 
-          event.acceptedUsers?.includes(userId) || 
-          event.rejectedUsers?.includes(userId)) {
-        return res.status(400).json({ message: "You have already requested to join this event" });
-      }
-
-      // Add user to requested_users array directly
-      const updatedRequestedUsers = [...(event.requestedUsers || []), userId];
-      
-      await storage.updateEvent(eventId, {
-        requestedUsers: updatedRequestedUsers
-      } as any);
-
-      // Return a mock booking object for compatibility
-      const booking = {
-        id: Date.now(),
-        eventId: eventId,
-        userId: userId,
-        status: "requested",
-        paymentIntentId: null,
-        amountPaid: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
+      const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid booking data", errors: error.errors });
+      }
       res.status(500).json({ message: "Failed to create booking" });
     }
   });
 
   app.get('/api/my-bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const bookings = await storage.getBookingsByUser(userId);
       res.json(bookings);
     } catch (error) {
@@ -409,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/pending-bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const pendingBookings = await storage.getPendingBookingsForHost(userId);
       res.json(pendingBookings);
     } catch (error) {
@@ -420,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/events/:id/bookings', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const eventId = parseInt(req.params.id);
       
       // Check if user owns the event
@@ -439,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/bookings/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const bookingId = parseInt(req.params.id);
       const { status } = req.body;
 
@@ -454,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to update this booking" });
       }
 
-      const updatedBooking = await storage.updateBookingStatus(booking.eventId, booking.userId, status);
+      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
       
       if (!updatedBooking) {
         return res.status(404).json({ message: "Failed to update booking" });
@@ -471,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/bookings/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const bookingId = parseInt(req.params.id);
       
       // Verify user owns this booking
@@ -534,54 +392,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Content, receiverId, and authenticated user are required" });
       }
 
-      // First, find or create a chat between sender and receiver for this event
-      const { data: existingChat } = await supabase
-        .from('chats')
-        .select('id')
-        .eq('event_id', eventId)
-        .eq('sender_id', senderId)
-        .eq('receiver_id', receiverId)
-        .single();
-
-      let chatId;
-      if (existingChat) {
-        chatId = existingChat.id;
-      } else {
-        // Check if reverse chat exists (receiver as sender)
-        const { data: reverseChat } = await supabase
-          .from('chats')
-          .select('id')
-          .eq('event_id', eventId)
-          .eq('sender_id', receiverId)
-          .eq('receiver_id', senderId)
-          .single();
-
-        if (reverseChat) {
-          chatId = reverseChat.id;
-        } else {
-          // Create new chat
-          const { data: newChat, error: chatError } = await supabase
-            .from('chats')
-            .insert({
-              sender_id: senderId,
-              receiver_id: receiverId,
-              event_id: eventId,
-            })
-            .select('id')
-            .single();
-
-          if (chatError) {
-            throw new Error(`Failed to create chat: ${chatError.message}`);
-          }
-          chatId = newChat.id;
-        }
-      }
-
       const message = await storage.createChatMessage({
-        chatId,
+        eventId,
         senderId,
+        receiverId,
         content,
-        readAt: null,
+        messageType,
+        readBy: [senderId] // Sender has read their own message
       });
 
       console.log(`Message created successfully with ID: ${message.id}`);
@@ -617,7 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/events/:id/chatroom', isAuthenticated, async (req: any, res) => {
     try {
       const eventId = parseInt(req.params.id);
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       
       const success = await storage.deleteChatroom(eventId, userId);
       
@@ -649,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Simple booking creation without payment processing
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const { eventId } = req.body;
       
       // Check if event exists and has capacity
@@ -689,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cancel booking (by participant)
   app.put('/api/bookings/:id/cancel', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const bookingId = parseInt(req.params.id);
       
       // Get the booking and verify the user owns it
@@ -708,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update booking status to cancelled
-      const updatedBooking = await storage.updateBookingStatus(booking.eventId, booking.userId, 'cancelled');
+      const updatedBooking = await storage.updateBookingStatus(bookingId, 'cancelled');
       
       // Player count is now calculated dynamically, no manual manipulation needed
       
@@ -722,7 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Review routes
   app.post('/api/reviews', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const reviewData = {
         ...req.body,
         reviewerId: userId,

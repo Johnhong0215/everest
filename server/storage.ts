@@ -1,4 +1,12 @@
 import {
+  users,
+  events,
+  bookings,
+  chatMessages,
+  payments,
+  reviews,
+  userSportPreferences,
+  sportsSettings,
   type User,
   type UpsertUser,
   type Event,
@@ -16,7 +24,8 @@ import {
   type InsertReview,
   type SportsSettings,
 } from "@shared/schema";
-import { supabaseAdmin } from "../shared/supabase.js";
+import { db } from "./db";
+import { eq, and, or, desc, asc, count, like, gte, lte, inArray, sql, ne, not } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -83,235 +92,71 @@ export interface IStorage {
   getSportsSettings(): Promise<Record<string, Record<string, string[]>>>;
 }
 
-export class SupabaseStorage implements IStorage {
+export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    // Get user from auth.users and combine with profile data
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(id);
-    if (authError || !authUser.user) return undefined;
-
-    // Get profile data
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    // If no profile exists, create one
-    if (profileError && profileError.code === 'PGRST116') {
-      const { data: newProfile, error: createError } = await supabaseAdmin
-        .from('user_profiles')
-        .insert({
-          id: id,
-          first_name: authUser.user.user_metadata?.first_name || '',
-          last_name: authUser.user.user_metadata?.last_name || '',
-        })
-        .select()
-        .single();
-      
-      if (createError) return undefined;
-      
-      return {
-        id: authUser.user.id,
-        email: authUser.user.email || '',
-        firstName: newProfile.first_name,
-        lastName: newProfile.last_name,
-        profileImageUrl: newProfile.profile_image_url,
-        stripeCustomerId: newProfile.stripe_customer_id,
-        stripeSubscriptionId: newProfile.stripe_subscription_id,
-        phoneVerified: newProfile.phone_verified,
-        idVerified: newProfile.id_verified,
-        bio: newProfile.bio,
-        createdAt: new Date(authUser.user.created_at),
-        updatedAt: new Date(newProfile.updated_at),
-      } as User;
-    }
-
-    if (profileError) return undefined;
-
-    return {
-      id: authUser.user.id,
-      email: authUser.user.email || '',
-      firstName: profile.first_name,
-      lastName: profile.last_name,
-      profileImageUrl: profile.profile_image_url,
-      stripeCustomerId: profile.stripe_customer_id,
-      stripeSubscriptionId: profile.stripe_subscription_id,
-      phoneVerified: profile.phone_verified,
-      idVerified: profile.id_verified,
-      bio: profile.bio,
-      createdAt: new Date(authUser.user.created_at),
-      updatedAt: new Date(profile.updated_at),
-    } as User;
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // Update profile data
-    const { data, error } = await supabaseAdmin
-      .from('user_profiles')
-      .upsert({
-        id: userData.id,
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        profile_image_url: userData.profileImageUrl,
-        stripe_customer_id: userData.stripeCustomerId,
-        stripe_subscription_id: userData.stripeSubscriptionId,
-        phone_verified: userData.phoneVerified,
-        id_verified: userData.idVerified,
-        bio: userData.bio,
-        updated_at: new Date().toISOString(),
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
       })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Get auth user data
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userData.id);
-    if (authError || !authUser.user) throw authError;
-
-    return {
-      id: authUser.user.id,
-      email: authUser.user.email || userData.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      profileImageUrl: data.profile_image_url,
-      stripeCustomerId: data.stripe_customer_id,
-      stripeSubscriptionId: data.stripe_subscription_id,
-      phoneVerified: data.phone_verified,
-      idVerified: data.id_verified,
-      bio: data.bio,
-      createdAt: new Date(authUser.user.created_at),
-      updatedAt: new Date(data.updated_at),
-    } as User;
+      .returning();
+    return user;
   }
 
   async updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User> {
-    const { data, error } = await supabaseAdmin
-      .from('user_profiles')
-      .update({
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscriptionId,
-        updated_at: new Date().toISOString(),
+    const [user] = await db
+      .update(users)
+      .set({
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+        updatedAt: new Date(),
       })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Get auth user data
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
-    if (authError || !authUser.user) throw authError;
-
-    return {
-      id: authUser.user.id,
-      email: authUser.user.email || '',
-      firstName: data.first_name,
-      lastName: data.last_name,
-      profileImageUrl: data.profile_image_url,
-      stripeCustomerId: data.stripe_customer_id,
-      stripeSubscriptionId: data.stripe_subscription_id,
-      phoneVerified: data.phone_verified,
-      idVerified: data.id_verified,
-      bio: data.bio,
-      createdAt: new Date(authUser.user.created_at),
-      updatedAt: new Date(data.updated_at),
-    } as User;
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 
   // Event operations
   async createEvent(event: InsertEvent): Promise<Event> {
-    // Map camelCase to snake_case for Supabase
-    const supabaseEvent = {
-      host_id: event.hostId,
-      title: event.title,
-      description: event.description,
-      sport: event.sport,
-      skill_level: event.skillLevel,
-      gender_mix: event.genderMix,
-      start_time: event.startTime,
-      end_time: event.endTime,
-      location: event.location,
-      latitude: event.latitude,
-      longitude: event.longitude,
-      max_players: event.maxPlayers,
-      current_players: 1,
-      price_per_person: event.pricePerPerson,
-      sport_config: event.sportConfig || {},
-      status: event.status || 'published',
-      notes: event.notes,
-    };
-
-    const { data, error } = await supabaseAdmin
-      .from('events')
-      .insert(supabaseEvent)
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    // Map back to camelCase for the response
-    return {
-      id: data.id,
-      hostId: data.host_id,
-      title: data.title,
-      description: data.description,
-      sport: data.sport,
-      skillLevel: data.skill_level,
-      genderMix: data.gender_mix,
-      startTime: data.start_time,
-      endTime: data.end_time,
-      location: data.location,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      maxPlayers: data.max_players,
-      currentPlayers: data.current_players,
-      pricePerPerson: data.price_per_person,
-      sportConfig: data.sport_config,
-      status: data.status,
-      notes: data.notes,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    } as Event;
+    const [newEvent] = await db.insert(events).values(event).returning();
+    return newEvent;
   }
 
   async getEvent(id: number): Promise<EventWithHost | undefined> {
-    const { data: event, error } = await supabaseAdmin
-      .from('events')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const result = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.hostId, users.id))
+      .leftJoin(bookings, eq(events.id, bookings.eventId))
+      .where(eq(events.id, id));
 
-    if (error || !event) return undefined;
+    if (result.length === 0) return undefined;
 
-    // Get host information from user_profiles
-    const { data: host, error: hostError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('*')
-      .eq('id', event.host_id)
-      .single();
-
-    if (hostError) return undefined;
-
-    // Get bookings for this event
-    const { data: bookings, error: bookingsError } = await supabaseAdmin
-      .from('bookings')
-      .select('*')
-      .eq('event_id', id);
-
-    if (bookingsError) throw bookingsError;
+    const event = result[0].events;
+    const host = result[0].users!;
+    const eventBookings = result.filter(r => r.bookings).map(r => r.bookings!) as Booking[];
 
     // Calculate current players dynamically: host (1) + accepted bookings
-    const acceptedBookings = bookings?.filter((b: any) => b.status === 'accepted') || [];
-    const currentPlayers = 1 + acceptedBookings.length;
+    const acceptedBookings = eventBookings.filter(b => b.status === 'accepted');
+    const currentPlayers = 1 + acceptedBookings.length; // Host counts as 1
 
     return {
       ...event,
-      host: host,
-      bookings: bookings || [],
-      current_players: currentPlayers,
-    } as EventWithHost;
+      currentPlayers, // Override with dynamically calculated value
+      host,
+      bookings: eventBookings,
+    };
   }
 
   async getEvents(filters?: {
@@ -325,437 +170,640 @@ export class SupabaseStorage implements IStorage {
     search?: string;
     limit?: number;
     offset?: number;
+    userLat?: number;
+    userLng?: number;
     userTimezone?: string;
   }): Promise<EventWithHost[]> {
-    let query = supabaseAdmin
-      .from('events')
-      .select('*')
-      .eq('status', 'published')
-      .gte('start_time', new Date().toISOString())
-      .order('start_time', { ascending: true });
+    // Build conditions
+    const conditions = [
+      eq(events.status, "published"),
+      // Only show events that haven't started yet
+      gte(events.startTime, new Date())
+    ];
 
     if (filters?.sports && filters.sports.length > 0) {
-      query = query.in('sport', filters.sports);
+      conditions.push(inArray(events.sport, filters.sports as any));
+    }
+
+    if (filters?.date) {
+      // Create dates in user's timezone for accurate filtering
+      const userTimezone = filters.userTimezone || 'UTC';
+      
+      if (filters.date === 'today') {
+        // Get today's date in user's timezone
+        const today = new Date();
+        const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
+        console.log(`Date filter: today -> comparing DATE((start_time AT TIME ZONE 'UTC') AT TIME ZONE '${userTimezone}') = ${targetDateStr}`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`);
+      } else if (filters.date === 'tomorrow') {
+        // Get tomorrow's date in user's timezone
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(tomorrow);
+        console.log(`Date filter: tomorrow -> comparing DATE((start_time AT TIME ZONE 'UTC') AT TIME ZONE '${userTimezone}') = ${targetDateStr}`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`);
+      } else if (filters.date === 'week') {
+        // This week logic - use user's timezone
+        const today = new Date();
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
+        
+        // Calculate end of week in user's timezone
+        const todayInUserTz = new Date(todayStr + 'T00:00:00');
+        const endOfWeek = new Date(todayInUserTz);
+        endOfWeek.setDate(todayInUserTz.getDate() + (6 - todayInUserTz.getDay()));
+        const endOfWeekStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(endOfWeek);
+        
+        console.log(`Week filter: from ${todayStr} to ${endOfWeekStr} (timezone: ${userTimezone})`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) >= ${todayStr}::date`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) <= ${endOfWeekStr}::date`);
+      } else if (filters.date === 'month') {
+        // This month logic - use user's timezone
+        const today = new Date();
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(today);
+        
+        // Get last day of current month in user's timezone
+        const todayInUserTz = new Date(todayStr + 'T00:00:00');
+        const endOfMonth = new Date(todayInUserTz.getFullYear(), todayInUserTz.getMonth() + 1, 0);
+        const endOfMonthStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(endOfMonth);
+        
+        console.log(`Month filter: from ${todayStr} to ${endOfMonthStr} (timezone: ${userTimezone})`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) >= ${todayStr}::date`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) <= ${endOfMonthStr}::date`);
+      } else {
+        // Custom date format (YYYY-MM-DD)
+        const targetDateStr = filters.date;
+        console.log(`Date filter: custom date -> comparing DATE((start_time AT TIME ZONE 'UTC') AT TIME ZONE '${userTimezone}') = ${targetDateStr}`);
+        conditions.push(sql`DATE((${events.startTime} AT TIME ZONE 'UTC') AT TIME ZONE ${userTimezone}) = ${targetDateStr}::date`);
+      }
     }
 
     if (filters?.skillLevels && filters.skillLevels.length > 0) {
-      query = query.in('skill_level', filters.skillLevels);
+      conditions.push(inArray(events.skillLevel, filters.skillLevels as any));
     }
 
     if (filters?.genders && filters.genders.length > 0) {
-      query = query.in('gender_mix', filters.genders);
+      conditions.push(inArray(events.genderMix, filters.genders as any));
     }
 
     if (filters?.priceMax) {
-      query = query.lte('price_per_person', filters.priceMax);
+      conditions.push(lte(events.pricePerPerson, filters.priceMax.toString()));
     }
 
     if (filters?.search) {
-      query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,location.ilike.%${filters.search}%`);
+      conditions.push(
+        like(events.title, `%${filters.search}%`)
+      );
     }
 
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
+    if (filters?.location) {
+      conditions.push(
+        like(events.location, `%${filters.location}%`)
+      );
     }
 
-    if (filters?.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
-    }
+    const result = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.hostId, users.id))
+      .leftJoin(bookings, eq(events.id, bookings.eventId))
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(desc(events.createdAt))
+      .limit(filters?.limit || 50)
+      .offset(filters?.offset || 0);
 
-    const { data: events, error } = await query;
-
-    if (error) throw error;
-    if (!events || events.length === 0) return [];
-
-    // Get host information for all events from user_profiles
-    const hostIds = [...new Set(events.map(event => event.host_id))];
-    const { data: hosts, error: hostError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('*')
-      .in('id', hostIds);
-
-    if (hostError) throw hostError;
-
-    // Get bookings for all events
-    const eventIds = events.map(event => event.id);
-    const { data: bookings, error: bookingsError } = await supabaseAdmin
-      .from('bookings')
-      .select('*')
-      .in('event_id', eventIds);
-
-    if (bookingsError) throw bookingsError;
-
-    // Create maps for easy lookup
-    const hostMap = new Map(hosts?.map(host => [host.id, host]) || []);
-    const bookingsMap: Record<number, any[]> = {};
-    eventIds.forEach(id => bookingsMap[id] = []);
+    // Group by event
+    const eventMap = new Map<number, EventWithHost>();
     
-    bookings?.forEach(booking => {
-      if (!bookingsMap[booking.event_id]) {
-        bookingsMap[booking.event_id] = [];
+    for (const row of result) {
+      const event = row.events;
+      const host = row.users!;
+      const booking = row.bookings;
+
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, {
+          ...event,
+          host,
+          bookings: [],
+        });
       }
-      bookingsMap[booking.event_id].push(booking);
-    });
 
-    return events.map((event: any) => {
-      const eventBookings = bookingsMap[event.id] || [];
-      const acceptedBookings = eventBookings.filter((b: any) => b.status === 'accepted');
-      const currentPlayers = 1 + acceptedBookings.length;
+      if (booking) {
+        eventMap.get(event.id)!.bookings.push(booking);
+      }
+    }
 
+    let eventsArray = Array.from(eventMap.values());
+
+    // Calculate current players dynamically for each event
+    eventsArray = eventsArray.map(event => {
+      const acceptedBookings = event.bookings.filter(b => b.status === 'accepted');
+      const currentPlayers = 1 + acceptedBookings.length; // Host counts as 1
       return {
-        id: event.id,
-        hostId: event.host_id,
-        title: event.title,
-        description: event.description,
-        sport: event.sport,
-        skillLevel: event.skill_level,
-        genderMix: event.gender_mix,
-        startTime: event.start_time,
-        endTime: event.end_time,
-        location: event.location,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        maxPlayers: event.max_players,
-        currentPlayers: currentPlayers,
-        pricePerPerson: event.price_per_person,
-        sportConfig: event.sport_config,
-        status: event.status,
-        notes: event.notes,
-        createdAt: event.created_at,
-        updatedAt: event.updated_at,
-        host: hostMap.get(event.host_id),
-        bookings: eventBookings,
-      } as EventWithHost;
+        ...event,
+        currentPlayers,
+      };
     });
+
+    // Apply distance filtering if user location and radius are provided
+    if (filters?.userLat && filters?.userLng && filters?.radius) {
+      eventsArray = eventsArray.filter(event => {
+        if (!event.latitude || !event.longitude) return false;
+        
+        const eventLat = parseFloat(event.latitude);
+        const eventLng = parseFloat(event.longitude);
+        
+        // Calculate distance in miles using Haversine formula
+        const R = 3959; // Radius of Earth in miles
+        const dLat = (eventLat - filters.userLat!) * Math.PI / 180;
+        const dLng = (eventLng - filters.userLng!) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(filters.userLat! * Math.PI / 180) * Math.cos(eventLat * Math.PI / 180) * 
+          Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        return distance <= filters.radius!;
+      });
+    }
+
+    return eventsArray;
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {
-    const { data, error } = await supabaseAdmin
-      .from('events')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) return undefined;
-    return data as Event;
+    const [event] = await db
+      .update(events)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(events.id, id))
+      .returning();
+    return event;
   }
 
   async updateEventPlayerCount(id: number, playerCount: number): Promise<boolean> {
-    const { error } = await supabaseAdmin
-      .from('events')
-      .update({
-        current_players: playerCount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-
-    return !error;
+    const result = await db
+      .update(events)
+      .set({ currentPlayers: playerCount, updatedAt: new Date() })
+      .where(eq(events.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async deleteEvent(id: number): Promise<boolean> {
-    const { error } = await supabaseAdmin
-      .from('events')
-      .delete()
-      .eq('id', id);
-
-    return !error;
+    // First delete all related bookings
+    await db.delete(bookings).where(eq(bookings.eventId, id));
+    
+    // Then delete all related chat messages
+    await db.delete(chatMessages).where(eq(chatMessages.eventId, id));
+    
+    // Finally delete the event
+    const result = await db.delete(events).where(eq(events.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async getEventsByHost(hostId: string): Promise<EventWithHost[]> {
-    const { data, error } = await supabaseAdmin
-      .from('events')
-      .select(`
-        *,
-        host:user_profiles(*),
-        bookings(*)
-      `)
-      .eq('host_id', hostId)
-      .order('start_time', { ascending: false });
+    const result = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.hostId, users.id))
+      .leftJoin(bookings, eq(events.id, bookings.eventId))
+      .where(eq(events.hostId, hostId))
+      .orderBy(desc(events.startTime));
 
-    if (error) throw error;
+    const eventMap = new Map<number, EventWithHost>();
+    
+    for (const row of result) {
+      const event = row.events;
+      const host = row.users!;
+      const booking = row.bookings;
 
-    return (data || []).map((event: any) => {
-      const acceptedBookings = event.bookings?.filter((b: any) => b.status === 'accepted') || [];
-      const currentPlayers = 1 + acceptedBookings.length;
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, {
+          ...event,
+          host,
+          bookings: [],
+        });
+      }
 
+      if (booking) {
+        eventMap.get(event.id)!.bookings.push(booking);
+      }
+    }
+
+    // Calculate current players dynamically for each event
+    return Array.from(eventMap.values()).map(event => {
+      const acceptedBookings = event.bookings.filter(b => b.status === 'accepted');
+      const currentPlayers = 1 + acceptedBookings.length; // Host counts as 1
       return {
         ...event,
-        host: event.host,
-        bookings: event.bookings || [],
-        current_players: currentPlayers,
-      } as EventWithHost;
+        currentPlayers,
+      };
     });
   }
 
   // Booking operations
   async createBooking(booking: InsertBooking): Promise<Booking> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .insert(booking)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Booking;
+    const [newBooking] = await db.insert(bookings).values(booking).returning();
+    
+    // DO NOT increment player count here - only increment when booking is accepted
+    
+    return newBooking;
   }
 
   async getBooking(id: number): Promise<BookingWithEventAndUser | undefined> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .select(`
-        *,
-        event:events(*,host:user_profiles(*)),
-        user:user_profiles(*)
-      `)
-      .eq('id', id)
-      .single();
+    const result = await db
+      .select()
+      .from(bookings)
+      .leftJoin(events, eq(bookings.eventId, events.id))
+      .leftJoin(users, eq(events.hostId, users.id))
+      .where(eq(bookings.id, id));
 
-    if (error || !data) return undefined;
-    return data as BookingWithEventAndUser;
+    if (result.length === 0) return undefined;
+
+    const booking = result[0].bookings;
+    const event = result[0].events!;
+    const host = result[0].users!;
+    const user = await this.getUser(booking.userId);
+
+    return {
+      ...booking,
+      event: { ...event, host, bookings: [] },
+      user: user!,
+    };
   }
 
   async getBookingsByUser(userId: string): Promise<BookingWithEventAndUser[]> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .select(`
-        *,
-        event:events(*,host:user_profiles(*)),
-        user:user_profiles(*)
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const result = await db
+      .select()
+      .from(bookings)
+      .leftJoin(events, eq(bookings.eventId, events.id))
+      .leftJoin(users, eq(events.hostId, users.id))
+      .where(eq(bookings.userId, userId))
+      .orderBy(desc(bookings.createdAt));
 
-    if (error) throw error;
-    return (data || []) as BookingWithEventAndUser[];
+    const user = await this.getUser(userId);
+    
+    return result.map(row => ({
+      ...row.bookings,
+      event: { ...row.events!, host: row.users!, bookings: [] },
+      user: user!,
+    }));
   }
 
   async getBookingsByEvent(eventId: number): Promise<BookingWithEventAndUser[]> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .select(`
-        *,
-        event:events(*,host:user_profiles(*)),
-        user:user_profiles(*)
-      `)
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: false });
+    const result = await db
+      .select()
+      .from(bookings)
+      .leftJoin(events, eq(bookings.eventId, events.id))
+      .leftJoin(users, eq(events.hostId, users.id))
+      .where(eq(bookings.eventId, eventId))
+      .orderBy(desc(bookings.createdAt));
 
-    if (error) throw error;
-    return (data || []) as BookingWithEventAndUser[];
+    const bookingUsers = await Promise.all(
+      result.map(row => this.getUser(row.bookings.userId))
+    );
+
+    return result.map((row, index) => ({
+      ...row.bookings,
+      event: { ...row.events!, host: row.users!, bookings: [] },
+      user: bookingUsers[index]!,
+    }));
   }
 
   async getPendingBookingsForHost(hostId: string): Promise<BookingWithEventAndUser[]> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .select(`
-        *,
-        event:events!inner(*,host:user_profiles(*)),
-        user:user_profiles(*)
-      `)
-      .eq('event.host_id', hostId)
-      .eq('status', 'requested')
-      .order('created_at', { ascending: false });
+    const result = await db
+      .select()
+      .from(bookings)
+      .leftJoin(events, eq(bookings.eventId, events.id))
+      .leftJoin(users, eq(events.hostId, users.id))
+      .where(and(eq(events.hostId, hostId), sql`${bookings.status} = 'requested'`))
+      .orderBy(desc(bookings.createdAt));
 
-    if (error) throw error;
-    return (data || []) as BookingWithEventAndUser[];
+    const bookingUsers = await Promise.all(
+      result.map(row => this.getUser(row.bookings.userId))
+    );
+
+    return result.map((row, index) => ({
+      ...row.bookings,
+      event: { ...row.events!, host: row.users!, bookings: [] },
+      user: bookingUsers[index]!,
+    }));
   }
 
   async updateBookingStatus(id: number, status: string): Promise<Booking | undefined> {
-    const { data, error } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) return undefined;
-    return data as Booking;
+    const [booking] = await db
+      .update(bookings)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return booking;
   }
 
   async cancelBooking(id: number): Promise<boolean> {
-    const { error } = await supabaseAdmin
-      .from('bookings')
-      .delete()
-      .eq('id', id);
+    const booking = await db.select().from(bookings).where(eq(bookings.id, id));
+    if (booking.length === 0) return false;
 
-    return !error;
+    await db
+      .update(bookings)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(bookings.id, id));
+
+    // Update event current players count
+    await db
+      .update(events)
+      .set({ 
+        currentPlayers: sql`${events.currentPlayers} - 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(events.id, booking[0].eventId));
+
+    return true;
   }
 
   // Chat operations
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const { data, error } = await supabaseAdmin
-      .from('chat_messages')
-      .insert({
-        ...message,
-        read_by: JSON.stringify([message.senderId]),
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as ChatMessage;
+    const messageData = {
+      ...message,
+      readBy: message.readBy || [message.senderId], // Sender automatically reads their own message
+    };
+    const [newMessage] = await db.insert(chatMessages).values(messageData).returning();
+    return newMessage;
   }
 
   async getChatMessages(eventId: number, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
-    const { data, error } = await supabaseAdmin
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:user_profiles(*)
-      `)
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: true })
-      .range(offset, offset + limit - 1);
+    const result = await db
+      .select({
+        id: chatMessages.id,
+        eventId: chatMessages.eventId,
+        senderId: chatMessages.senderId,
+        content: chatMessages.content,
+        messageType: chatMessages.messageType,
+        metadata: chatMessages.metadata,
+        readBy: chatMessages.readBy,
+        createdAt: chatMessages.createdAt,
+        senderFirstName: users.firstName,
+        senderLastName: users.lastName,
+        senderEmail: users.email,
+        senderProfileImageUrl: users.profileImageUrl,
+      })
+      .from(chatMessages)
+      .leftJoin(users, eq(chatMessages.senderId, users.id))
+      .where(eq(chatMessages.eventId, eventId))
+      .orderBy(asc(chatMessages.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    if (error) throw error;
-    return (data || []) as ChatMessageWithSender[];
+    return result.map(row => ({
+      id: row.id,
+      eventId: row.eventId,
+      senderId: row.senderId,
+      content: row.content,
+      messageType: row.messageType,
+      metadata: row.metadata,
+      readBy: row.readBy || [],
+      createdAt: row.createdAt,
+      sender: {
+        id: row.senderId,
+        firstName: row.senderFirstName || null,
+        lastName: row.senderLastName || null,
+        email: row.senderEmail || null,
+        profileImageUrl: row.senderProfileImageUrl || null,
+      },
+    })) as ChatMessageWithSender[];
   }
 
   async getChatMessagesForConversation(eventId: number, userId1: string, userId2: string, limit: number = 50, offset: number = 0): Promise<ChatMessageWithSender[]> {
-    const { data, error } = await supabaseAdmin
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:user_profiles(*)
-      `)
-      .eq('event_id', eventId)
-      .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
-      .order('created_at', { ascending: true })
-      .range(offset, offset + limit - 1);
+    try {
+      console.log(`Querying database for event ${eventId} between users ${userId1} and ${userId2}`);
+      
+      const messages = await db
+        .select({
+          id: chatMessages.id,
+          eventId: chatMessages.eventId,
+          senderId: chatMessages.senderId,
+          receiverId: chatMessages.receiverId,
+          content: chatMessages.content,
+          messageType: chatMessages.messageType,
+          metadata: chatMessages.metadata,
+          readBy: chatMessages.readBy,
+          createdAt: chatMessages.createdAt,
+          senderFirstName: users.firstName,
+          senderLastName: users.lastName,
+          senderEmail: users.email,
+          senderProfileImageUrl: users.profileImageUrl
+        })
+        .from(chatMessages)
+        .innerJoin(users, eq(chatMessages.senderId, users.id))
+        .where(and(
+          eq(chatMessages.eventId, eventId),
+          or(
+            and(eq(chatMessages.senderId, userId1), eq(chatMessages.receiverId, userId2)),
+            and(eq(chatMessages.senderId, userId2), eq(chatMessages.receiverId, userId1))
+          )
+        ))
+        .orderBy(asc(chatMessages.createdAt))
+        .limit(limit)
+        .offset(offset);
 
-    if (error) throw error;
-    return (data || []) as ChatMessageWithSender[];
+      console.log(`Found ${messages.length} messages in database for conversation between ${userId1} and ${userId2}`);
+      
+      if (messages.length === 0) {
+        // Debug: Check if there are any messages for this event at all
+        const allMessages = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(chatMessages)
+          .where(eq(chatMessages.eventId, eventId));
+        console.log(`Total messages for event ${eventId}: ${allMessages[0]?.count || 0}`);
+      }
+
+      return messages.map(msg => ({
+        id: msg.id,
+        eventId: msg.eventId,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        content: msg.content,
+        messageType: msg.messageType,
+        metadata: msg.metadata,
+        readBy: msg.readBy || [],
+        createdAt: msg.createdAt,
+        sender: {
+          id: msg.senderId,
+          firstName: msg.senderFirstName,
+          lastName: msg.senderLastName,
+          email: msg.senderEmail,
+          profileImageUrl: msg.senderProfileImageUrl
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching conversation messages:', error);
+      return [];
+    }
   }
 
   async getEventChats(userId: string): Promise<{ eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[]> {
-    // This is a complex query that needs to be simplified for Supabase
-    // Get all events where user is host or has bookings
-    const { data: userEvents, error: eventsError } = await supabaseAdmin
-      .from('events')
-      .select('*')
-      .or(`host_id.eq.${userId},bookings.user_id.eq.${userId}`);
+    try {
+      // Get all unique conversation pairs (eventId + other participant)
+      const conversations = await db
+        .selectDistinct({
+          eventId: chatMessages.eventId,
+          senderId: chatMessages.senderId,
+          receiverId: chatMessages.receiverId
+        })
+        .from(chatMessages)
+        .where(
+          or(
+            eq(chatMessages.senderId, userId),
+            eq(chatMessages.receiverId, userId)
+          )
+        );
 
-    if (eventsError) throw eventsError;
-
-    const chats = [];
-    for (const event of userEvents || []) {
-      const { data: messages, error: messagesError } = await supabaseAdmin
-        .from('chat_messages')
-        .select('*')
-        .eq('event_id', event.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (messagesError) continue;
-
-      const lastMessage = messages?.[0] || null;
+      // Group by eventId and determine unique conversation partners
+      const conversationMap = new Map<string, {eventId: number, otherUserId: string}>();
       
-      // Count unread messages
-      const { count: unreadCount } = await supabaseAdmin
-        .from('chat_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('event_id', event.id)
-        .neq('sender_id', userId)
-        .not('read_by', 'cs', `["${userId}"]`);
-
-      chats.push({
-        eventId: event.id,
-        event,
-        lastMessage,
-        unreadCount: unreadCount || 0,
-        otherParticipant: null, // Simplified for now
-      });
-    }
-
-    return chats;
-  }
-
-  async markMessageAsRead(messageId: number, userId: string): Promise<boolean> {
-    const { data: message, error: fetchError } = await supabaseAdmin
-      .from('chat_messages')
-      .select('read_by')
-      .eq('id', messageId)
-      .single();
-
-    if (fetchError) return false;
-
-    const readBy = JSON.parse(message.read_by || '[]');
-    if (!readBy.includes(userId)) {
-      readBy.push(userId);
-    }
-
-    const { error } = await supabaseAdmin
-      .from('chat_messages')
-      .update({ read_by: JSON.stringify(readBy) })
-      .eq('id', messageId);
-
-    return !error;
-  }
-
-  async markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean> {
-    // This is complex in Supabase, simplified approach
-    const { error } = await supabaseAdmin
-      .rpc('mark_all_messages_read', {
-        event_id: eventId,
-        user_id: userId
+      conversations.forEach(conv => {
+        const otherUserId = conv.senderId === userId ? conv.receiverId : conv.senderId;
+        const key = `${conv.eventId}-${otherUserId}`;
+        conversationMap.set(key, {
+          eventId: conv.eventId,
+          otherUserId
+        });
       });
 
-    return !error;
-  }
+      if (conversationMap.size === 0) return [];
 
-  async deleteChatroom(eventId: number, userId: string): Promise<boolean> {
-    // In the original implementation, this doesn't actually delete messages
-    // It just marks them as deleted for the user
-    return true;
+      const chats = await Promise.all(Array.from(conversationMap.values()).map(async (conv) => {
+          try {
+            // Get complete event details with host
+            // Get event details
+            const eventQuery = await db
+              .select()
+              .from(events)
+              .innerJoin(users, eq(events.hostId, users.id))
+              .where(eq(events.id, conv.eventId))
+              .limit(1);
+
+            if (eventQuery.length === 0) return null;
+
+            const eventData = eventQuery[0].events;
+            const event = {
+              ...eventData,
+              host: eventQuery[0].users
+            };
+
+            // Get other participant details
+            const otherParticipantQuery = await db
+              .select()
+              .from(users)
+              .where(eq(users.id, conv.otherUserId))
+              .limit(1);
+
+            if (otherParticipantQuery.length === 0) return null;
+            const otherParticipant = otherParticipantQuery[0];
+
+            // Get unread message count for this specific conversation
+            const unreadCountQuery = await db
+              .select({ count: count() })
+              .from(chatMessages)
+              .where(and(
+                eq(chatMessages.eventId, conv.eventId),
+                eq(chatMessages.senderId, conv.otherUserId),
+                eq(chatMessages.receiverId, userId),
+                sql`NOT (${chatMessages.readBy} @> ${JSON.stringify([userId])})`
+              ));
+
+            const unreadCount = unreadCountQuery[0].count;
+
+            // Get last message for this specific conversation
+            const lastMessageQuery = await db
+              .select({
+                id: chatMessages.id,
+                content: chatMessages.content,
+                senderId: chatMessages.senderId,
+                createdAt: chatMessages.createdAt,
+                senderFirstName: users.firstName,
+                senderLastName: users.lastName,
+                senderEmail: users.email,
+                senderProfileImageUrl: users.profileImageUrl
+              })
+              .from(chatMessages)
+              .innerJoin(users, eq(chatMessages.senderId, users.id))
+              .where(and(
+                eq(chatMessages.eventId, conv.eventId),
+                or(
+                  and(eq(chatMessages.senderId, userId), eq(chatMessages.receiverId, conv.otherUserId)),
+                  and(eq(chatMessages.senderId, conv.otherUserId), eq(chatMessages.receiverId, userId))
+                )
+              ))
+              .orderBy(desc(chatMessages.createdAt))
+              .limit(1);
+
+            const lastMessage = lastMessageQuery.length > 0 ? {
+              ...lastMessageQuery[0],
+              sender: {
+                id: lastMessageQuery[0].senderId,
+                firstName: lastMessageQuery[0].senderFirstName,
+                lastName: lastMessageQuery[0].senderLastName,
+                email: lastMessageQuery[0].senderEmail,
+                profileImageUrl: lastMessageQuery[0].senderProfileImageUrl
+              }
+            } : null;
+
+            // Only return if there's a last message
+            if (!lastMessage) return null;
+
+            return {
+              eventId: conv.eventId,
+              event,
+              lastMessage,
+              unreadCount,
+              otherParticipant
+            };
+
+          } catch (error) {
+            console.error(`Error processing chat for event ${conv.eventId} with user ${conv.otherUserId}:`, error);
+            return null;
+          }
+        })
+      );
+
+      const validChats = chats.filter(chat => chat !== null) as { eventId: number; event: Event; lastMessage: ChatMessage | null; unreadCount: number; otherParticipant: any }[];
+      
+      return validChats.sort((a, b) => {
+        const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+        const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    } catch (error) {
+      console.error('Error fetching event chats:', error);
+      return [];
+    }
   }
 
   // Payment operations
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const { data, error } = await supabaseAdmin
-      .from('payments')
-      .insert(payment)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Payment;
+    const [newPayment] = await db.insert(payments).values(payment).returning();
+    return newPayment;
   }
 
   async updatePaymentStatus(id: number, status: string, payoutDate?: Date): Promise<Payment | undefined> {
-    const { data, error } = await supabaseAdmin
-      .from('payments')
-      .update({
-        status,
-        payout_date: payoutDate?.toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const updates: any = { status: status as any, updatedAt: new Date() };
+    if (payoutDate) updates.payoutDate = payoutDate;
 
-    if (error) return undefined;
-    return data as Payment;
+    const [payment] = await db
+      .update(payments)
+      .set(updates)
+      .where(eq(payments.id, id))
+      .returning();
+    return payment;
   }
 
   async getPaymentsByUser(userId: string): Promise<Payment[]> {
-    const { data, error } = await supabaseAdmin
-      .from('payments')
-      .select(`
-        *,
-        booking:bookings(user_id)
-      `)
-      .eq('booking.user_id', userId)
-      .order('created_at', { ascending: false });
+    const result = await db
+      .select()
+      .from(payments)
+      .leftJoin(bookings, eq(payments.bookingId, bookings.id))
+      .where(eq(bookings.userId, userId))
+      .orderBy(desc(payments.createdAt));
 
-    if (error) throw error;
-    return (data || []) as Payment[];
+    return result.map(row => row.payments);
   }
 
   async getEarnings(hostId: string): Promise<{
@@ -764,89 +812,192 @@ export class SupabaseStorage implements IStorage {
     pending: number;
     nextPayoutDate: Date | null;
   }> {
-    // Simplified earnings calculation
-    const { data, error } = await supabaseAdmin
-      .from('payments')
-      .select('host_payout, status, created_at')
-      .eq('booking.event.host_id', hostId);
+    const hostEvents = await db
+      .select({ id: events.id })
+      .from(events)
+      .where(eq(events.hostId, hostId));
 
-    if (error) throw error;
+    const eventIds = hostEvents.map(e => e.id);
 
-    const payments = data || [];
-    const total = payments.reduce((sum, p) => sum + (p.host_payout || 0), 0);
-    const thisMonth = payments
-      .filter(p => new Date(p.created_at).getMonth() === new Date().getMonth())
-      .reduce((sum, p) => sum + (p.host_payout || 0), 0);
-    const pending = payments
-      .filter(p => p.status === 'pending')
-      .reduce((sum, p) => sum + (p.host_payout || 0), 0);
+    if (eventIds.length === 0) {
+      return { total: 0, thisMonth: 0, pending: 0, nextPayoutDate: null };
+    }
 
-    return {
-      total,
-      thisMonth,
-      pending,
-      nextPayoutDate: null, // Simplified
-    };
+    const hostBookings = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(inArray(bookings.eventId, eventIds));
+
+    const bookingIds = hostBookings.map(b => b.id);
+
+    if (bookingIds.length === 0) {
+      return { total: 0, thisMonth: 0, pending: 0, nextPayoutDate: null };
+    }
+
+    const allPayments = await db
+      .select()
+      .from(payments)
+      .where(inArray(payments.bookingId, bookingIds));
+
+    const total = allPayments
+      .filter(p => p.status === "paid")
+      .reduce((sum, p) => sum + parseFloat(p.hostPayout || "0"), 0);
+
+    const thisMonth = allPayments
+      .filter(p => p.status === "paid" && p.createdAt && p.createdAt.getMonth() === new Date().getMonth())
+      .reduce((sum, p) => sum + parseFloat(p.hostPayout || "0"), 0);
+
+    const pending = allPayments
+      .filter(p => p.status === "escrowed")
+      .reduce((sum, p) => sum + parseFloat(p.hostPayout || "0"), 0);
+
+    const nextPayoutDate = allPayments
+      .filter(p => p.status === "escrowed")
+      .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0))[0]?.payoutDate || null;
+
+    return { total, thisMonth, pending, nextPayoutDate };
   }
 
   // Review operations
   async createReview(review: InsertReview): Promise<Review> {
-    const { data, error } = await supabaseAdmin
-      .from('reviews')
-      .insert(review)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Review;
+    const [newReview] = await db.insert(reviews).values(review).returning();
+    return newReview;
   }
 
   async getReviewsForUser(userId: string): Promise<Review[]> {
-    const { data, error } = await supabaseAdmin
-      .from('reviews')
-      .select('*')
-      .eq('reviewee_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return (data || []) as Review[];
+    return await db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.revieweeId, userId))
+      .orderBy(desc(reviews.createdAt));
   }
 
   async getUserRating(userId: string): Promise<number> {
-    const { data, error } = await supabaseAdmin
-      .from('reviews')
-      .select('rating')
-      .eq('reviewee_id', userId);
+    const userReviews = await db
+      .select({ rating: reviews.rating })
+      .from(reviews)
+      .where(eq(reviews.revieweeId, userId));
 
-    if (error || !data || data.length === 0) return 0;
+    if (userReviews.length === 0) return 0;
 
-    const sum = data.reduce((total, review) => total + review.rating, 0);
-    return sum / data.length;
+    const average = userReviews.reduce((sum, r) => sum + r.rating, 0) / userReviews.length;
+    return Math.round(average * 10) / 10; // Round to 1 decimal place
   }
 
-  // Sports settings operations
+  async markMessageAsRead(messageId: number, userId: string): Promise<boolean> {
+    try {
+      const message = await db
+        .select({ readBy: chatMessages.readBy })
+        .from(chatMessages)
+        .where(eq(chatMessages.id, messageId))
+        .limit(1);
+
+      if (message.length === 0) return false;
+
+      const currentReadBy = message[0].readBy || [];
+      if (!currentReadBy.includes(userId)) {
+        await db
+          .update(chatMessages)
+          .set({ readBy: [...currentReadBy, userId] })
+          .where(eq(chatMessages.id, messageId));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error marking message as read:", error);
+      return false;
+    }
+  }
+
+  async markAllMessagesAsRead(eventId: number, userId: string): Promise<boolean> {
+    try {
+      console.log(`Marking messages as read for event ${eventId}, user ${userId}`);
+      
+      const messages = await db
+        .select({ id: chatMessages.id, readBy: chatMessages.readBy })
+        .from(chatMessages)
+        .where(
+          and(
+            eq(chatMessages.eventId, eventId),
+            ne(chatMessages.senderId, userId) // Only mark messages from others as read
+          )
+        );
+
+      console.log(`Found ${messages.length} messages to mark as read`);
+
+      for (const message of messages) {
+        const currentReadBy = message.readBy || [];
+        if (!currentReadBy.includes(userId)) {
+          await db
+            .update(chatMessages)
+            .set({ readBy: [...currentReadBy, userId] })
+            .where(eq(chatMessages.id, message.id));
+          console.log(`Marked message ${message.id} as read by ${userId}`);
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error marking all messages as read:", error);
+      return false;
+    }
+  }
+
+  async deleteChatroom(eventId: number, userId: string): Promise<boolean> {
+    try {
+      // Verify user has access to this event (either host or participant)
+      const event = await db
+        .select({ hostId: events.hostId })
+        .from(events)
+        .where(eq(events.id, eventId))
+        .limit(1);
+
+      if (event.length === 0) return false;
+
+      const booking = await db
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(and(eq(bookings.eventId, eventId), eq(bookings.userId, userId)))
+        .limit(1);
+
+      if (event[0].hostId !== userId && booking.length === 0) {
+        return false; // User has no access to this event
+      }
+
+      // Delete all messages for this event
+      await db
+        .delete(chatMessages)
+        .where(eq(chatMessages.eventId, eventId));
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting chatroom:", error);
+      return false;
+    }
+  }
+
   async getSportsSettings(): Promise<Record<string, Record<string, string[]>>> {
-    const { data, error } = await supabaseAdmin
-      .from('sports_settings')
-      .select('*')
-      .order('display_order', { ascending: true });
+    const settings = await db
+      .select()
+      .from(sportsSettings)
+      .orderBy(asc(sportsSettings.sport), asc(sportsSettings.settingKey), asc(sportsSettings.displayOrder));
 
-    if (error) throw error;
+    const groupedSettings: Record<string, Record<string, string[]>> = {};
 
-    const settings: Record<string, Record<string, string[]>> = {};
-    
-    for (const setting of data || []) {
-      if (!settings[setting.sport]) {
-        settings[setting.sport] = {};
+    for (const setting of settings) {
+      if (!groupedSettings[setting.sport]) {
+        groupedSettings[setting.sport] = {};
       }
-      if (!settings[setting.sport][setting.setting_key]) {
-        settings[setting.sport][setting.setting_key] = [];
+      
+      if (!groupedSettings[setting.sport][setting.settingKey]) {
+        groupedSettings[setting.sport][setting.settingKey] = [];
       }
-      settings[setting.sport][setting.setting_key].push(setting.setting_value);
+      
+      groupedSettings[setting.sport][setting.settingKey].push(setting.settingValue);
     }
 
-    return settings;
+    return groupedSettings;
   }
 }
 
-export const storage = new SupabaseStorage();
+export const storage = new DatabaseStorage();

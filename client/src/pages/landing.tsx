@@ -1,14 +1,10 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Activity, Users, MapPin, MessageCircle, Shield, Star } from "lucide-react";
-import AuthModal from "@/components/auth/auth-modal";
 
 export default function Landing() {
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
   const handleLogin = () => {
-    setShowAuthModal(true);
+    window.location.href = "/api/login";
   };
 
   return (
@@ -212,12 +208,6 @@ export default function Landing() {
           </p>
         </div>
       </footer>
-      
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
-      />
     </div>
   );
 }

@@ -28,9 +28,9 @@ export default function BookingRequestsModal({ isOpen, onClose, eventId }: Booki
 
   // Approve booking mutation
   const approveBookingMutation = useMutation({
-    mutationFn: async (booking: BookingWithEventAndUser) => {
-      const response = await apiRequest('PATCH', `/api/events/${booking.eventId}/participants/${booking.userId}`, {
-        action: 'approve'
+    mutationFn: async (bookingId: number) => {
+      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, {
+        status: 'accepted'
       });
       return response;
     },
@@ -53,9 +53,9 @@ export default function BookingRequestsModal({ isOpen, onClose, eventId }: Booki
 
   // Reject booking mutation
   const rejectBookingMutation = useMutation({
-    mutationFn: async (booking: BookingWithEventAndUser) => {
-      const response = await apiRequest('PATCH', `/api/events/${booking.eventId}/participants/${booking.userId}`, {
-        action: 'reject'
+    mutationFn: async (bookingId: number) => {
+      const response = await apiRequest('PATCH', `/api/bookings/${bookingId}`, {
+        status: 'rejected'
       });
       return response;
     },
@@ -141,7 +141,7 @@ export default function BookingRequestsModal({ isOpen, onClose, eventId }: Booki
 
                 <div className="flex space-x-2">
                   <Button
-                    onClick={() => approveBookingMutation.mutate(booking)}
+                    onClick={() => approveBookingMutation.mutate(booking.id)}
                     disabled={approveBookingMutation.isPending}
                     className="flex-1 bg-green-600 hover:bg-green-700"
                   >
@@ -149,7 +149,7 @@ export default function BookingRequestsModal({ isOpen, onClose, eventId }: Booki
                     Approve
                   </Button>
                   <Button
-                    onClick={() => rejectBookingMutation.mutate(booking)}
+                    onClick={() => rejectBookingMutation.mutate(booking.id)}
                     disabled={rejectBookingMutation.isPending}
                     variant="destructive"
                     className="flex-1"

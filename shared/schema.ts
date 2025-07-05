@@ -32,7 +32,6 @@ export const users = pgTable("users", {
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
-  displayName: varchar("display_name"),
   profileImageUrl: varchar("profile_image_url"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
@@ -110,9 +109,6 @@ export const events = pgTable("events", {
   sportConfig: jsonb("sport_config").notNull(), // Sport-specific configuration
   status: eventStatusEnum("status").default("published"),
   notes: text("notes"),
-  requestedUsers: text("requested_users").array().default([]), // UUIDs of users who requested to join
-  acceptedUsers: text("accepted_users").array().default([]), // UUIDs of users who are accepted
-  rejectedUsers: text("rejected_users").array().default([]), // UUIDs of users who are rejected
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -129,31 +125,18 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Chats table - tracks conversations between users for specific events
-export const chats = pgTable("chats", {
-  id: serial("id").primaryKey(),
-  senderId: varchar("sender_id").notNull().references(() => users.id),
-  receiverId: varchar("receiver_id").notNull().references(() => users.id),
-  eventId: integer("event_id").notNull().references(() => events.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => [
-  index("idx_chats_participants").on(table.senderId, table.receiverId, table.eventId),
-  index("idx_chats_event").on(table.eventId),
-]);
-
-// Chat messages table - stores individual messages
+// Chat messages table
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
-  chatId: integer("chat_id").notNull().references(() => chats.id),
+  eventId: integer("event_id").notNull().references(() => events.id),
   senderId: varchar("sender_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  messageType: varchar("message_type", { length: 50 }).default("text"), // text, image, location
+  metadata: jsonb("metadata"), // For attachments, location data, etc.
+  readBy: jsonb("read_by").$type<string[]>().default([]), // Array of user IDs who have read this message
   createdAt: timestamp("created_at").defaultNow(),
-  readAt: timestamp("read_at"),
-}, (table) => [
-  index("idx_chat_messages_chat_time").on(table.chatId, table.createdAt),
-  index("idx_chat_messages_sender").on(table.senderId),
-]);
+});
 
 // Payment transactions table
 export const payments = pgTable("payments", {
@@ -203,8 +186,6 @@ export const sportsSettings = pgTable("sports_settings", {
 export const usersRelations = relations(users, ({ many }) => ({
   hostedEvents: many(events),
   bookings: many(bookings),
-  chatsAsSender: many(chats, { relationName: "sender" }),
-  chatsAsReceiver: many(chats, { relationName: "receiver" }),
   chatMessages: many(chatMessages),
   sportPreferences: many(userSportPreferences),
   reviewsGiven: many(reviews, { relationName: "reviewer" }),
@@ -217,26 +198,8 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     references: [users.id],
   }),
   bookings: many(bookings),
-  chats: many(chats),
+  chatMessages: many(chatMessages),
   reviews: many(reviews),
-}));
-
-export const chatsRelations = relations(chats, ({ one, many }) => ({
-  sender: one(users, {
-    fields: [chats.senderId],
-    references: [users.id],
-    relationName: "sender",
-  }),
-  receiver: one(users, {
-    fields: [chats.receiverId],
-    references: [users.id],
-    relationName: "receiver",
-  }),
-  event: one(events, {
-    fields: [chats.eventId],
-    references: [events.id],
-  }),
-  messages: many(chatMessages),
 }));
 
 export const bookingsRelations = relations(bookings, ({ one, many }) => ({
@@ -252,9 +215,9 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
-  chat: one(chats, {
-    fields: [chatMessages.chatId],
-    references: [chats.id],
+  event: one(events, {
+    fields: [chatMessages.eventId],
+    references: [events.id],
   }),
   sender: one(users, {
     fields: [chatMessages.senderId],
@@ -302,28 +265,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const insertEventSchema = createInsertSchema(events).omit({
   id: true,
   currentPlayers: true,
-  requestedUsers: true,
-  acceptedUsers: true,
-  rejectedUsers: true,
   createdAt: true,
   updatedAt: true,
-}).extend({
-  pricePerPerson: z.coerce.number().min(0).max(999.99).refine(
-    (val) => {
-      // Ensure the number has at most 2 decimal places
-      return Number.isInteger(val * 100);
-    },
-    { message: "Price must have at most 2 decimal places" }
-  ),
 });
 
 export const insertBookingSchema = createInsertSchema(bookings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertChatSchema = createInsertSchema(chats).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -357,8 +303,6 @@ export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
-export type InsertChat = z.infer<typeof insertChatSchema>;
-export type Chat = typeof chats.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 

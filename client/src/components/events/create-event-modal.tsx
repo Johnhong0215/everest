@@ -31,10 +31,7 @@ const createEventFormSchema = insertEventSchema.omit({
   startTime: z.string(),
   endTime: z.string(),
   maxPlayers: z.coerce.number().min(2).max(22),
-  pricePerPerson: z.coerce.number().min(0).max(999.99).refine(
-    (val) => Number.isInteger(val * 100),
-    { message: "Price must have at most 2 decimal places" }
-  ),
+  pricePerPerson: z.string().min(1),
   title: z.string().min(1, "Title is required"),
   location: z.string().min(1, "Location is required"),
 });
@@ -93,7 +90,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
       endTime: toLocalDateTimeString(addOneHourWithDayRollover(getMinimumStartTime())),
       location: '',
       maxPlayers: 4,
-      pricePerPerson: 12.00,
+      pricePerPerson: '12.00',
       sportConfig: {},
     },
   });
@@ -333,7 +330,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
         <Form {...form}>
           <form 
-            onSubmit={form.handleSubmit(onSubmit as any, (errors) => {
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
               console.log('Form validation failed:', errors);
               toast({
                 title: "Form Error",
@@ -375,7 +372,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
             {/* Event Title */}
             <FormField
-              control={form.control as any}
+              control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
@@ -441,7 +438,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField
-                  control={form.control as any}
+                  control={form.control}
                   name="startTime"
                   render={({ field }) => (
                     <FormItem>
@@ -507,7 +504,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                   )}
                 />
                 <FormField
-                  control={form.control as any}
+                  control={form.control}
                   name="endTime"
                   render={({ field }) => (
                     <FormItem>
@@ -601,7 +598,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
             {/* Location */}
             <FormField
-              control={form.control as any}
+              control={form.control}
               name="location"
               render={({ field }) => (
                 <FormItem>
@@ -622,7 +619,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
             {/* Players & Settings */}
             <div className="grid grid-cols-3 gap-4">
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="maxPlayers"
                 render={({ field }) => (
                   <FormItem>
@@ -641,7 +638,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 )}
               />
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="skillLevel"
                 render={({ field }) => (
                   <FormItem>
@@ -665,7 +662,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
                 )}
               />
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="genderMix"
                 render={({ field }) => (
                   <FormItem>
@@ -692,7 +689,7 @@ export default function CreateEventModal({ isOpen, onClose }: CreateEventModalPr
 
             {/* Cost */}
             <FormField
-              control={form.control as any}
+              control={form.control}
               name="pricePerPerson"
               render={({ field }) => (
                 <FormItem>

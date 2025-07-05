@@ -371,13 +371,18 @@ export default function EventGrid({
     staleTime: 30000, // 30 seconds
   });
 
-  // Filter out events that have already started (by exact time)
+  // Filter out outdated events (events from previous days, but keep all events for today)
   const filteredEvents = rawEvents.filter(event => {
-    const eventStartTime = new Date(event.startTime);
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const eventDate = new Date(event.startTime);
     const now = new Date();
     
-    // Only show events that haven't started yet
-    return eventStartTime > now;
+    // Get date strings in user's timezone
+    const eventDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(eventDate);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(now);
+    
+    // Show events that are today or in the future (by date, not time)
+    return eventDateStr >= todayStr;
   });
 
   // Sort events by date first, then by distance within each date
@@ -429,13 +434,6 @@ export default function EventGrid({
     events.forEach(event => {
       // Convert event UTC timestamp to user's timezone date
       const eventDate = new Date(event.startTime);
-      
-      // Check if date is valid
-      if (isNaN(eventDate.getTime())) {
-        console.error('Invalid date for event:', event.id, 'startTime:', event.startTime);
-        return; // Skip this event if date is invalid
-      }
-      
       const eventDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(eventDate);
       
       let groupKey: string;
@@ -480,7 +478,10 @@ export default function EventGrid({
   // Create booking mutation
   const createBookingMutation = useMutation({
     mutationFn: async (eventId: number) => {
-      const response = await apiRequest('POST', `/api/events/${eventId}/join`, {});
+      const response = await apiRequest('POST', '/api/bookings', {
+        eventId
+        // Status will be set to 'requested' automatically by the server
+      });
       return response;
     },
     onSuccess: () => {
