@@ -270,7 +270,7 @@ export default function EventGrid({
         setLocationPermission('granted');
         setLocationLoading(false);
         
-
+        console.log('User location state updated:', location);
         
         // Save to localStorage for persistence
         try {
