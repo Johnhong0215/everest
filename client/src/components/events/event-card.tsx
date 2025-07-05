@@ -49,8 +49,7 @@ export default function EventCard({ event, onJoin, onOpenChat, onCancel, onModif
     ? calculateDistance(userLocation.lat, userLocation.lng, parseFloat(event.latitude), parseFloat(event.longitude))
     : null;
 
-  // Debug: log current state for troubleshooting
-  console.log(`Event ${event.id}: userLocation=${!!userLocation}, coords=${event.latitude},${event.longitude}, distance=${distance}`);
+
 
   return (
     <Card className={`card-hover border ${
